@@ -1,0 +1,118 @@
+import { useState } from 'react';
+import Layout from '@/components/Layout';
+import { useTickets, useUpdateTicket } from '@/hooks/useTickets';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { Search } from 'lucide-react';
+import { type TicketStage } from '@/types/database';
+import { WarehouseTable } from './WarehouseTable';
+
+export default function Warehouse() {
+  const [tab, setTab] = useState('pending');
+  const [search, setSearch] = useState('');
+  const { toast } = useToast();
+  const updateTicket = useUpdateTicket();
+
+  const stageFilters: Record<string, TicketStage[]> = {
+    pending: ['LODGED', 'WAREHOUSE_PENDING'],
+    approved: ['WAREHOUSE_APPROVED'],
+    completed: ['EXCHANGE_COMPLETED', 'INVOICING_PENDING', 'INVOICED', 'CLOSED'],
+    denied: ['WAREHOUSE_DENIED'],
+  };
+
+  const { data: tickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
+
+  const handleReceive = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'WAREHOUSE_PENDING',
+      status: 'IN_PROCESS',
+      warehouse_received_at: new Date().toISOString(),
+      assigned_team: 'warehouse',
+      eventType: 'RECEIVED',
+    });
+    toast({ title: 'Received', description: 'Items received at warehouse' });
+  };
+
+  const handleApprove = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'WAREHOUSE_APPROVED',
+      warehouse_approved_at: new Date().toISOString(),
+      eventType: 'APPROVED',
+    });
+    toast({ title: 'Approved', description: 'Return approved' });
+  };
+
+  const handleDeny = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'WAREHOUSE_DENIED',
+      status: 'DENIED',
+      warehouse_denied_at: new Date().toISOString(),
+      eventType: 'DENIED',
+    });
+    toast({ title: 'Denied', description: 'Return denied' });
+  };
+
+  const handleExchangeComplete = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'EXCHANGE_COMPLETED',
+      exchange_completed_at: new Date().toISOString(),
+      eventType: 'EXCHANGE_DONE',
+    });
+    toast({ title: 'Completed', description: 'Exchange completed successfully' });
+  };
+
+  const handleSendToInvoicing = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'INVOICING_PENDING',
+      sent_to_invoicing_at: new Date().toISOString(),
+      assigned_team: 'invoicing',
+      eventType: 'SENT_TO_INVOICE',
+    });
+    toast({ title: 'Sent to Invoicing', description: 'Exchange sent to invoicing team' });
+  };
+
+  return (
+    <Layout>
+      <div className="p-8 animate-fade-in">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Warehouse Processing</h1>
+          <p className="text-muted-foreground">Process returns and exchanges</p>
+        </div>
+
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+          </div>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="denied">Denied</TabsTrigger>
+          </TabsList>
+          <TabsContent value={tab} className="mt-6">
+            <WarehouseTable
+              tickets={tickets}
+              isLoading={isLoading}
+              onReceive={handleReceive}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+              onExchangeComplete={handleExchangeComplete}
+              onSendToInvoicing={handleSendToInvoicing}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
+  );
+}
