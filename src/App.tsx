@@ -5,18 +5,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserProvider, useUser, type UserRole } from "@/contexts/UserContext";
-import Dashboard from "./pages/Dashboard";
-import ExchangeLodging from "./pages/ExchangeLodging";
-import Warehouse from "./pages/Warehouse";
-import Invoicing from "./pages/Invoicing";
-import TicketDetail from "./pages/TicketDetail";
-import NotFound from "./pages/NotFound";
+import Layout from '@/components/Layout';
+import Dashboard from '@/pages/Dashboard';
+import ExchangeLodging from '@/pages/ExchangeLodging';
+import Warehouse from '@/pages/Warehouse';
+import Invoicing from '@/pages/Invoicing';
+import TicketDetail from '@/pages/TicketDetail';
+import Login from '@/pages/Login';
+import Users from '@/pages/Users';
+import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
 
 // Define role-based access to pages
 const roleAccess: Record<UserRole, string[]> = {
-  admin: ['/', '/dashboard', '/exchange-lodging', '/warehouse', '/invoicing', '/ticket'],
+  admin: ['/', '/dashboard', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
   support: ['/', '/dashboard', '/exchange-lodging', '/ticket'],
   warehouse: ['/', '/dashboard', '/warehouse'],
   accounts: ['/', '/dashboard', '/invoicing'],
@@ -29,7 +32,20 @@ function ProtectedRoute({
   children: React.ReactNode
   requiredPaths: string[]
 }) {
-  const { user } = useUser();
+  const { user, isLoading } = useUser();
+  
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   const userPaths = roleAccess[user.role];
   
   // Check if user has access to any of the required paths
@@ -56,6 +72,24 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppContent() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -65,10 +99,19 @@ function AppContent() {
             <Toaster />
             <Sonner />
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/login" element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              } />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route 
                 path="/dashboard" 
-                element={<Dashboard />} 
+                element={
+                  <ProtectedRoute requiredPaths={['/dashboard']}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
               />
               <Route 
                 path="/exchange-lodging" 
@@ -91,6 +134,14 @@ function AppContent() {
                 element={
                   <ProtectedRoute requiredPaths={['/invoicing']}>
                     <Invoicing />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/users" 
+                element={
+                  <ProtectedRoute requiredPaths={['/users']}>
+                    <Users />
                   </ProtectedRoute>
                 } 
               />

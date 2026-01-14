@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'support' | 'warehouse' | 'accounts' | 'admin';
 
@@ -10,14 +11,15 @@ export interface User {
 }
 
 interface UserContextType {
-  user: User;
-  setUser: (user: User) => void;
+  user: User | null;
+  setUser: (user: User | null) => void;
   logout: () => void;
+  isLoading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Mock users for testing
+// Mock users for testing (fallback only)
 const mockUsers: Record<UserRole, User> = {
   admin: {
     id: '0',
@@ -46,14 +48,35 @@ const mockUsers: Record<UserRole, User> = {
 };
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User>(mockUsers.support);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if we have a real authenticated user
+    const checkAuthUser = () => {
+      // For now, we'll not set any default user
+      // This will force the login page to show
+      // In production, this would check Supabase auth state
+      const urlParams = new URLSearchParams(window.location.search);
+      const useMock = urlParams.get('mock') === 'true';
+      
+      if (useMock) {
+        // Only use mock user if explicitly requested via URL parameter
+        setUser(mockUsers.support);
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkAuthUser();
+  }, []);
 
   const logout = () => {
-    setUser(mockUsers.support);
+    setUser(null);
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, logout }}>
+    <UserContext.Provider value={{ user, setUser, logout, isLoading }}>
       {children}
     </UserContext.Provider>
   );

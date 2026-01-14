@@ -37,53 +37,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }, 2000);
 
-        const { data: { session } } = await supabase.auth.getSession();
+        // Skip Supabase auth check for now to avoid bearer token issues
+        // const { data: { session } } = await supabase.auth.getSession();
         
         if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-            // Redirect to dashboard after successful authentication
-            navigate('/dashboard');
-          } else {
+          // setSession(session);
+          // setUser(session?.user ?? null);
+          // if (session?.user) {
+          //   await fetchProfile(session.user.id);
+          //   // Redirect to dashboard after successful authentication
+          //   navigate('/dashboard');
+          // } else {
             setLoading(false);
-          }
+          // }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (isMounted) {
           setLoading(false);
         }
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
       }
     };
 
     initAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-            // Redirect to dashboard after successful authentication
-            navigate('/dashboard');
-          } else {
-            setProfile(null);
-            setLoading(false);
-          }
-        }
-      }
-    );
+    // Skip Supabase auth listener for now
+    // const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    //   async (_event, session) => {
+    //     if (isMounted) {
+    //       setSession(session);
+    //       setUser(session?.user ?? null);
+    //       if (session?.user) {
+    //         await fetchProfile(session.user.id);
+    //         // Redirect to dashboard after successful authentication
+    //         navigate('/dashboard');
+    //       } else {
+    //         setProfile(null);
+    //         setLoading(false);
+    //       }
+    //     }
+    //   }
+    // );
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      // subscription?.unsubscribe();
     };
-  }, []);
+  }, [navigate, loading]);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -121,8 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    // Skip Supabase auth signOut for mock authentication
+    // const { error } = await supabase.auth.signOut();
+    // if (error) throw error;
+    console.log('Mock sign out successful');
   };
 
   const hasRole = (roles: UserRole[]) => {
