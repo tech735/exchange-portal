@@ -47,9 +47,9 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Items per page:</span>
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">Items per page:</span>
         <Select value={itemsPerPage.toString()} onValueChange={(value) => onItemsPerPageChange(Number(value))}>
           <SelectTrigger className="w-20">
             <SelectValue />
@@ -63,15 +63,16 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
         </Select>
       </div>
       
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 w-full sm:w-auto">
         <Button
           variant="outline"
           size="sm"
           onClick={exportToCSV}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 w-full sm:w-auto"
         >
           <Download className="h-4 w-4" />
-          Export CSV
+          <span className="hidden sm:inline">Export CSV</span>
+          <span className="sm:hidden">Export</span>
         </Button>
       </div>
 
@@ -91,6 +92,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
               variant="ghost"
               size="sm"
               onClick={() => onPageChange(1)}
+              className="hidden xs:inline"
             >
               1
             </Button>
@@ -102,6 +104,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
               variant={currentPage === page ? "default" : "ghost"}
               size="sm"
               onClick={() => onPageChange(page)}
+              className="text-xs sm:text-sm"
             >
               {page}
             </Button>
@@ -112,6 +115,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
               variant="ghost"
               size="sm"
               onClick={() => onPageChange(totalPages)}
+              className="hidden xs:inline"
             >
               {totalPages}
             </Button>
@@ -203,7 +207,7 @@ export function DataTable({
           </div>
         )}
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -220,14 +224,15 @@ export function DataTable({
               size="sm"
               onClick={() => setShowExportDialog(true)}
               disabled={selectedRows.length === 0}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto"
             >
               <Download className="h-4 w-4" />
-              Export Selected ({selectedRows.length})
+              <span className="hidden sm:inline">Export Selected ({selectedRows.length})</span>
+              <span className="sm:hidden">Export ({selectedRows.length})</span>
             </Button>
           </div>
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="w-12 py-3 px-4 font-medium">
@@ -239,7 +244,7 @@ export function DataTable({
                     />
                   </th>
                   {columns.map((column) => (
-                    <th key={column.key} className="text-left py-3 px-4 font-medium">
+                    <th key={column.key} className="text-left py-3 px-2 sm:px-4 font-medium whitespace-nowrap">
                       {column.label}
                     </th>
                   ))}
@@ -264,7 +269,7 @@ export function DataTable({
                         />
                       </td>
                       {columns.map((column) => (
-                        <td key={column.key} className="py-3 px-4">
+                        <td key={column.key} className="py-3 px-2 sm:px-4 whitespace-nowrap">
                           {column.render ? column.render(row[column.key], row) : row[column.key]}
                         </td>
                       ))}

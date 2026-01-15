@@ -11,7 +11,6 @@ import { useCreateTicket } from '@/hooks/useTickets';
 import { useProducts } from '@/hooks/useProducts';
 import { ItemSelector } from './ItemSelector';
 
-// Mock products for testing
 const MOCK_PRODUCTS = [
   { id: '1', sku: 'SHIRT-WHT-001', product_name: 'White School Shirt', variants: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
   { id: '2', sku: 'PANT-NVY-001', product_name: 'Navy Blue Trousers', variants: ['24', '26', '28', '30', '32', '34', '36'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
@@ -23,6 +22,12 @@ const MOCK_PRODUCTS = [
   { id: '8', sku: 'BELT-BLK-001', product_name: 'Black Leather Belt', variants: ['S', 'M', 'L', 'XL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
   { id: '9', sku: 'BAG-NVY-001', product_name: 'Navy School Backpack', variants: ['Standard'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
   { id: '10', sku: 'SPORT-WHT-001', product_name: 'White Sports T-Shirt', variants: ['XS', 'S', 'M', 'L', 'XL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
+];
+
+// Mock schools for dropdown
+const MOCK_SCHOOLS = [
+  { id: '1', name: 'Shiv Nadar School', type: 'regular' },
+  { id: '2', name: 'The Knowledge Habitat School', type: 'regular' },
 ];
 
 interface ExchangeFormProps {
@@ -37,6 +42,7 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
     student_name: '',
     student_grade: '',
     student_section: '',
+    school_name: '',
     reason_code: '' as ReasonCode,
     reason_notes: '',
     notes: '',
@@ -45,14 +51,19 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
   const [exchangeItems, setExchangeItems] = useState<TicketItem[]>([]);
   const [returnSearch, setReturnSearch] = useState('');
   const [exchangeSearch, setExchangeSearch] = useState('');
-  // Fetch all products by not providing search parameter
-  const { data: allProducts, isLoading: productsLoading } = useProducts();
+  // Fetch products with search for return items
+  const { data: returnProducts, isLoading: returnProductsLoading } = useProducts(returnSearch);
+  // Fetch products with search for exchange items
+  const { data: exchangeProducts, isLoading: exchangeProductsLoading } = useProducts(exchangeSearch);
   const createTicket = useCreateTicket();
   const { toast } = useToast();
 
   // Use fetched products or fallback to mock products for testing
-  const products = Array.isArray(allProducts) && allProducts.length > 0 
-    ? allProducts 
+  const returnProductsList = Array.isArray(returnProducts) && returnProducts.length > 0 
+    ? returnProducts 
+    : MOCK_PRODUCTS;
+  const exchangeProductsList = Array.isArray(exchangeProducts) && exchangeProducts.length > 0 
+    ? exchangeProducts 
     : MOCK_PRODUCTS;
 
   const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string }, size: string, qty: number) => {
@@ -97,7 +108,7 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Order ID *</Label>
           <Input value={formData.order_id} onChange={(e) => setFormData({ ...formData, order_id: e.target.value })} required />
@@ -111,10 +122,26 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
         <Label>Customer Name *</Label>
         <Input value={formData.customer_name} onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })} required />
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="space-y-2"><Label>Student Name</Label><Input value={formData.student_name} onChange={(e) => setFormData({ ...formData, student_name: e.target.value })} /></div>
         <div className="space-y-2"><Label>Grade</Label><Input value={formData.student_grade} onChange={(e) => setFormData({ ...formData, student_grade: e.target.value })} /></div>
         <div className="space-y-2"><Label>Section</Label><Input value={formData.student_section} onChange={(e) => setFormData({ ...formData, student_section: e.target.value })} /></div>
+      </div>
+      <div className="space-y-2">
+        <Label>School *</Label>
+        <Select value={formData.school_name} onValueChange={(v) => setFormData({ ...formData, school_name: v })}>
+          <SelectTrigger><SelectValue placeholder="Select school" /></SelectTrigger>
+          <SelectContent>
+            {MOCK_SCHOOLS.map((school) => (
+              <SelectItem key={school.id} value={school.name}>
+                {school.name}
+                {school.type === 'knowledge' && (
+                  <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Knowledge</span>
+                )}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <Label>Reason for Exchange *</Label>
@@ -125,8 +152,8 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       </div>
       <div className="space-y-2"><Label>Reason Notes</Label><Textarea value={formData.reason_notes} onChange={(e) => setFormData({ ...formData, reason_notes: e.target.value })} /></div>
 
-      <ItemSelector title="Return Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} products={products} search={returnSearch} onSearch={setReturnSearch} />
-      <ItemSelector title="Exchange Items" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} products={products} search={exchangeSearch} onSearch={setExchangeSearch} />
+      <ItemSelector title="Return Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} products={returnProductsList} search={returnSearch} onSearch={setReturnSearch} />
+      <ItemSelector title="Exchange Items" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} products={exchangeProductsList} search={exchangeSearch} onSearch={setExchangeSearch} />
 
       <div className="space-y-2"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
       <Button type="submit" className="w-full" disabled={createTicket.isPending}>{createTicket.isPending ? 'Creating...' : 'Create Exchange Ticket'}</Button>

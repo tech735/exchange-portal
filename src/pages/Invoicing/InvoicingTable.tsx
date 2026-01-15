@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
+import { DataTable, type DataTableProps, Pagination } from '@/components/ui/DataTable';
 import { AlertTriangle, CheckCircle, Clock, IndianRupee } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { STAGE_LABELS, type Ticket } from '@/types/database';
@@ -122,51 +122,13 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose }: I
         console.log('Selected invoicing tickets:', selectedRows);
       }}
     >
-      <div className="flex items-center justify-between px-4 py-3 border-t">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Items per page:</span>
-          <select 
-            value={itemsPerPage} 
-            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="w-20 px-2 py-1 border rounded text-sm"
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
-            </svg>
-          </Button>
-          
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Button>
-        </div>
-      </div>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={setItemsPerPage}
+      />
     </DataTable>
   );
 }

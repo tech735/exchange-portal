@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserSelector } from '@/components/UserSelector';
 
@@ -26,6 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { user, logout, hasFullAccess } = useUser();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Filter navigation items based on user role or full access
   const navItems = allNavItems.filter(item => {
@@ -51,8 +53,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-        <div className="p-6 border-b border-sidebar-border">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/src/assets/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-10 h-10" />
             <div>
@@ -60,6 +74,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-sidebar-foreground/60">Manage Returns</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
         
         {hasFullAccess() && (
@@ -97,7 +119,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">{children}</main>
+      
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-background border-b border-border">
+        <div className="flex items-center justify-between p-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src="/src/assets/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-8 h-8" />
+            <span className="font-semibold text-sm">Exchange Portal</span>
+          </div>
+          <div className="w-8" /> {/* Spacer for centering */}
+        </div>
+      </div>
+      
+      <main className="flex-1 overflow-auto lg:pt-0 pt-16">{children}</main>
     </div>
   );
 }

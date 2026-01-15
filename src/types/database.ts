@@ -57,6 +57,7 @@ export interface Ticket {
   student_name: string | null;
   student_grade: string | null;
   student_section: string | null;
+  school_name: string | null;
   reason_code: ReasonCode;
   reason_notes: string | null;
   stage: TicketStage;

@@ -13,7 +13,8 @@ export function useProducts(search?: string) {
         .order('product_name');
 
       if (search) {
-        query = query.or(`sku.ilike.%${search}%,product_name.ilike.%${search}%`);
+        const searchLower = search.toLowerCase();
+        query = query.or(`sku.ilike.%${search}%,product_name.ilike.%${search}%,school_tags.cs.{${searchLower}}`);
       }
 
       const { data, error } = await query;
