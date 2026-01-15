@@ -51,14 +51,14 @@ CREATE TRIGGER update_product_catalog_updated_at
 
 -- Insert sample products (you can replace these with your actual data)
 INSERT INTO public.product_catalog (sku, product_name, product_description, category, variants, school_tags, price) VALUES
-  ('SHIRT-WHT-001', 'White School Shirt', 'Classic white school shirt with school logo', 'Uniforms', '["XS", "S", "M", "L", "XL", "XXL"]', ARRAY['All Schools'], 25.99),
-  ('SKIRT-NVY-001', 'Navy Blue Skirt', 'Navy blue school skirt with adjustable waist', 'Uniforms', '["XS", "S", "M", "L", "XL"]', ARRAY['All Schools'], 35.99),
-  ('PANT-NVY-001', 'Navy Blue Trousers', 'Navy blue school trousers', 'Uniforms', '["24", "26", "28", "30", "32", "34", "36"]', ARRAY['All Schools'], 45.99),
-  ('BLZR-NVY-001', 'Navy Blue Blazer', 'Navy blue blazer with school emblem', 'Uniforms', '["XS", "S", "M", "L", "XL", "XXL"]', ARRAY['All Schools'], 89.99),
-  ('SHOE-BLK-001', 'Black School Shoes', 'Formal black school shoes', 'Footwear', '["3", "4", "5", "6", "7", "8", "9", "10"]', ARRAY['All Schools'], 55.99),
-  ('SOCK-WHT-001', 'White School Socks', 'Pack of 3 white school socks', 'Accessories', '["S", "M", "L"]', ARRAY['All Schools'], 12.99),
-  ('TIE-STR-001', 'Striped School Tie', 'School striped tie', 'Accessories', '["Standard"]', ARRAY['All Schools'], 15.99),
-  ('BELT-BLK-001', 'Black Leather Belt', 'Black leather school belt', 'Accessories', '["S", "M", "L", "XL"]', ARRAY['All Schools'], 18.99),
-  ('BAG-NVY-001', 'Navy School Backpack', 'Navy blue school backpack', 'Bags', '["Standard"]', ARRAY['All Schools'], 42.99),
-  ('SPORT-WHT-001', 'White Sports T-Shirt', 'White sports t-shirt for PE', 'Sports', '["XS", "S", "M", "L", "XL"]', ARRAY['All Schools'], 22.99)
+  ('SHIRT-WHT-001', 'White School Shirt', 'Classic white school shirt with school logo', 'Uniforms', '["XS", "S", "M", "L", "XL", "XXL"]', ARRAY['All Schools', 'SNS', 'TKHS'], 25.99),
+  ('SKIRT-NVY-001', 'Navy Blue Skirt', 'Navy blue school skirt with adjustable waist', 'Uniforms', '["XS", "S", "M", "L", "XL"]', ARRAY['All Schools', 'SNS', 'TKHS'], 35.99),
+  ('PANT-NVY-001', 'Navy Blue Trousers', 'Navy blue school trousers', 'Uniforms', '["24", "26", "28", "30", "32", "34", "36"]', ARRAY['All Schools', 'SNS', 'TKHS'], 45.99),
+  ('BLZR-NVY-001', 'Navy Blue Blazer', 'Navy blue blazer with school emblem', 'Uniforms', '["XS", "S", "M", "L", "XL", "XXL"]', ARRAY['All Schools', 'SNS', 'TKHS'], 89.99),
+  ('SHOE-BLK-001', 'Black School Shoes', 'Formal black school shoes', 'Footwear', '["3", "4", "5", "6", "7", "8", "9", "10"]', ARRAY['All Schools', 'SNS', 'TKHS'], 55.99),
+  ('SOCK-WHT-001', 'White School Socks', 'Pack of 3 white school socks', 'Accessories', '["S", "M", "L"]', ARRAY['All Schools', 'SNS', 'TKHS'], 12.99),
+  ('TIE-STR-001', 'Striped School Tie', 'School striped tie', 'Accessories', '["Standard"]', ARRAY['All Schools', 'SNS', 'TKHS'], 15.99),
+  ('BELT-BLK-001', 'Black Leather Belt', 'Black leather school belt', 'Accessories', '["S", "M", "L", "XL"]', ARRAY['All Schools', 'SNS', 'TKHS'], 18.99),
+  ('BAG-NVY-001', 'Navy School Backpack', 'Navy blue school backpack', 'Bags', '["Standard"]', ARRAY['All Schools', 'SNS', 'TKHS'], 42.99),
+  ('SPORT-WHT-001', 'White Sports T-Shirt', 'White sports t-shirt for PE', 'Sports', '["XS", "S", "M", "L", "XL"]', ARRAY['All Schools', 'SNS', 'TKHS'], 22.99)
 ON CONFLICT (sku) DO NOTHING;

@@ -122,7 +122,7 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
                     </div>
                   </div>
                   <div className="text-sm font-medium text-red-600">
-                    -₹{(productPrices?.[item.sku] || 1000 * item.qty).toLocaleString()}
+                    -₹{((productPrices?.[item.sku] || 1000) * item.qty).toLocaleString()}
                   </div>
                 </div>
               ))}
@@ -149,7 +149,7 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
                     </div>
                   </div>
                   <div className="text-sm font-medium text-green-600">
-                    +₹{(productPrices?.[item.sku] || 1000 * item.qty).toLocaleString()}
+                    +₹{((productPrices?.[item.sku] || 1000) * item.qty).toLocaleString()}
                   </div>
                 </div>
               ))}

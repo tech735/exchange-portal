@@ -8,21 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Trash2 } from 'lucide-react';
 import { REASON_LABELS, type ReasonCode, type TicketItem } from '@/types/database';
 import { useCreateTicket } from '@/hooks/useTickets';
-import { useProducts } from '@/hooks/useProducts';
 import { ItemSelector } from './ItemSelector';
-
-const MOCK_PRODUCTS = [
-  { id: '1', sku: 'SHIRT-WHT-001', product_name: 'White School Shirt', variants: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '2', sku: 'PANT-NVY-001', product_name: 'Navy Blue Trousers', variants: ['24', '26', '28', '30', '32', '34', '36'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '3', sku: 'SKIRT-NVY-001', product_name: 'Navy Blue Skirt', variants: ['XS', 'S', 'M', 'L', 'XL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '4', sku: 'BLZR-NVY-001', product_name: 'Navy Blue Blazer', variants: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '5', sku: 'SHOE-BLK-001', product_name: 'Black School Shoes', variants: ['3', '4', '5', '6', '7', '8', '9', '10'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '6', sku: 'SOCK-WHT-001', product_name: 'White School Socks (Pack of 3)', variants: ['S', 'M', 'L'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '7', sku: 'TIE-STR-001', product_name: 'Striped School Tie', variants: ['Standard'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '8', sku: 'BELT-BLK-001', product_name: 'Black Leather Belt', variants: ['S', 'M', 'L', 'XL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '9', sku: 'BAG-NVY-001', product_name: 'Navy School Backpack', variants: ['Standard'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-  { id: '10', sku: 'SPORT-WHT-001', product_name: 'White Sports T-Shirt', variants: ['XS', 'S', 'M', 'L', 'XL'], school_tags: ['All Schools'], active: true, created_at: new Date().toISOString() },
-];
 
 // Mock schools for dropdown
 const MOCK_SCHOOLS = [
@@ -49,22 +35,8 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
   });
   const [returnItems, setReturnItems] = useState<TicketItem[]>([]);
   const [exchangeItems, setExchangeItems] = useState<TicketItem[]>([]);
-  const [returnSearch, setReturnSearch] = useState('');
-  const [exchangeSearch, setExchangeSearch] = useState('');
-  // Fetch products with search for return items
-  const { data: returnProducts, isLoading: returnProductsLoading } = useProducts(returnSearch);
-  // Fetch products with search for exchange items
-  const { data: exchangeProducts, isLoading: exchangeProductsLoading } = useProducts(exchangeSearch);
   const createTicket = useCreateTicket();
   const { toast } = useToast();
-
-  // Use fetched products or fallback to mock products for testing
-  const returnProductsList = Array.isArray(returnProducts) && returnProducts.length > 0 
-    ? returnProducts 
-    : MOCK_PRODUCTS;
-  const exchangeProductsList = Array.isArray(exchangeProducts) && exchangeProducts.length > 0 
-    ? exchangeProducts 
-    : MOCK_PRODUCTS;
 
   const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string }, size: string, qty: number) => {
     const item: TicketItem = { sku: product.sku, product_name: product.product_name, size, qty };
@@ -152,8 +124,8 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       </div>
       <div className="space-y-2"><Label>Reason Notes</Label><Textarea value={formData.reason_notes} onChange={(e) => setFormData({ ...formData, reason_notes: e.target.value })} /></div>
 
-      <ItemSelector title="Return Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} products={returnProductsList} search={returnSearch} onSearch={setReturnSearch} />
-      <ItemSelector title="Exchange Items" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} products={exchangeProductsList} search={exchangeSearch} onSearch={setExchangeSearch} />
+      <ItemSelector title="Return Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} />
+      <ItemSelector title="Exchange Items" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} />
 
       <div className="space-y-2"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
       <Button type="submit" className="w-full" disabled={createTicket.isPending}>{createTicket.isPending ? 'Creating...' : 'Create Exchange Ticket'}</Button>

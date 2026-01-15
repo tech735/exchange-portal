@@ -2,17 +2,16 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Trash2, ChevronDown, Search, Tag } from 'lucide-react';
+import { Trash2, Search, Tag } from 'lucide-react';
 import { type TicketItem } from '@/types/database';
+import { useProducts } from '@/hooks/useProducts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ItemSelectorProps {
   title: string;
   items: TicketItem[];
   onRemove: (index: number) => void;
   onAdd: (product: { sku: string; product_name: string; variants: string[]; school_tags?: string[] }, size: string, qty: number) => void;
-  products: { sku: string; product_name: string; variants: string[]; school_tags?: string[] }[];
-  search: string;
-  onSearch: (search: string) => void;
 }
 
 export function ItemSelector({
@@ -20,25 +19,29 @@ export function ItemSelector({
   items,
   onRemove,
   onAdd,
-  products,
-  search,
-  onSearch,
 }: ItemSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<{ sku: string; product_name: string; variants: string[] } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{ sku: string; product_name: string; variants: string[]; school_tags?: string[] } | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('1');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Use products hook to get all products
+  const { data: products } = useProducts();
 
-  // Validate products array
+  // Validate products array and filter by search term
   const validProducts = Array.isArray(products) ? products : [];
-
-  const handleSelectProduct = (product: { sku: string; product_name: string; variants: string[] }) => {
-    setSelectedProduct(product);
-    setSelectedSize(null);
-    setQuantity('1');
-    setIsOpen(false);
-    onSearch('');
-  };
+  const filteredProducts = validProducts.filter(product => {
+    if (!searchTerm.trim()) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      product.sku.toLowerCase().includes(searchLower) ||
+      product.product_name.toLowerCase().includes(searchLower) ||
+      (product.school_tags && product.school_tags.some(tag => 
+        tag.toLowerCase().includes(searchLower)
+      ))
+    );
+  });
 
   const handleAddItem = () => {
     if (selectedProduct && selectedSize && quantity) {
@@ -47,12 +50,27 @@ export function ItemSelector({
       setSelectedProduct(null);
       setSelectedSize(null);
       setQuantity('1');
+      setSearchTerm('');
     }
   };
 
-  const displayText = selectedProduct 
-    ? `${selectedProduct.product_name}`
-    : 'Select an item...';
+  const handleProductSelect = (sku: string) => {
+    const product = validProducts.find(p => p.sku === sku);
+    if (product) {
+      setSelectedProduct(product);
+      setSelectedSize(null);
+      setQuantity('1');
+      setSearchTerm('');
+      setIsOpen(false);
+    }
+  };
+
+  const getDisplayText = () => {
+    if (selectedProduct) {
+      return selectedProduct.product_name;
+    }
+    return searchTerm ? 'Search results...' : 'Select a product';
+  };
 
   return (
     <div className="space-y-4">
@@ -100,72 +118,76 @@ export function ItemSelector({
       <div className="border rounded-lg p-4 bg-blue-50 space-y-3">
         <Label className="text-sm font-semibold text-blue-900">Add New Item</Label>
 
-        {/* Search Input */}
+        {/* Enhanced Product Dropdown with Integrated Search */}
         <div className="space-y-2">
-          <Label className="text-xs">Search Products (SKU, Name, or Tags)</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by SKU, product name, or tags..."
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-              className="pl-10 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Product Dropdown */}
-        <div className="space-y-2">
-          <Label className="text-xs">Select Product</Label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsOpen(!isOpen)}
-              className="w-full px-3 py-2 border rounded-md bg-white text-left text-sm flex items-center justify-between hover:bg-gray-50"
-            >
-              <span className={selectedProduct ? 'text-foreground font-medium' : 'text-muted-foreground'}>
-                {selectedProduct ? selectedProduct.product_name : 'Select a product...'}
-              </span>
-              <ChevronDown className={`h-4 w-4 transition ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 border rounded-md bg-white shadow-lg z-50">
-                <div className="max-h-64 overflow-y-auto">
-                  {validProducts.length > 0 ? (
-                    validProducts.map((p) => (
-                      <button
-                        key={p.sku}
-                        type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-blue-100 text-sm border-b last:border-b-0 transition"
-                        onClick={() => handleSelectProduct(p)}
-                      >
-                        <div className="font-medium">{p.product_name}</div>
-                        <div className="text-xs text-muted-foreground">SKU: {p.sku}</div>
-                        {p.school_tags && p.school_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {p.school_tags.slice(0, 3).map((tag, idx) => (
-                              <span key={idx} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
-                                <Tag className="h-2.5 w-2.5" />
-                                {tag}
-                              </span>
-                            ))}
-                            {p.school_tags.length > 3 && (
-                              <span className="text-xs text-gray-500">+{p.school_tags.length - 3} more</span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-3 py-2 text-sm text-muted-foreground text-center">
-                      {search ? 'No products found matching your search' : 'Loading products...'}
-                    </div>
-                  )}
+          <Label>Select Product</Label>
+          <Select 
+            value={selectedProduct?.sku || ''} 
+            onValueChange={handleProductSelect}
+            open={isOpen}
+            onOpenChange={setIsOpen}
+          >
+            <SelectTrigger className="h-12">
+              <SelectValue placeholder={getDisplayText()} />
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+              {/* Integrated Search Input */}
+              <div className="sticky top-0 z-10 p-3 border-b bg-background">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by SKU, product name, or tags..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-9"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Product List with Enhanced Display */}
+              <div className="max-h-60 overflow-y-auto">
+                {filteredProducts.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    {searchTerm ? 'No products found matching your search' : 'No products available'}
+                  </div>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <SelectItem 
+                      key={product.sku} 
+                      value={product.sku}
+                      className="p-3 cursor-pointer hover:bg-accent"
+                    >
+                      <div className="flex flex-col items-start space-y-1">
+                        <div className="w-full">
+                          <span className="font-medium text-sm truncate">{product.product_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                            {product.sku}
+                          </span>
+                          {product.school_tags && product.school_tags.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {product.school_tags.slice(0, 2).map((tag, idx) => (
+                                <span key={idx} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                  <Tag className="h-2.5 w-2.5" />
+                                  {tag}
+                                </span>
+                              ))}
+                              {product.school_tags.length > 2 && (
+                                <span className="text-xs text-gray-500">+{product.school_tags.length - 2}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </div>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Size and Quantity Selection */}
@@ -215,7 +237,7 @@ export function ItemSelector({
               </div>
             )}
 
-            {/* Cancel Button */}
+            {/* Clear Selection Button */}
             <Button
               type="button"
               variant="outline"
@@ -224,7 +246,7 @@ export function ItemSelector({
                 setSelectedProduct(null);
                 setSelectedSize(null);
                 setQuantity('1');
-                setIsOpen(false);
+                setSearchTerm('');
               }}
               className="w-full text-xs"
             >

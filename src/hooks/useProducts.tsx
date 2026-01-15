@@ -4,20 +4,14 @@ import type { ProductCatalog } from '@/types/database';
 
 export function useProducts(search?: string) {
   return useQuery({
-    queryKey: ['products', search],
+    queryKey: ['products'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('product_catalog')
         .select('*')
         .eq('active', true)
         .order('product_name');
 
-      if (search) {
-        const searchLower = search.toLowerCase();
-        query = query.or(`sku.ilike.%${search}%,product_name.ilike.%${search}%,school_tags.cs.{${searchLower}}`);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       
       return (data || []).map(product => {

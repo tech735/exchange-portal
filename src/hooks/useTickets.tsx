@@ -10,6 +10,7 @@ interface CreateTicketData {
   student_name?: string;
   student_grade?: string;
   student_section?: string;
+  school_name?: string;
   reason_code: ReasonCode;
   reason_notes?: string;
   return_items: TicketItem[];
@@ -56,6 +57,7 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     student_name: data.student_name ? String(data.student_name) : null,
     student_grade: data.student_grade ? String(data.student_grade) : null,
     student_section: data.student_section ? String(data.student_section) : null,
+    school_name: data.school_name ? String(data.school_name) : null,
     reason_code: data.reason_code as ReasonCode,
     reason_notes: data.reason_notes ? String(data.reason_notes) : null,
     stage: data.stage as TicketStage,
@@ -156,6 +158,7 @@ export function useCreateTicket() {
           student_name: data.student_name || null,
           student_grade: data.student_grade || null,
           student_section: data.student_section || null,
+          school_name: data.school_name || null,
           reason_code: data.reason_code,
           reason_notes: data.reason_notes || null,
           return_items: data.return_items as any,
