@@ -7,17 +7,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, AlertTriangle } from 'lucide-react';
-import { REASON_LABELS, STAGE_LABELS, type TicketStatus, type Ticket } from '@/types/database';
+import { Plus, Search, AlertTriangle, Calculator, IndianRupee, CheckCircle, Clock } from 'lucide-react';
+import { REASON_LABELS, STAGE_LABELS, type TicketStatus, type Ticket, type TicketItem } from '@/types/database';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { ExchangeForm } from './ExchangeForm';
 import { TicketsTable } from './TicketsTable';
+import { ExchangeCalculator } from './ExchangeCalculator.tsx';
 
 export default function ExchangeLodging() {
-  const [tab, setTab] = useState<TicketStatus>('NEW');
+  const [tab, setTab] = useState<'NEW' | 'IN_PROCESS' | 'COMPLETED'>('NEW');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
   const statusFilters: Record<string, TicketStatus[]> = {
     NEW: ['NEW'],
@@ -25,7 +27,15 @@ export default function ExchangeLodging() {
     COMPLETED: ['COMPLETED'],
   };
 
-  const { data: tickets, isLoading } = useTickets({ status: statusFilters[tab], search });
+  const { data: tickets, isLoading } = useTickets({ 
+    status: statusFilters[tab], 
+    search 
+  });
+
+  const handleTicketSelect = (ticket: any) => {
+    setSelectedTicket(ticket);
+    setTab('IN_PROCESS');
+  };
 
   return (
     <Layout>
@@ -63,14 +73,22 @@ export default function ExchangeLodging() {
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as TicketStatus)}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
           <TabsList>
             <TabsTrigger value="NEW">New</TabsTrigger>
             <TabsTrigger value="IN_PROCESS">In Process</TabsTrigger>
             <TabsTrigger value="COMPLETED">Completed</TabsTrigger>
           </TabsList>
           <TabsContent value={tab} className="mt-6">
-            <TicketsTable tickets={tickets} isLoading={isLoading} />
+            {tab === 'IN_PROCESS' && selectedTicket ? (
+              <ExchangeCalculator ticket={selectedTicket} />
+            ) : (
+              <TicketsTable 
+                tickets={tickets} 
+                isLoading={isLoading} 
+                onTicketSelect={handleTicketSelect}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

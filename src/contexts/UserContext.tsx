@@ -12,71 +12,89 @@ export interface User {
 
 interface UserContextType {
   user: User | null;
+  originalAdminUser: User | null;
   setUser: (user: User | null) => void;
+  setOriginalAdminUser: (user: User | null) => void;
   logout: () => void;
   isLoading: boolean;
+  hasFullAccess: () => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 // Mock users for testing (fallback only)
-const mockUsers: Record<UserRole, User> = {
+const mockUsers: Record<string, User> = {
   admin: {
     id: '0',
     name: 'Admin',
     role: 'admin',
-    email: 'admin@example.com',
-  },
-  support: {
-    id: '1',
-    name: 'Support User',
-    role: 'support',
-    email: 'support@example.com',
-  },
-  warehouse: {
-    id: '2',
-    name: 'Warehouse Manager',
-    role: 'warehouse',
-    email: 'warehouse@example.com',
-  },
-  accounts: {
-    id: '3',
-    name: 'Accounts Manager',
-    role: 'accounts',
-    email: 'accounts@example.com',
+    email: 'admin@kotu.com',
   },
 };
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [originalAdminUser, setOriginalAdminUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if we have a real authenticated user
-    const checkAuthUser = () => {
-      // For now, we'll not set any default user
-      // This will force the login page to show
-      // In production, this would check Supabase auth state
-      const urlParams = new URLSearchParams(window.location.search);
-      const useMock = urlParams.get('mock') === 'true';
-      
-      if (useMock) {
-        // Only use mock user if explicitly requested via URL parameter
-        setUser(mockUsers.support);
+    // Check if we have a persisted user in localStorage
+    const checkPersistedUser = () => {
+      try {
+        const persistedUser = localStorage.getItem('user');
+        const persistedOriginalAdmin = localStorage.getItem('originalAdminUser');
+        
+        if (persistedUser) {
+          const parsedUser = JSON.parse(persistedUser);
+          setUser(parsedUser);
+        }
+        
+        if (persistedOriginalAdmin) {
+          const parsedOriginalAdmin = JSON.parse(persistedOriginalAdmin);
+          setOriginalAdminUser(parsedOriginalAdmin);
+        }
+      } catch (error) {
+        console.error('Error parsing persisted user:', error);
+        // Clear corrupted data
+        localStorage.removeItem('user');
+        localStorage.removeItem('originalAdminUser');
       }
       
       setIsLoading(false);
     };
 
-    checkAuthUser();
+    checkPersistedUser();
   }, []);
+
+  // Persist user state to localStorage whenever it changes
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user');
+    }
+  }, [user]);
+
+  // Persist original admin user state
+  useEffect(() => {
+    if (originalAdminUser) {
+      localStorage.setItem('originalAdminUser', JSON.stringify(originalAdminUser));
+    } else {
+      localStorage.removeItem('originalAdminUser');
+    }
+  }, [originalAdminUser]);
 
   const logout = () => {
     setUser(null);
+    setOriginalAdminUser(null);
+  };
+
+  const hasFullAccess = () => {
+    return originalAdminUser?.role === 'admin' || user?.role === 'admin';
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, logout, isLoading }}>
+    <UserContext.Provider value={{ user, originalAdminUser, setUser, setOriginalAdminUser, logout, isLoading, hasFullAccess }}>
       {children}
     </UserContext.Provider>
   );

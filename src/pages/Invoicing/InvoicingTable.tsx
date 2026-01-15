@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, IndianRupee } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { STAGE_LABELS, type Ticket } from '@/types/database';
 import { format } from 'date-fns';
@@ -55,6 +55,33 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose }: I
           {value ? format(new Date(value), 'MMM d, HH:mm') : '-'}
         </div>
       )
+    },
+    {
+      key: 'payment_collected',
+      label: 'Payment Collected',
+      render: (_: any, row: Ticket) => {
+        const isCollected = row.sent_to_invoicing_at ? true : false;
+        return (
+          <div className="flex items-center gap-2">
+            {isCollected ? (
+              <>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <div>
+                  <div className="text-sm font-medium text-green-600">Collected</div>
+                  <div className="text-xs text-muted-foreground">
+                    {format(new Date(row.sent_to_invoicing_at!), 'MMM d, HH:mm')}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Clock className="h-4 w-4 text-orange-500" />
+                <div className="text-sm font-medium text-orange-500">Pending</div>
+              </>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'stage',

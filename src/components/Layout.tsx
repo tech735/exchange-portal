@@ -14,22 +14,26 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'support', 'warehouse', 'accounts'] },
-  { to: '/exchange-lodging', label: 'Exchange Lodging', icon: Package, roles: ['admin', 'support'] },
-  { to: '/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['admin', 'warehouse'] },
-  { to: '/invoicing', label: 'Invoicing', icon: Receipt, roles: ['admin', 'accounts'] },
-  { to: '/users', label: 'Users', icon: User, roles: ['admin'] },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SUPPORT', 'WAREHOUSE', 'INVOICING'] },
+  { to: '/exchange-lodging', label: 'Exchange Lodging', icon: Package, roles: ['ADMIN', 'SUPPORT'] },
+  { to: '/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['ADMIN', 'WAREHOUSE'] },
+  { to: '/invoicing', label: 'Invoicing', icon: Receipt, roles: ['ADMIN', 'INVOICING'] },
+  { to: '/users', label: 'Users', icon: User, roles: ['ADMIN'] },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { user } = useUser();
-  const { logout } = useUser();
+  const { user, logout, hasFullAccess } = useUser();
 
-  // Filter navigation items based on user role
-  const navItems = allNavItems.filter(item => user?.role ? item.roles.includes(user.role) : false);
+  // Filter navigation items based on user role or full access
+  const navItems = allNavItems.filter(item => {
+    if (hasFullAccess()) {
+      return true; // Admin users with full access can see all items
+    }
+    return user?.role ? item.roles.includes(user.role) : false;
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -58,7 +62,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         
-        {user?.role === 'admin' && (
+        {hasFullAccess() && (
           <div className="p-4 border-b border-sidebar-border">
             <UserSelector />
           </div>
@@ -79,7 +83,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role || 'guest'}</p>
+              <p className="text-xs text-sidebar-foreground/60 capitalize">
+                {user?.role || 'guest'}
+                {hasFullAccess() && user?.role !== 'admin' && (
+                  <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded">Full Access</span>
+                )}
+              </p>
             </div>
           </div>
           <div className={cn('sidebar-nav-item', 'w-full justify-start cursor-pointer')} onClick={handleSignOut}>

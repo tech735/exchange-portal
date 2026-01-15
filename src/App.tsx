@@ -14,15 +14,17 @@ import TicketDetail from '@/pages/TicketDetail';
 import Login from '@/pages/Login';
 import Users from '@/pages/Users';
 import NotFound from '@/pages/NotFound';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import type { UserRole as DatabaseUserRole } from '@/types/database';
 
 const queryClient = new QueryClient();
 
 // Define role-based access to pages
-const roleAccess: Record<UserRole, string[]> = {
-  admin: ['/', '/dashboard', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
-  support: ['/', '/dashboard', '/exchange-lodging', '/ticket'],
-  warehouse: ['/', '/dashboard', '/warehouse'],
-  accounts: ['/', '/dashboard', '/invoicing'],
+const roleAccess: Record<DatabaseUserRole, string[]> = {
+  ADMIN: ['/', '/dashboard', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
+  SUPPORT: ['/', '/dashboard', '/exchange-lodging', '/ticket'],
+  WAREHOUSE: ['/', '/dashboard', '/warehouse'],
+  INVOICING: ['/', '/dashboard', '/invoicing'],
 };
 
 function ProtectedRoute({ 
@@ -32,7 +34,7 @@ function ProtectedRoute({
   children: React.ReactNode
   requiredPaths: string[]
 }) {
-  const { user, isLoading } = useUser();
+  const { user, isLoading, hasFullAccess } = useUser();
   
   if (isLoading) {
     return (
@@ -46,7 +48,14 @@ function ProtectedRoute({
     return <Navigate to="/login" replace />;
   }
 
-  const userPaths = roleAccess[user.role];
+  // If user has full access (admin who switched roles), grant access to all pages
+  if (hasFullAccess()) {
+    return <>{children}</>;
+  }
+
+  // Get user role safely - handle both UserContext user and auth user
+  const userRole = user?.role || 'SUPPORT';
+  const userPaths = roleAccess[userRole as keyof typeof roleAccess] || [];
   
   // Check if user has access to any of the required paths
   const hasAccess = requiredPaths.some(path => 
@@ -59,7 +68,7 @@ function ProtectedRoute({
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
           <p className="text-muted-foreground mb-4">
-            You don't have access to this page as a {user.role}
+            You don't have access to this page as a {userRole}
           </p>
           <a href="/" className="text-primary hover:underline">
             Go to Dashboard
@@ -92,13 +101,14 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
               <Route path="/login" element={
                 <PublicRoute>
                   <Login />
@@ -159,6 +169,7 @@ function AppContent() {
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

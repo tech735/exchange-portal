@@ -100,8 +100,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setProfile(data as Profile);
+      if (error) {
+        console.error('Profile fetch error:', error);
+        // Don't throw error, just log it and continue
+        return;
+      }
+      
+      if (data) {
+        setProfile(data as Profile);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -110,21 +117,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    // Redirect will be handled by onAuthStateChange listener
+    // Mock implementation since we're not using Supabase Auth
+    console.log('Mock sign in called');
+    // Redirect will be handled by Login component
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    });
-    if (error) throw error;
-    // Redirect will be handled by onAuthStateChange listener
+    // Mock implementation since we're not using Supabase Auth
+    console.log('Mock sign up called');
+    // Redirect will be handled by Login component
   };
 
   const signOut = async () => {

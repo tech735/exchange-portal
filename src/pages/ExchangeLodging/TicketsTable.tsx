@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Calculator } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { REASON_LABELS, STAGE_LABELS, type Ticket } from '@/types/database';
 import { format } from 'date-fns';
@@ -10,9 +10,10 @@ import { useState } from 'react';
 interface TicketsTableProps {
   tickets?: Ticket[];
   isLoading?: boolean;
+  onTicketSelect?: (ticket: Ticket) => void;
 }
 
-export function TicketsTable({ tickets, isLoading }: TicketsTableProps) {
+export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -26,9 +27,21 @@ export function TicketsTable({ tickets, isLoading }: TicketsTableProps) {
       key: 'order_id',
       label: 'Order ID',
       render: (value: string, row: Ticket) => (
-        <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
-          {value}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
+            {value}
+          </Link>
+          {onTicketSelect && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onTicketSelect(row)}
+              className="ml-2"
+            >
+              <Calculator className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       )
     },
     {

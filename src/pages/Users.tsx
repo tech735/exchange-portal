@@ -12,22 +12,22 @@ import { Plus, Edit, Trash2, User, Mail, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'support' | 'warehouse' | 'accounts';
-  is_active: boolean;
+  role: 'ADMIN' | 'SUPPORT' | 'WAREHOUSE' | 'INVOICING';
   created_at: string;
-  last_login?: string;
+  updated_at: string;
 }
 
 const roles = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'support', label: 'Support' },
-  { value: 'warehouse', label: 'Warehouse' },
-  { value: 'accounts', label: 'Accounts' }
+  { value: 'ADMIN', label: 'Admin' },
+  { value: 'SUPPORT', label: 'Support' },
+  { value: 'WAREHOUSE', label: 'Warehouse' },
+  { value: 'INVOICING', label: 'Accounts' }
 ];
 
 export default function Users() {
@@ -35,8 +35,7 @@ export default function Users() {
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
-    role: 'support' as const,
-    is_active: true
+    role: 'SUPPORT' as const
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -48,8 +47,8 @@ export default function Users() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('users')
+      const { data, error } = await supabase
+        .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -61,27 +60,14 @@ export default function Users() {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof formData) => {
-      // First create user in Supabase Auth
-      const { data: authData, error: authError } = await (supabase.auth as any).admin.createUser({
-        email: userData.email,
-        email_confirm: true,
-        user_metadata: {
-          full_name: userData.full_name,
-          role: userData.role
-        }
-      });
-
-      if (authError) throw authError;
-
-      // Then create user record in our users table
-      const { data, error } = await (supabase as any)
-        .from('users')
+      // Create user record in profiles table
+      const { data, error } = await supabase
+        .from('profiles')
         .insert({
+          id: uuidv4(),
           email: userData.email,
           full_name: userData.full_name,
-          role: userData.role,
-          is_active: userData.is_active,
-          created_by: currentUser?.id
+          role: userData.role
         })
         .select()
         .single();
@@ -91,9 +77,9 @@ export default function Users() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSuccess('User created successfully!');
+      setSuccess('User created successfully! They can now log in with their email.');
       setError('');
-      setFormData({ email: '', full_name: '', role: 'support', is_active: true });
+      setFormData({ email: '', full_name: '', role: 'SUPPORT' });
       setShowCreateDialog(false);
     },
     onError: (error: any) => {
@@ -105,8 +91,8 @@ export default function Users() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<User> }) => {
-      const { data, error } = await (supabase as any)
-        .from('users')
+      const { data, error } = await supabase
+        .from('profiles')
         .update(updates)
         .eq('id', id)
         .select()
@@ -129,9 +115,9 @@ export default function Users() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Delete from users table
-      const { error } = await (supabase as any)
-        .from('users')
+      // Delete from profiles table
+      const { error } = await supabase
+        .from('profiles')
         .delete()
         .eq('id', id);
       
@@ -216,15 +202,6 @@ export default function Users() {
       )
     },
     {
-      key: 'is_active',
-      label: 'Status',
-      render: (value: boolean, row: User) => (
-        <Badge variant={value ? "default" : "secondary"}>
-          {value ? "Active" : "Inactive"}
-        </Badge>
-      )
-    },
-    {
       key: 'created_at',
       label: 'Created',
       render: (value: string) => (
@@ -238,14 +215,6 @@ export default function Users() {
       label: 'Actions',
       render: (_: any, row: User) => (
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleUpdateUser(row.id, { is_active: !row.is_active })}
-            disabled={row.id === currentUser?.id}
-          >
-            {row.is_active ? 'Deactivate' : 'Activate'}
-          </Button>
           <Button
             size="sm"
             variant="destructive"
@@ -330,16 +299,6 @@ export default function Users() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                />
-                <Label htmlFor="is_active">Active User</Label>
               </div>
 
               <div className="flex justify-end gap-2">

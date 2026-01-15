@@ -10,6 +10,7 @@ export function Timeline({ ticket }: TimelineProps) {
   const milestones = [
     { label: 'Created', date: ticket.created_at },
     { label: 'Lodged', date: ticket.lodged_at },
+    { label: 'Payment Collected', date: ticket.sent_to_invoicing_at },
     { label: 'Warehouse Received', date: ticket.warehouse_received_at },
     { label: 'Approved', date: ticket.warehouse_approved_at },
     { label: 'Denied', date: ticket.warehouse_denied_at },

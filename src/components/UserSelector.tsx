@@ -4,15 +4,26 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 export function UserSelector() {
-  const { user, setUser } = useUser();
-  const roles: UserRole[] = ['admin', 'support', 'warehouse', 'accounts'];
+  const { user, setUser, originalAdminUser, setOriginalAdminUser } = useUser();
+  const roles = ['admin'];
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const handleRoleChange = (role: UserRole) => {
+  const handleRoleChange = (role: string) => {
     // Clear all queries when switching users to prevent old data showing
     queryClient.clear();
-    setUser(mockUsers[role]);
+    
+    // If we're switching to admin and there's an original admin user, restore them
+    if (role === 'admin' && originalAdminUser) {
+      setUser(originalAdminUser);
+    } else {
+      // If current user is admin and we're switching away, store them as original admin
+      if (user?.role === 'admin' && !originalAdminUser) {
+        setOriginalAdminUser(user);
+      }
+      setUser(mockUsers[role]);
+    }
+    
     // Redirect to dashboard after user switch
     navigate('/dashboard');
   };

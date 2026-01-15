@@ -6,6 +6,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { STAGE_LABELS, STATUS_LABELS } from '@/types/database';
 import { ExchangeDetails } from './ExchangeDetails';
 import { ItemsDisplay } from './ItemsDisplay';
+import { PaymentSummary } from './PaymentSummary';
 import { Timeline } from './Timeline';
 import { AuditLog } from './AuditLog';
 
@@ -50,7 +51,7 @@ export default function TicketDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <ExchangeDetails ticket={ticket} />
-
+            <PaymentSummary ticket={ticket} />
             <div className="grid grid-cols-2 gap-6">
               <ItemsDisplay title="Return Items" items={ticket.return_items} />
               <ItemsDisplay title="Exchange Items" items={ticket.exchange_items} />

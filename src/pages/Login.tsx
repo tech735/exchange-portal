@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { mockUsers } from '@/contexts/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { signIn } = useAuth();
-  const { setUser } = useUser();
+  const { setUser, setOriginalAdminUser } = useUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,26 +26,39 @@ export default function Login() {
     setError('');
 
     try {
-      // Use mock authentication only for now to avoid Supabase auth issues
+      // Check if it's the admin user
       if (email === 'admin@kotu.com' && password === 'test123') {
         console.log('Using mock authentication');
-        setUser(mockUsers.admin);
+        const adminUser = mockUsers.admin;
+        setUser(adminUser);
+        setOriginalAdminUser(adminUser);
         navigate('/dashboard');
-      } else if (email === 'support@kotu.com' && password === 'test123') {
-        console.log('Using mock authentication for support');
-        setUser(mockUsers.support);
-        navigate('/dashboard');
-      } else if (email === 'warehouse@kotu.com' && password === 'test123') {
-        console.log('Using mock authentication for warehouse');
-        setUser(mockUsers.warehouse);
-        navigate('/dashboard');
-      } else if (email === 'accounts@kotu.com' && password === 'test123') {
-        console.log('Using mock authentication for accounts');
-        setUser(mockUsers.accounts);
-        navigate('/dashboard');
-      } else {
-        setError('Invalid credentials. Use admin@kotu.com / test123 for admin');
+        return;
       }
+
+      // For other users, check against profiles table
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error || !profile) {
+        setError('Invalid credentials');
+        return;
+      }
+
+      // For demo purposes, accept any password for created users
+      // In production, you'd implement proper password authentication
+      const userFromProfile = {
+        id: profile.id,
+        name: profile.full_name || 'User',
+        email: profile.email,
+        role: profile.role as any
+      };
+
+      setUser(userFromProfile);
+      navigate('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
       setError('Login failed. Please try again.');
@@ -130,7 +144,7 @@ export default function Login() {
             </form>
 
             <div className="mt-6 space-y-4">
-              <Button 
+              {/* <Button 
                 type="button" 
                 variant="outline" 
                 className="w-full"
@@ -146,7 +160,7 @@ export default function Login() {
                 <p><strong>Warehouse:</strong> warehouse@kotu.com / test123</p>
                 <p><strong>Accounts:</strong> accounts@kotu.com / test123</p>
                 <p className="text-xs mt-2">Note: Using mock authentication only</p>
-              </div>
+              </div> */}
             </div>
           </CardContent>
         </Card>
