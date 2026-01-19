@@ -101,8 +101,8 @@ export default function Invoicing() {
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="done">Done</TabsTrigger>
           </TabsList>

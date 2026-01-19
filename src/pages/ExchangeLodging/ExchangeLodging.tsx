@@ -112,8 +112,8 @@ export default function ExchangeLodging() {
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+          <TabsList>
             <TabsTrigger value="NEW">New</TabsTrigger>
             <TabsTrigger value="IN_PROCESS">In Process</TabsTrigger>
             <TabsTrigger value="COMPLETED">Completed</TabsTrigger>
