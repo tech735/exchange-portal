@@ -8,7 +8,8 @@ import {
   Plus, 
   Minus, 
   CheckCircle,
-  Package
+  Package,
+  ArrowLeft
 } from 'lucide-react';
 import { type TicketItem } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
@@ -61,7 +62,7 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
       
       setIsProcessed(true);
       toast({ 
-        title: 'Amount Collected', 
+        title: totalExchangeValue === 0 ? 'Refund sent to invoicing team' : 'Amount Collected', 
         description: 'Ticket moved to warehouse for processing' 
       });
       
@@ -195,8 +196,17 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
             </div>
 
             <div className="flex items-center justify-between text-lg font-bold border-t pt-3">
-              <span>Final Amount to Collect:</span>
-              <span className="text-primary">₹{totalExchangeValue.toLocaleString()}</span>
+              {totalExchangeValue === 0 ? (
+                <>
+                  <span>Refund Amount:</span>
+                  <span className="text-orange-600">₹{(returnItemsValue - exchangeItemsValue - deliveryCharge).toLocaleString()}</span>
+                </>
+              ) : (
+                <>
+                  <span>Final Amount to Collect:</span>
+                  <span className="text-primary">₹{totalExchangeValue.toLocaleString()}</span>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
@@ -206,24 +216,49 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
       <Card>
         <CardContent className="p-6">
           <div className="text-center space-y-4">
-            <div className="text-lg font-medium">
-              Amount to be collected: <span className="text-primary font-bold">₹{totalExchangeValue.toLocaleString()}</span>
-            </div>
-            
-            {isProcessed ? (
-              <div className="flex items-center justify-center gap-2 text-green-600">
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">Amount Collected - Sent to Warehouse</span>
-              </div>
+            {totalExchangeValue === 0 ? (
+              <>
+                <div className="text-lg font-medium">
+                  Refund Amount: <span className="text-orange-600 font-bold">₹{(returnItemsValue - exchangeItemsValue - deliveryCharge).toLocaleString()}</span>
+                </div>
+                {isProcessed ? (
+                  <div className="flex items-center justify-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Refund Processed - Sent to Warehouse</span>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleProcessExchange}
+                    className="w-full"
+                    size="lg"
+                    variant="outline"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Process Refund
+                  </Button>
+                )}
+              </>
             ) : (
-              <Button 
-                onClick={handleProcessExchange}
-                className="w-full"
-                size="lg"
-              >
-                <IndianRupee className="h-4 w-4 mr-2" />
-                Mark as Collected
-              </Button>
+              <>
+                <div className="text-lg font-medium">
+                  Amount to be collected: <span className="text-primary font-bold">₹{totalExchangeValue.toLocaleString()}</span>
+                </div>
+                {isProcessed ? (
+                  <div className="flex items-center justify-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Amount Collected - Sent to Warehouse</span>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleProcessExchange}
+                    className="w-full"
+                    size="lg"
+                  >
+                    <IndianRupee className="h-4 w-4 mr-2" />
+                    Mark as Collected
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </CardContent>

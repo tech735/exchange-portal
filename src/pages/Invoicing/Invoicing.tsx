@@ -17,8 +17,8 @@ export default function Invoicing() {
   const updateTicket = useUpdateTicket();
 
   const stageFilters: Record<string, TicketStage[]> = {
-    pending: ['EXCHANGE_COMPLETED', 'INVOICING_PENDING'],
-    done: ['INVOICED', 'CLOSED'],
+    pending: ['EXCHANGE_COMPLETED', 'INVOICING_PENDING', 'INVOICED', 'TO_BE_REFUNDED'],
+    done: ['CLOSED'],
   };
 
   const { data: tickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
@@ -54,10 +54,24 @@ export default function Invoicing() {
     await updateTicket.mutateAsync({
       id,
       stage: 'CLOSED',
+      status: 'COMPLETED',
+      refund_status: 'PROCESSED',
       closed_at: new Date().toISOString(),
       eventType: 'CLOSED',
     });
-    toast({ title: 'Closed', description: 'Ticket closed' });
+    toast({ title: 'Ticket Finalized', description: 'Ticket has been finalized and closed' });
+  };
+
+  const handleSendToRefund = async (id: string) => {
+    await updateTicket.mutateAsync({
+      id,
+      stage: 'CLOSED',
+      status: 'COMPLETED',
+      refund_sent_at: new Date().toISOString(),
+      refund_status: 'PROCESSED',
+      eventType: 'REFUND_SENT',
+    });
+    toast({ title: 'Refund Processed', description: 'Ticket marked as refunded and closed' });
   };
 
   return (
@@ -107,7 +121,7 @@ export default function Invoicing() {
             <TabsTrigger value="done">Done</TabsTrigger>
           </TabsList>
           <TabsContent value={tab} className="mt-6">
-            <InvoicingTable tickets={tickets} isLoading={isLoading} onInvoiceDone={handleInvoiceDone} onClose={handleClose} />
+            <InvoicingTable tickets={tickets} isLoading={isLoading} onInvoiceDone={handleInvoiceDone} onClose={handleClose} onSendToRefund={handleSendToRefund} />
           </TabsContent>
         </Tabs>
       </div>

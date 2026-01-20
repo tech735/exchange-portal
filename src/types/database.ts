@@ -6,6 +6,7 @@ export type TicketStage =
   | 'EXCHANGE_COMPLETED'
   | 'INVOICING_PENDING'
   | 'INVOICED'
+  | 'TO_BE_REFUNDED'
   | 'CLOSED'
   | 'ESCALATED';
 
@@ -28,6 +29,7 @@ export type EventType =
   | 'EXCHANGE_DONE'
   | 'SENT_TO_INVOICE'
   | 'INVOICED'
+  | 'REFUND_SENT'
   | 'ESCALATED'
   | 'CLOSED';
 
@@ -77,6 +79,10 @@ export interface Ticket {
   exchange_completed_at: string | null;
   sent_to_invoicing_at: string | null;
   invoicing_done_at: string | null;
+  refund_sent_at: string | null;
+  refund_amount: number;
+  refund_status: 'NONE' | 'PENDING' | 'PROCESSED';
+  amount_collected: number;
   closed_at: string | null;
   updated_at: string;
 }
@@ -117,6 +123,7 @@ export const STAGE_LABELS: Record<TicketStage, string> = {
   EXCHANGE_COMPLETED: 'Exchange Completed',
   INVOICING_PENDING: 'Invoicing Pending',
   INVOICED: 'Invoiced',
+  TO_BE_REFUNDED: 'To Be Refunded',
   CLOSED: 'Closed',
   ESCALATED: 'Escalated',
 };
@@ -138,6 +145,7 @@ export const EVENT_LABELS: Record<EventType, string> = {
   EXCHANGE_DONE: 'Exchange Completed',
   SENT_TO_INVOICE: 'Sent to Invoicing',
   INVOICED: 'Invoicing Done',
+  REFUND_SENT: 'Refund Sent',
   ESCALATED: 'SLA Escalated',
   CLOSED: 'Ticket Closed',
 };

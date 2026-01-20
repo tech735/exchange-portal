@@ -28,11 +28,16 @@ interface UpdateTicketData {
   exchange_completed_at?: string;
   sent_to_invoicing_at?: string;
   invoicing_done_at?: string;
+  refund_sent_at?: string;
+  refund_amount?: number;
+  refund_status?: 'NONE' | 'PENDING' | 'PROCESSED';
+  amount_collected?: number;
   closed_at?: string;
   sla_breached?: boolean;
   sla_breached_at?: string;
   notes?: string;
   assigned_team?: string;
+  eventType?: EventType;
 }
 
 function parseTicketItems(items: unknown): TicketItem[] {
@@ -77,6 +82,10 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     exchange_completed_at: data.exchange_completed_at ? String(data.exchange_completed_at) : null,
     sent_to_invoicing_at: data.sent_to_invoicing_at ? String(data.sent_to_invoicing_at) : null,
     invoicing_done_at: data.invoicing_done_at ? String(data.invoicing_done_at) : null,
+    refund_sent_at: data.refund_sent_at ? String(data.refund_sent_at) : null,
+    refund_amount: Number(data.refund_amount || 0),
+    refund_status: (data.refund_status as 'NONE' | 'PENDING' | 'PROCESSED') || 'NONE',
+    amount_collected: Number(data.amount_collected || 0),
     closed_at: data.closed_at ? String(data.closed_at) : null,
     updated_at: String(data.updated_at),
   };
