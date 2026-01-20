@@ -68,7 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}>
         <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/src/assets/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-10 h-10" />
+            <img src="/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-10 h-10" />
             <div>
               <h1 className="font-semibold text-sidebar-foreground">Exchange Portal</h1>
               <p className="text-xs text-sidebar-foreground/60">Manage Returns</p>
@@ -131,7 +131,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <img src="/src/assets/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-8 h-8" />
+            <img src="/Vector-Blue-KOTU-Logo.png" alt="KOTU Logo" className="w-8 h-8" />
             <span className="font-semibold text-sm">Exchange Portal</span>
           </div>
           <div className="w-8" /> {/* Spacer for centering */}
