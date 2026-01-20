@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-vercel-no-index"
+        }
+      ]
+    }
+  ]
+}
