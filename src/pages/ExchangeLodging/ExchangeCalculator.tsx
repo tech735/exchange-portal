@@ -63,13 +63,8 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
       setIsProcessed(true);
       toast({ 
         title: totalExchangeValue === 0 ? 'Refund sent to invoicing team' : 'Amount Collected', 
-        description: 'Ticket moved to warehouse for processing' 
+        description: 'Ticket processed successfully' 
       });
-      
-      // Automatically navigate to warehouse page
-      setTimeout(() => {
-        navigate('/warehouse');
-      }, 1500);
       
     } catch (error) {
       toast({ 
@@ -224,7 +219,7 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
                 {isProcessed ? (
                   <div className="flex items-center justify-center gap-2 text-green-600">
                     <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">Refund Processed - Sent to Warehouse</span>
+                    <span className="font-medium">Refund Processed Successfully</span>
                   </div>
                 ) : (
                   <Button 
@@ -246,7 +241,7 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
                 {isProcessed ? (
                   <div className="flex items-center justify-center gap-2 text-green-600">
                     <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">Amount Collected - Sent to Warehouse</span>
+                    <span className="font-medium">Amount Collected Successfully</span>
                   </div>
                 ) : (
                   <Button 

@@ -137,7 +137,8 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
               </Button>
             )}
             {row.stage === 'INVOICED' && needsRefund && (
-              <Button size="sm" variant="outline" onClick={() => onSendToRefund(row.id)}>
+              <Button size="sm" onClick={() => onSendToRefund(row.id)}>
+                <CheckCircle className="h-4 w-4 mr-1" />
                 Mark as Refunded
               </Button>
             )}

@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Trash2 } from 'lucide-react';
 import { REASON_LABELS, type ReasonCode, type TicketItem } from '@/types/database';
 import { useCreateTicket } from '@/hooks/useTickets';
-import { ItemSelector } from './ItemSelector';
+import { ImprovedItemSelector } from './ImprovedItemSelector';
 
 // Mock schools for dropdown
 const MOCK_SCHOOLS = [
@@ -124,8 +124,8 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       </div>
       <div className="space-y-2"><Label>Reason Notes</Label><Textarea value={formData.reason_notes} onChange={(e) => setFormData({ ...formData, reason_notes: e.target.value })} /></div>
 
-      <ItemSelector title="Return Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} />
-      <ItemSelector title="Exchange Items" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} />
+      <ImprovedItemSelector title="Return Line Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} />
+      <ImprovedItemSelector title="Exchange Deliverables" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} />
 
       <div className="space-y-2"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
       <Button type="submit" className="w-full" disabled={createTicket.isPending}>{createTicket.isPending ? 'Creating...' : 'Create Exchange Ticket'}</Button>

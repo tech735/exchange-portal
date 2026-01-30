@@ -5,7 +5,6 @@ import { useUser } from '@/contexts/UserContext';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { UserSelector } from '@/components/UserSelector';
 
 interface NavItem {
   to: string;
@@ -84,12 +83,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
         
-        {hasFullAccess() && (
-          <div className="p-4 border-b border-sidebar-border">
-            <UserSelector />
-          </div>
-        )}
-
+        
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} className={cn('sidebar-nav-item', location.pathname === to && 'sidebar-nav-item-active')}>
@@ -107,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name || 'User'}</p>
               <p className="text-xs text-sidebar-foreground/60 capitalize">
                 {user?.role || 'guest'}
-                {hasFullAccess() && user?.role !== 'admin' && (
+                {hasFullAccess() && user?.role !== 'ADMIN' && (
                   <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded">Full Access</span>
                 )}
               </p>

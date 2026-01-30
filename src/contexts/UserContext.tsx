@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-
-export type UserRole = 'support' | 'warehouse' | 'accounts' | 'admin';
+import type { UserRole } from '@/types/database';
 
 export interface User {
   id: string;
@@ -27,7 +26,7 @@ const mockUsers: Record<string, User> = {
   admin: {
     id: '0',
     name: 'Admin',
-    role: 'admin',
+    role: 'ADMIN',
     email: 'admin@kotu.com',
   },
 };
@@ -90,7 +89,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const hasFullAccess = () => {
-    return originalAdminUser?.role === 'admin' || user?.role === 'admin';
+    return originalAdminUser?.role === 'ADMIN' || user?.role === 'ADMIN';
   };
 
   return (
