@@ -8,10 +8,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { type TicketStage } from '@/types/database';
 import { WarehouseTable } from './WarehouseTable';
+import { AWBFormDialog } from '@/components/AWBFormDialog';
 
 export default function Warehouse() {
   const [tab, setTab] = useState('pending');
   const [search, setSearch] = useState('');
+  const [awbDialogOpen, setAwbDialogOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [awbType, setAwbType] = useState<'return' | 'exchange'>('return');
   const { toast } = useToast();
   const updateTicket = useUpdateTicket();
 
@@ -36,14 +41,42 @@ export default function Warehouse() {
     toast({ title: 'Received', description: 'Items received at warehouse' });
   };
 
-  const handleApprove = async (id: string) => {
-    await updateTicket.mutateAsync({
-      id,
-      stage: 'WAREHOUSE_APPROVED',
-      warehouse_approved_at: new Date().toISOString(),
-      eventType: 'APPROVED',
-    });
-    toast({ title: 'Approved', description: 'Return approved' });
+  const handleApprove = (ticketId: string, orderId: string) => {
+    setSelectedTicketId(ticketId);
+    setSelectedOrderId(orderId);
+    setAwbType('return');
+    setAwbDialogOpen(true);
+  };
+
+  const handleAwbSubmit = async (awb: string) => {
+    if (!selectedTicketId) return;
+    
+    if (awbType === 'return') {
+      await updateTicket.mutateAsync({
+        id: selectedTicketId,
+        stage: 'WAREHOUSE_APPROVED',
+        warehouse_approved_at: new Date().toISOString(),
+        return_awb: awb,
+        eventType: 'APPROVED',
+      });
+      toast({ title: 'Approved', description: `Return approved with AWB: ${awb}` });
+    } else {
+      await updateTicket.mutateAsync({
+        id: selectedTicketId,
+        stage: 'EXCHANGE_COMPLETED',
+        exchange_completed_at: new Date().toISOString(),
+        exchange_awb: awb,
+        eventType: 'EXCHANGE_DONE',
+      });
+      toast({ title: 'Completed', description: `Exchange completed with AWB: ${awb}` });
+    }
+  };
+
+  const handleExchangeComplete = (ticketId: string, orderId: string) => {
+    setSelectedTicketId(ticketId);
+    setSelectedOrderId(orderId);
+    setAwbType('exchange');
+    setAwbDialogOpen(true);
   };
 
   const handleDeny = async (id: string) => {
@@ -55,16 +88,6 @@ export default function Warehouse() {
       eventType: 'DENIED',
     });
     toast({ title: 'Denied', description: 'Return denied' });
-  };
-
-  const handleExchangeComplete = async (id: string) => {
-    await updateTicket.mutateAsync({
-      id,
-      stage: 'EXCHANGE_COMPLETED',
-      exchange_completed_at: new Date().toISOString(),
-      eventType: 'EXCHANGE_DONE',
-    });
-    toast({ title: 'Completed', description: 'Exchange completed successfully' });
   };
 
   const handleSendToInvoicing = async (id: string) => {
@@ -112,6 +135,15 @@ export default function Warehouse() {
             />
           </TabsContent>
         </Tabs>
+
+        <AWBFormDialog
+          open={awbDialogOpen}
+          onOpenChange={setAwbDialogOpen}
+          onSubmit={handleAwbSubmit}
+          orderId={selectedOrderId || ''}
+          awbType={awbType}
+          isLoading={updateTicket.isPending}
+        />
       </div>
     </Layout>
   );

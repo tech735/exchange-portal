@@ -67,6 +67,8 @@ export interface Ticket {
   return_items: TicketItem[];
   exchange_items: TicketItem[];
   notes: string | null;
+  return_awb: string | null;
+  exchange_awb: string | null;
   sla_breached: boolean;
   sla_breached_at: string | null;
   assigned_team: string;

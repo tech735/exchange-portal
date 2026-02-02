@@ -4,14 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import { UserProvider, useUser, type UserRole } from "@/contexts/UserContext";
-import Layout from '@/components/Layout';
+import { UserProvider, useUser } from "@/contexts/UserContext";
 import Dashboard from '@/pages/Dashboard';
 import ExchangeLodging from '@/pages/ExchangeLodging';
 import Warehouse from '@/pages/Warehouse';
 import Invoicing from '@/pages/Invoicing';
 import TicketDetail from '@/pages/TicketDetail';
-import Login from '@/pages/Login';
+import AuthScreens from '@/pages/auth_screens/AuthScreens';
 import Users from '@/pages/Users';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -111,7 +110,7 @@ function AppContent() {
               <Routes>
               <Route path="/login" element={
                 <PublicRoute>
-                  <Login />
+                  <AuthScreens />
                 </PublicRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

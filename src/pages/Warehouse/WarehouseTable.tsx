@@ -10,9 +10,9 @@ interface WarehouseTableProps {
   tickets?: Ticket[];
   isLoading?: boolean;
   onReceive: (id: string) => Promise<void>;
-  onApprove: (id: string) => Promise<void>;
+  onApprove: (ticketId: string, orderId: string) => void;
   onDeny: (id: string) => Promise<void>;
-  onExchangeComplete: (id: string) => Promise<void>;
+  onExchangeComplete: (ticketId: string, orderId: string) => void;
   onSendToInvoicing: (id: string) => Promise<void>;
 }
 
@@ -97,7 +97,7 @@ export function WarehouseTable({
           )}
           {row.stage === 'WAREHOUSE_PENDING' && (
             <>
-              <Button size="sm" onClick={() => onApprove(row.id)}>
+              <Button size="sm" onClick={() => onApprove(row.id, row.order_id)}>
                 <Check className="h-4 w-4 mr-1" />
                 Approve
               </Button>
@@ -108,7 +108,7 @@ export function WarehouseTable({
             </>
           )}
           {row.stage === 'WAREHOUSE_APPROVED' && (
-            <Button size="sm" onClick={() => onExchangeComplete(row.id)}>
+            <Button size="sm" onClick={() => onExchangeComplete(row.id, row.order_id)}>
               Exchange Done
             </Button>
           )}

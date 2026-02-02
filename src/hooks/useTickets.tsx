@@ -36,6 +36,8 @@ interface UpdateTicketData {
   sla_breached?: boolean;
   sla_breached_at?: string;
   notes?: string;
+  return_awb?: string;
+  exchange_awb?: string;
   assigned_team?: string;
   eventType?: EventType;
 }
@@ -70,6 +72,8 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     return_items: parseTicketItems(data.return_items),
     exchange_items: parseTicketItems(data.exchange_items),
     notes: data.notes ? String(data.notes) : null,
+    return_awb: data.return_awb ? String(data.return_awb) : null,
+    exchange_awb: data.exchange_awb ? String(data.exchange_awb) : null,
     sla_breached: Boolean(data.sla_breached),
     sla_breached_at: data.sla_breached_at ? String(data.sla_breached_at) : null,
     assigned_team: String(data.assigned_team || 'support'),

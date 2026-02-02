@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { type Ticket } from '@/types/database';
 import { REASON_LABELS } from '@/types/database';
+import { Package } from 'lucide-react';
 
 interface ExchangeDetailsProps {
   ticket: Ticket;
@@ -27,6 +29,24 @@ export function ExchangeDetails({ ticket }: ExchangeDetailsProps) {
             <span className="text-sm text-muted-foreground">Student:</span> {ticket.student_name}{' '}
             {ticket.student_grade && `(${ticket.student_grade}`}
             {ticket.student_section && `-${ticket.student_section})`}
+          </div>
+        )}
+        {ticket.return_awb && (
+          <div>
+            <span className="text-sm text-muted-foreground">Return AWB:</span>{' '}
+            <Badge variant="secondary" className="ml-2">
+              <Package className="h-3 w-3 mr-1" />
+              {ticket.return_awb}
+            </Badge>
+          </div>
+        )}
+        {ticket.exchange_awb && (
+          <div>
+            <span className="text-sm text-muted-foreground">Exchange AWB:</span>{' '}
+            <Badge variant="secondary" className="ml-2">
+              <Package className="h-3 w-3 mr-1" />
+              {ticket.exchange_awb}
+            </Badge>
           </div>
         )}
       </CardContent>
