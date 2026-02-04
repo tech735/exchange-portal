@@ -6,11 +6,12 @@ interface KPICardProps {
   value: number;
   icon: LucideIcon;
   color: string;
+  variant?: 'default' | 'primary';
 }
 
-export function KPICard({ title, value, icon: Icon, color }: KPICardProps) {
+export function KPICard({ title, value, icon: Icon, color, variant = 'default' }: KPICardProps) {
   return (
-    <Card className="kpi-card">
+    <Card className="bg-white border border-border">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <Icon className={`h-5 w-5 ${color}`} />

@@ -103,38 +103,38 @@ export default function Warehouse() {
 
   return (
     <Layout>
-      <div className="p-8 animate-fade-in">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Warehouse Processing</h1>
-          <p className="text-muted-foreground">Process returns and exchanges</p>
+      <div className="page-shell animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-semibold">Warehouse Processing</h1>
+          <p className="text-muted-foreground mt-2">Process returns and exchanges</p>
         </div>
 
-        <div className="mb-6">
-          <div className="relative max-w-md">
+        <div className="card-base">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
           </div>
-        </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="approved">Approved</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="denied">Denied</TabsTrigger>
-          </TabsList>
-          <TabsContent value={tab} className="mt-6">
-            <WarehouseTable
-              tickets={tickets}
-              isLoading={isLoading}
-              onReceive={handleReceive}
-              onApprove={handleApprove}
-              onDeny={handleDeny}
-              onExchangeComplete={handleExchangeComplete}
-              onSendToInvoicing={handleSendToInvoicing}
-            />
-          </TabsContent>
-        </Tabs>
+          <Tabs value={tab} onValueChange={setTab} className="mt-6">
+            <TabsList>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="approved">Approved</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="denied">Denied</TabsTrigger>
+            </TabsList>
+            <TabsContent value={tab} className="mt-6">
+              <WarehouseTable
+                tickets={tickets}
+                isLoading={isLoading}
+                onReceive={handleReceive}
+                onApprove={handleApprove}
+                onDeny={handleDeny}
+                onExchangeComplete={handleExchangeComplete}
+                onSendToInvoicing={handleSendToInvoicing}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
 
         <AWBFormDialog
           open={awbDialogOpen}

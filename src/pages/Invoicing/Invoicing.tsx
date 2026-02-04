@@ -76,54 +76,57 @@ export default function Invoicing() {
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Invoicing</h1>
-              <p className="text-muted-foreground">Complete invoicing for exchanges</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={!tickets || tickets.length === 0}
-                className="flex items-center gap-2 w-full sm:w-auto"
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportExcel}
-                disabled={!tickets || tickets.length === 0}
-                className="flex items-center gap-2 w-full sm:w-auto"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Export Excel
-              </Button>
-            </div>
+      <div className="page-shell animate-fade-in">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-semibold">Invoicing</h1>
+            <p className="text-muted-foreground mt-2">Complete invoicing for exchanges</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={!tickets || tickets.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              disabled={!tickets || tickets.length === 0}
+              className="flex items-center gap-2"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Export Excel
+            </Button>
           </div>
         </div>
 
-        <div className="mb-4 sm:mb-6">
-          <div className="relative w-full sm:max-w-md">
+        <div className="card-base">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search by order ID, name, or phone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+            <Input
+              placeholder="Search by order ID, name, or phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="done">Done</TabsTrigger>
-          </TabsList>
-          <TabsContent value={tab} className="mt-6">
-            <InvoicingTable tickets={tickets} isLoading={isLoading} onInvoiceDone={handleInvoiceDone} onClose={handleClose} onSendToRefund={handleSendToRefund} />
-          </TabsContent>
-        </Tabs>
+          <Tabs value={tab} onValueChange={setTab} className="mt-6">
+            <TabsList>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="done">Done</TabsTrigger>
+            </TabsList>
+            <TabsContent value={tab} className="mt-6">
+              <InvoicingTable tickets={tickets} isLoading={isLoading} onInvoiceDone={handleInvoiceDone} onClose={handleClose} onSendToRefund={handleSendToRefund} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </Layout>
   );
