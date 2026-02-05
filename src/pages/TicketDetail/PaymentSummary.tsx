@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Clock, IndianRupee } from 'lucide-react';
-import { type Ticket } from '@/types/database';
+import { type Ticket, TicketItem } from '@/types/database';
 import { format } from 'date-fns';
 import { useProductPrices } from '@/hooks/useProductPrices';
 
@@ -12,7 +12,7 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
   const { data: productPrices } = useProductPrices();
   
   // Calculate item values using actual prices
-  const calculateItemValue = (items: any[]): number => {
+  const calculateItemValue = (items: TicketItem[]): number => {
     return items.reduce((total, item) => {
       const itemPrice = productPrices?.[item.sku] || 1000; // Fallback to 1000 if price not found
       return total + (itemPrice * item.qty);

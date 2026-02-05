@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EVENT_LABELS } from '@/types/database';
+import { EVENT_LABELS, TicketEvent } from '@/types/database';
 import { format } from 'date-fns';
 
 interface AuditLogProps {
-  events?: any[];
+  events?: TicketEvent[];
 }
 
 export function AuditLog({ events }: AuditLogProps) {

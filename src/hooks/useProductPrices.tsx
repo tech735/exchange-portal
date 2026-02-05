@@ -44,7 +44,7 @@ export function useProductPrices() {
             // Use default prices based on product type
             const priceMap: Record<string, number> = {};
             if (productsWithoutPrice && Array.isArray(productsWithoutPrice)) {
-              productsWithoutPrice.forEach((product: any) => {
+              productsWithoutPrice.forEach((product: ProductWithoutPrice) => {
                 priceMap[product.sku] = getDefaultPrice(product.sku);
               });
             }
@@ -61,7 +61,7 @@ export function useProductPrices() {
         // Convert to price lookup map
         const priceMap: Record<string, number> = {};
         if (data && Array.isArray(data)) {
-          data.forEach((product: any) => {
+          data.forEach((product: ProductWithPrice) => {
             priceMap[product.sku] = Number(product.price) || getDefaultPrice(product.sku);
           });
         }

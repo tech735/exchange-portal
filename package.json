@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "lint:css": "stylelint \"src/**/*.{css,scss,less}\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -78,6 +79,9 @@
     "globals": "^15.15.0",
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
+    "stylelint": "^17.1.1",
+    "stylelint-config-recommended": "^18.0.0",
+    "stylelint-config-standard": "^40.0.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

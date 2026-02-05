@@ -68,11 +68,11 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       await createTicket.mutateAsync(payload);
       toast({ title: 'Success', description: 'Exchange ticket created' });
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating ticket:', error);
       toast({ 
         title: 'Error', 
-        description: error?.message || 'Failed to create ticket', 
+        description: error instanceof Error ? error.message : 'Failed to create ticket', 
         variant: 'destructive' 
       });
     }

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
 import { AlertTriangle, Check, Package, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { STAGE_LABELS, type Ticket } from '@/types/database';
+import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
 import { useState } from 'react';
 
 interface WarehouseTableProps {
@@ -60,7 +60,7 @@ export function WarehouseTable({
     {
       key: 'return_items',
       label: 'Items',
-      render: (value: any[]) => (
+      render: (value: TicketItem[]) => (
         <div className="max-w-xs">
           {value.map((item, idx) => (
             <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1">
@@ -81,7 +81,7 @@ export function WarehouseTable({
     {
       key: 'actions',
       label: 'Actions',
-      render: (_: any, row: Ticket) => (
+      render: (_: unknown, row: Ticket) => (
         <div className="flex gap-2">
           {row.stage === 'LODGED' && (
             <>

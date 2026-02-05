@@ -20,7 +20,7 @@ export default function ExchangeLodging() {
   const [tab, setTab] = useState<'NEW' | 'IN_PROCESS' | 'COMPLETED'>('NEW');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const statusFilters: Record<string, TicketStatus[]> = {
     NEW: ['NEW'],
@@ -33,7 +33,7 @@ export default function ExchangeLodging() {
     search 
   });
 
-  const handleTicketSelect = (ticket: any) => {
+  const handleTicketSelect = (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setTab('IN_PROCESS');
   };
@@ -112,7 +112,7 @@ export default function ExchangeLodging() {
               />
             </div>
           </div>
-          <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="mt-6">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'NEW' | 'IN_PROCESS' | 'COMPLETED')} className="mt-6">
             <TabsList>
               <TabsTrigger value="NEW">New</TabsTrigger>
               <TabsTrigger value="IN_PROCESS">In Process</TabsTrigger>

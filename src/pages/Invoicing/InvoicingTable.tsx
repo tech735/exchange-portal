@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps, Pagination } from '@/components/ui/DataTable';
 import { AlertTriangle, CheckCircle, Clock, IndianRupee } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { STAGE_LABELS, type Ticket } from '@/types/database';
+import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { useProductPrices } from '@/hooks/useProductPrices';
@@ -28,7 +28,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
 
   // Calculate refund amount for a ticket
   const calculateRefundAmount = (ticket: Ticket): number => {
-    const calculateItemValue = (items: any[]): number => {
+    const calculateItemValue = (items: TicketItem[]): number => {
       return items.reduce((total, item) => {
         const itemPrice = productPrices?.[item.sku] || 1000;
         return total + (itemPrice * item.qty);
@@ -80,7 +80,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     {
       key: 'payment_collected',
       label: 'Payment/Refund',
-      render: (_: any, row: Ticket) => {
+      render: (_: unknown, row: Ticket) => {
         const isCollected = row.sent_to_invoicing_at ? true : false;
         const refundAmount = calculateRefundAmount(row);
         const needsRefund = refundAmount > 0;
@@ -124,7 +124,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     {
       key: 'actions',
       label: 'Actions',
-      render: (_: any, row: Ticket) => {
+      render: (_: unknown, row: Ticket) => {
         const refundAmount = calculateRefundAmount(row);
         const needsRefund = refundAmount > 0;
         

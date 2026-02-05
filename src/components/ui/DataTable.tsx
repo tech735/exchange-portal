@@ -5,18 +5,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-interface DataTableProps {
-  data: any[];
+interface DataTableProps<T extends { id: string | number } = { id: string }> {
+  data: T[];
   columns: {
     key: string;
     label: string;
-    render?: (value: any, row: any) => React.ReactNode;
+    render?: (value: unknown, row: T) => React.ReactNode;
   }[];
   isLoading?: boolean;
   emptyMessage?: string;
   children?: React.ReactNode;
   title?: string;
-  onSelectionChange?: (selectedRows: any[]) => void;
+  onSelectionChange?: (selectedRows: T[]) => void;
 }
 
 interface PaginationProps {
@@ -31,7 +31,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
   const pages = [];
   const maxVisiblePages = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
   
   if (endPage - startPage < maxVisiblePages - 1) {
     startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -135,7 +135,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
   );
 }
 
-export function DataTable({ 
+export function DataTable<T extends { id: string | number }>({
   data, 
   columns, 
   isLoading, 
@@ -143,8 +143,8 @@ export function DataTable({
   children,
   title,
   onSelectionChange
-}: DataTableProps) {
-  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+}: DataTableProps<T>) {
+  const [selectedRows, setSelectedRows] = useState<T[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const handleSelectAll = () => {
@@ -155,7 +155,7 @@ export function DataTable({
     }
   };
 
-  const handleSelectRow = (row: any) => {
+  const handleSelectRow = (row: T) => {
     setSelectedRows(prev => {
       const isSelected = prev.some(selected => selected.id === row.id);
       if (isSelected) {

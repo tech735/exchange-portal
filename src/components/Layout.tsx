@@ -145,14 +145,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 placeholder="Search tickets, orders, people"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 ml-auto">
               <button className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition">
                 <Mail className="h-4 w-4" />
               </button>
               <button className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition">
                 <Bell className="h-4 w-4" />
               </button>
-              <div className="flex items-center gap-3 pl-3">
+              <div className="flex items-center gap-3 pl-3 border-l border-border">
                 <div className="w-10 h-10 rounded-full bg-sidebar-accent flex items-center justify-center">
                   <User className="h-4 w-4 text-sidebar-foreground" />
                 </div>

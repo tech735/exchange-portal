@@ -9,17 +9,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { Plus, Edit, Trash2, User, Mail, Shield } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Mail } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useUser } from '@/contexts/UserContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import type { UserRole } from '@/types/database';
 import { v4 as uuidv4 } from 'uuid';
 
 interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'ADMIN' | 'SUPPORT' | 'WAREHOUSE' | 'INVOICING';
+  role: UserRole;
   created_at: string;
   updated_at: string;
 }
@@ -33,10 +36,14 @@ const roles = [
 
 export default function Users() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    email: string;
+    full_name: string;
+    role: UserRole;
+  }>({
     email: '',
     full_name: '',
-    role: 'SUPPORT' as const
+    role: 'SUPPORT'
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -83,8 +90,8 @@ export default function Users() {
       setFormData({ email: '', full_name: '', role: 'SUPPORT' });
       setShowCreateDialog(false);
     },
-    onError: (error: any) => {
-      setError(error.message || 'Failed to create user');
+    onError: (error: unknown) => {
+      setError(error instanceof Error ? error.message : 'Failed to create user');
       setSuccess('');
     }
   });
@@ -107,8 +114,8 @@ export default function Users() {
       setSuccess('User updated successfully!');
       setError('');
     },
-    onError: (error: any) => {
-      setError(error.message || 'Failed to update user');
+    onError: (error: unknown) => {
+      setError(error instanceof Error ? error.message : 'Failed to update user');
       setSuccess('');
     }
   });
@@ -129,8 +136,8 @@ export default function Users() {
       setSuccess('User deleted successfully!');
       setError('');
     },
-    onError: (error: any) => {
-      setError(error.message || 'Failed to delete user');
+    onError: (error: unknown) => {
+      setError(error instanceof Error ? error.message : 'Failed to delete user');
       setSuccess('');
     }
   });
@@ -185,7 +192,7 @@ export default function Users() {
           <Shield className="h-4 w-4 text-muted-foreground" />
           <Select
             value={value}
-            onValueChange={(newRole) => handleUpdateUser(row.id, { role: newRole as any })}
+            onValueChange={(newRole) => handleUpdateUser(row.id, { role: newRole as UserRole })}
             disabled={row.id === currentUser?.id}
           >
             <SelectTrigger className="w-32">
@@ -214,7 +221,7 @@ export default function Users() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (_: any, row: User) => (
+      render: (_: unknown, row: User) => (
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -288,7 +295,7 @@ export default function Users() {
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as any }))}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as UserRole }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
