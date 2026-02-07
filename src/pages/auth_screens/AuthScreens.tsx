@@ -51,11 +51,19 @@ export default function AuthScreens() {
           return;
         }
 
+        // Type assertion for the profile data
+        const typedProfile = profile as {
+          id: string;
+          full_name: string | null;
+          email: string;
+          role: DatabaseUserRole;
+        };
+
         const userFromProfile = {
-          id: profile.id,
-          name: profile.full_name || 'User',
-          email: profile.email,
-          role: profile.role as DatabaseUserRole
+          id: typedProfile.id,
+          name: typedProfile.full_name || 'User',
+          email: typedProfile.email,
+          role: typedProfile.role
         };
 
         setUser(userFromProfile);

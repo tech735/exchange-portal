@@ -2,6 +2,9 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserRole } from '@/types/database';
 
+// Re-export UserRole for convenience
+export type { UserRole } from '@/types/database';
+
 export interface User {
   id: string;
   name: string;

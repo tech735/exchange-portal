@@ -18,7 +18,7 @@ export function UserSelector() {
       setUser(originalAdminUser);
     } else {
       // If current user is admin and we're switching away, store them as original admin
-      if (user?.role === 'admin' && !originalAdminUser) {
+      if (user?.role === 'ADMIN' && !originalAdminUser) {
         setOriginalAdminUser(user);
       }
       setUser(mockUsers[role]);
