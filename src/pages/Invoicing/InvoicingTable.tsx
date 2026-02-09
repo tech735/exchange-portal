@@ -21,7 +21,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const { data: productPrices } = useProductPrices();
 
-  const totalPages = Math.ceil((tickets?.length || 0) / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];

@@ -14,6 +14,7 @@ import AuthScreens from '@/pages/auth_screens/AuthScreens';
 import Users from '@/pages/Users';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import SupabaseTest from '@/components/SupabaseTest';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
 
 const queryClient = new QueryClient();
@@ -153,6 +154,10 @@ function AppContent() {
                     <Users />
                   </ProtectedRoute>
                 } 
+              />
+              <Route 
+                path="/test-supabase" 
+                element={<SupabaseTest />} 
               />
               <Route 
                 path="/ticket/:id" 

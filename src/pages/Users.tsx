@@ -9,14 +9,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Mail } from 'lucide-react';
+import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole } from '@/types/database';
-import { v4 as uuidv4 } from 'uuid';
 
 interface User {
   id: string;
@@ -69,10 +69,9 @@ export default function Users() {
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof formData) => {
       // Create user record in profiles table
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('profiles')
         .insert({
-          id: uuidv4(),
           email: userData.email,
           full_name: userData.full_name,
           role: userData.role
@@ -99,7 +98,7 @@ export default function Users() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<User> }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('profiles')
         .update(updates)
         .eq('id', id)
@@ -163,15 +162,13 @@ export default function Users() {
     }
   };
 
+
   const columns = [
     {
       key: 'email',
       label: 'Email',
       render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <Mail className="h-4 w-4 text-muted-foreground" />
-          <span>{value}</span>
-        </div>
+        <span>{value}</span>
       )
     },
     {
@@ -222,16 +219,14 @@ export default function Users() {
       key: 'actions',
       label: 'Actions',
       render: (_: unknown, row: User) => (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleDeleteUser(row.id)}
-            disabled={row.id === currentUser?.id}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => handleDeleteUser(row.id)}
+          disabled={row.id === currentUser?.id}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       )
     }
   ];

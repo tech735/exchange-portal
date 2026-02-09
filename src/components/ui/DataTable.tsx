@@ -87,39 +87,9 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
         </Button>
         
         <div className="flex items-center gap-1">
-          {startPage > 1 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onPageChange(1)}
-              className="hidden xs:inline"
-            >
-              1
-            </Button>
-          )}
-          
-          {pages.map((page) => (
-            <Button
-              key={page}
-              variant={currentPage === page ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onPageChange(page)}
-              className="text-xs sm:text-sm"
-            >
-              {page}
-            </Button>
-          ))}
-          
-          {endPage < totalPages && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onPageChange(totalPages)}
-              className="hidden xs:inline"
-            >
-              {totalPages}
-            </Button>
-          )}
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
         </div>
         
         <Button

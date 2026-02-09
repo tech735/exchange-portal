@@ -67,12 +67,12 @@
     --stage-completed: 142 76% 36%;
     --stage-denied: 0 84% 60%;
 
-    --sidebar-background: 210 20% 96%;
-    --sidebar-foreground: 222 35% 18%;
+    --sidebar-background: 215 60% 32%;
+    --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 215 60% 32%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 18% 92%;
-    --sidebar-accent-foreground: 222 35% 18%;
+    --sidebar-accent: 215 65% 42%;
+    --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 214 20% 90%;
     --sidebar-ring: 215 60% 32%;
 
@@ -175,7 +175,7 @@
   }
 
   .sidebar-nav-item-active {
-    @apply bg-white text-sidebar-foreground font-medium shadow-sm;
+    @apply bg-white text-sidebar-primary font-medium shadow-sm;
   }
 
   .app-shell {

@@ -4,17 +4,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { mockUsers } from '@/contexts/UserContext';
 import { supabase } from '@/integrations/supabase/client';
-import type { UserRole as DatabaseUserRole } from '@/types/database';
-import { Facebook, Chrome, Linkedin } from 'lucide-react';
-import backgroundSvg from '@/assets/Background image for portral.svg';
+import type { UserRole as DatabaseUserRole, Profile } from '@/types/database';
+import { Facebook, Chrome, Linkedin, Eye, EyeOff } from 'lucide-react';
+import backgroundSvg from '@/assets/Background image for portral.png';
 
 export default function AuthScreens() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [selectedRole, setSelectedRole] = useState<DatabaseUserRole | ''>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const { setUser, setOriginalAdminUser } = useUser();
@@ -24,11 +26,85 @@ export default function AuthScreens() {
     setIsLoading(true);
     setError('');
 
+    // Form validation
+    if (!email || !password) {
+      setError('Email and password are required');
+      setIsLoading(false);
+      return;
+    }
+
+    if (isSignUp && !fullName.trim()) {
+      setError('Full name is required for signup');
+      setIsLoading(false);
+      return;
+    }
+
+    if (isSignUp && !selectedRole) {
+      setError('Please select a role for signup');
+      setIsLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setIsLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
-        // Handle sign up logic
-        setError('Sign up functionality not implemented yet');
-        return;
+        // Handle sign up logic - create new user profile
+        try {
+          // Create new user profile directly (let database handle uniqueness)
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              email: email,
+              full_name: fullName,
+              role: selectedRole || 'SUPPORT' // Fallback to SUPPORT if somehow empty
+            } as any) // Type assertion to bypass strict typing
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Profile creation error:', insertError);
+            
+            // Check for unique constraint violation
+            if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
+              setError('An account with this email already exists');
+            } else if (insertError.code === 'PGRST116') {
+              setError('Database setup incomplete. Please contact administrator.');
+            } else {
+              setError('Failed to create account. Please try again.');
+            }
+            return;
+          }
+
+          if (newProfile) {
+            // Set the user in context and navigate
+            const newUser = {
+              id: (newProfile as any).id,
+              name: (newProfile as any).full_name || 'User',
+              email: (newProfile as any).email,
+              role: (newProfile as any).role as DatabaseUserRole
+            };
+            
+            setUser(newUser);
+            navigate('/dashboard');
+            return;
+          }
+        } catch (signupErr) {
+          console.error('Signup error:', signupErr);
+          setError('Failed to create account. Please try again.');
+          return;
+        }
       } else {
         // Handle sign in logic (same as original)
         if (email === 'admin@kotu.com' && password === 'test123') {
@@ -321,15 +397,25 @@ export default function AuthScreens() {
                 disabled={isLoading}
               />
               
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             
             <a href="#" className="text-primary text-sm block text-center mt-3 mb-4 hover:underline">
@@ -403,15 +489,39 @@ export default function AuthScreens() {
                 disabled={isLoading}
               />
               
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as DatabaseUserRole)}
                 className="w-full px-4 py-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
                 required
                 disabled={isLoading}
-              />
+              >
+                <option value="">Select Role</option>
+                <option value="SUPPORT">Support</option>
+                <option value="WAREHOUSE">Warehouse</option>
+                <option value="INVOICING">Invoicing</option>
+                <option value="ADMIN">Admin</option>
+              </select>
             </div>
             
             <div className="mt-6">

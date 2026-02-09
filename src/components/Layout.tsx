@@ -94,10 +94,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="p-4">
-            <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-sidebar-foreground/50">General</p>
-            <div className="flex items-center gap-3 px-4 py-3 mt-2 rounded-2xl bg-white/70">
-              <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <User className="h-4 w-4 text-sidebar-foreground" />
+            <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-sidebar-primary/70">General</p>
+            <div className="flex items-center gap-3 px-4 py-3 mt-2 rounded-2xl">
+              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
+                <User className="h-4 w-4 text-sidebar-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name || 'User'}</p>

@@ -17,7 +17,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
-  const totalPages = Math.ceil((tickets?.length || 0) / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];
@@ -118,7 +118,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
             disabled={currentPage === 1}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Button>
           
