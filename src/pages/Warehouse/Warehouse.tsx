@@ -72,7 +72,17 @@ export default function Warehouse() {
     }
   };
 
-  const handleExchangeComplete = (ticketId: string, orderId: string) => {
+  const handleExchangeComplete = async (ticketId: string, orderId: string) => {
+    // Update ticket stage immediately to EXCHANGE_COMPLETED
+    await updateTicket.mutateAsync({
+      id: ticketId,
+      stage: 'EXCHANGE_COMPLETED',
+      exchange_completed_at: new Date().toISOString(),
+      eventType: 'EXCHANGE_DONE',
+    });
+    toast({ title: 'Exchange Completed', description: 'Exchange marked as completed' });
+    
+    // Optionally open AWB dialog for tracking
     setSelectedTicketId(ticketId);
     setSelectedOrderId(orderId);
     setAwbType('exchange');

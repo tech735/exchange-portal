@@ -120,7 +120,13 @@ export default function ExchangeLodging() {
             </TabsList>
             <TabsContent value={tab} className="mt-6">
               {tab === 'IN_PROCESS' && selectedTicket ? (
-                <ExchangeCalculator ticket={selectedTicket} />
+                <ExchangeCalculator 
+                  ticket={selectedTicket} 
+                  onProcessed={() => {
+                    setSelectedTicket(null);
+                    setTab('IN_PROCESS');
+                  }}
+                />
               ) : (
                 <TicketsTable 
                   tickets={tickets} 

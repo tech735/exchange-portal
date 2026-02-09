@@ -28,7 +28,6 @@ export default function Dashboard() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Command Center</p>
             <h1 className="text-3xl font-semibold text-foreground mt-2">Dashboard</h1>
             <p className="text-muted-foreground mt-2">Overview of exchange ticket status</p>
           </div>

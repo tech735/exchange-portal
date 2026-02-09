@@ -23,9 +23,10 @@ interface ExchangeCalculatorProps {
     return_items: TicketItem[];
     exchange_items: TicketItem[];
   };
+  onProcessed?: () => void;
 }
 
-export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
+export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorProps) {
   const [deliveryCharge, setDeliveryCharge] = useState(150);
   const [isProcessed, setIsProcessed] = useState(false);
   const navigate = useNavigate();
@@ -65,6 +66,10 @@ export function ExchangeCalculator({ ticket }: ExchangeCalculatorProps) {
         title: totalExchangeValue === 0 ? 'Refund sent to invoicing team' : 'Amount Collected', 
         description: 'Ticket processed successfully' 
       });
+      
+      // Notify parent component and navigate immediately
+      onProcessed?.();
+      navigate('/exchange-lodging?tab=IN_PROCESS');
       
     } catch (error) {
       toast({ 

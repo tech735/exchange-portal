@@ -33,17 +33,26 @@ The Exchange Flow Management System is a role-based React application that handl
 - Track ticket status through predefined stages
 - SLA monitoring and escalation alerts
 - Comprehensive audit trail with event logging
+- Export functionality (CSV and Excel)
 
 ### 3. **Warehouse Operations**
 - Receive and inspect returned items
 - Approve or deny exchange requests
 - Manage inventory and stock levels
 - Process exchange completions
+- AWB (Air Waybill) tracking
 
 ### 4. **Invoicing & Billing**
 - Generate invoices for approved exchanges
 - Track payment status
+- Handle refund processing
 - Financial reporting and analytics
+
+### 5. **Product Management**
+- Product catalog with SKU management
+- School-specific product tagging
+- Price management system
+- Inventory tracking
 
 ## 🔄 Application Workflow
 
@@ -68,12 +77,13 @@ LODGED → WAREHOUSE_PENDING → WAREHOUSE_APPROVED/DENIED
 - Updates ticket status to:
   - `WAREHOUSE_APPROVED`: Items accepted for exchange
   - `WAREHOUSE_DENIED`: Items rejected (with reasons)
+- Adds AWB tracking numbers for shipments
 
 ### 3. **Exchange Completion**
 ```
 WAREHOUSE_APPROVED → EXCHANGE_COMPLETED
 ```
-- Warehouse processes the exchange
+- Warehouse processes exchange
 - New items are prepared and shipped
 - Ticket status updated to `EXCHANGE_COMPLETED`
 
@@ -84,6 +94,7 @@ EXCHANGE_COMPLETED → INVOICING_PENDING → INVOICED
 - Approved exchanges are sent to invoicing
 - Invoices are generated based on exchange value
 - Payment tracking and status updates
+- Refund processing when applicable
 
 ### 5. **Ticket Closure**
 ```
@@ -103,6 +114,7 @@ INVOICED → CLOSED
 - **INVOICING_PENDING**: Awaiting invoice generation
 - **INVOICED**: Invoice generated and sent
 - **CLOSED**: Ticket fully resolved
+- **TO_BE_REFUNDED**: Refund processing required
 - **ESCALATED**: SLA breach or special handling required
 
 ### Ticket Status
@@ -119,24 +131,28 @@ INVOICED → CLOSED
 - ✅ User management and role assignment
 - ✅ System configuration and settings
 - ✅ Advanced reporting and analytics
+- ✅ Product catalog management
 
 ### Support
 - ✅ Create and edit exchange tickets
 - ✅ View all ticket information
 - ✅ Communicate with customers
 - ✅ Generate basic reports
+- ✅ Track ticket progress
 
 ### Warehouse
 - ✅ Process warehouse operations
 - ✅ Approve/deny exchange requests
 - ✅ Manage inventory
 - ✅ Update ticket statuses
+- ✅ AWB tracking management
 
 ### Invoicing
 - ✅ Generate and manage invoices
 - ✅ Track payments
 - ✅ Financial reporting
 - ✅ Billing operations
+- ✅ Refund processing
 
 ## 🗂️ Project Structure
 
@@ -144,7 +160,12 @@ INVOICED → CLOSED
 src/
 ├── components/          # Reusable UI components
 │   ├── ui/             # shadcn/ui components
-│   └── Layout.tsx      # Main application layout
+│   ├── Layout.tsx      # Main application layout
+│   ├── AWBFormDialog.tsx # AWB tracking dialog
+│   ├── ErrorBoundary.tsx # Error handling
+│   ├── NavLink.tsx     # Navigation component
+│   ├── SupabaseTest.tsx # Database testing
+│   └── UserSelector.tsx # User selection component
 ├── pages/              # Page components
 │   ├── Dashboard/      # Main dashboard with KPIs
 │   ├── ExchangeLodging/ # Ticket creation and management
@@ -152,11 +173,16 @@ src/
 │   ├── Invoicing/      # Invoicing interface
 │   ├── TicketDetail/   # Individual ticket view
 │   ├── Users.tsx       # User management
-│   └── Login.tsx       # Authentication
+│   ├── Index/          # Home page
+│   ├── auth_screens/   # Authentication screens
+│   └── NotFound.tsx    # 404 page
 ├── hooks/              # Custom React hooks
 │   ├── useAuth.ts      # Authentication logic
 │   ├── useTickets.ts   # Ticket data management
-│   └── useUsers.ts     # User management
+│   ├── useProducts.ts  # Product management
+│   ├── useProductPrices.ts # Price management
+│   ├── use-mobile.tsx  # Mobile detection
+│   └── use-toast.ts   # Toast notifications
 ├── contexts/           # React contexts
 │   └── UserContext.ts  # User state management
 ├── types/              # TypeScript type definitions
@@ -164,16 +190,23 @@ src/
 ├── lib/                # Utility functions
 ├── utils/              # Helper functions
 └── integrations/       # External integrations
+    └── supabase/       # Supabase configuration
 ```
 
 ## 🗃️ Database Schema
 
 ### Core Tables
 
+#### Profiles
+- User management and authentication
+- Role-based access control (ADMIN, SUPPORT, WAREHOUSE, INVOICING)
+- User preferences and settings
+
 #### Tickets
 - Primary table for exchange requests
 - Contains customer information, items, and workflow status
 - Tracks timestamps for each stage transition
+- AWB tracking for shipments
 
 #### Ticket Events
 - Audit trail for all ticket activities
@@ -184,11 +217,12 @@ src/
 - Master list of available products
 - Includes SKUs, variants, and school tags
 - Supports inventory management
+- Price information
 
-#### Profiles
-- User management and authentication
-- Role-based access control
-- User preferences and settings
+#### Refunds
+- Financial refund tracking
+- Links to tickets requiring refunds
+- Status and amount tracking
 
 ## 🔧 Setup & Installation
 
@@ -199,7 +233,7 @@ src/
 
 ### Installation Steps
 
-1. **Clone the repository**
+1. **Clone repository**
    ```bash
    git clone <repository-url>
    cd exchange-flow-main
@@ -219,7 +253,7 @@ src/
 
 4. **Set up database**
    - Create a new Supabase project
-   - Run the SQL migration scripts (see `readme/NEW-SETUP.md`)
+   - Run SQL migration scripts from `supabase/migrations/`
    - Configure authentication settings
 
 5. **Start development server**
@@ -227,7 +261,7 @@ src/
    npm run dev
    ```
 
-6. **Access the application**
+6. **Access application**
    - Open http://localhost:5173
    - Log in with your Supabase credentials
 
@@ -249,12 +283,14 @@ The dashboard tracks important metrics:
 - **Data Validation**: Form validation with Zod schemas
 - **Audit Trail**: Complete activity logging
 - **SLA Monitoring**: Automated escalation for overdue tickets
+- **Row Level Security**: Database-level access control
 
 ## 📱 Responsive Design
 
 - Mobile-first approach with Tailwind CSS
 - Responsive layouts for tablets and desktops
 - Touch-friendly interface elements
+- Collapsible sidebar for mobile devices
 - Consistent user experience across devices
 
 ## 🔄 Integration Capabilities
@@ -263,13 +299,23 @@ The dashboard tracks important metrics:
 - Product catalog synchronization
 - Automated data import/export
 - Custom reporting capabilities
-- (See `readme/google-sheets-integration.md` for details)
 
 ### External Systems
 - ERP system integration possibilities
 - Payment gateway connectivity
 - Email notification systems
 - SMS alert capabilities
+- AWB tracking integration
+
+## 🎨 UI/UX Features
+
+- **Modern Interface**: Clean, professional design with shadcn/ui
+- **Dark/Light Mode**: Theme switching capability
+- **Interactive Tables**: Sortable, filterable data tables
+- **Real-time Updates**: Live status updates
+- **Export Functionality**: CSV and Excel export options
+- **Toast Notifications**: Non-intrusive user feedback
+- **Loading States**: Skeleton loaders and progress indicators
 
 ## 🐛 Troubleshooting
 
@@ -278,7 +324,7 @@ The dashboard tracks important metrics:
 1. **Database Connection Errors**
    - Verify Supabase credentials in `.env`
    - Check Supabase project status
-   - Ensure tables are created
+   - Ensure tables are created via migrations
 
 2. **Authentication Issues**
    - Clear browser cache and cookies
@@ -290,15 +336,31 @@ The dashboard tracks important metrics:
    - Check React Query caching
    - Verify network connectivity
 
-## 📚 Additional Documentation
+4. **Build Issues**
+   - Ensure all dependencies are installed
+   - Check TypeScript configuration
+   - Verify environment variables
 
-- `readme/original-README.md` - Original project documentation
-- `readme/NEW-SETUP.md` - Detailed database setup guide
-- `readme/google-sheets-integration.md` - Google Sheets integration options
+## 🚀 Deployment
+
+### Production Build
+```bash
+npm run build
+```
+
+### Preview Build
+```bash
+npm run preview
+```
+
+### Environment Variables for Production
+- All environment variables from development
+- Additional production-specific configurations
+- Supabase production credentials
 
 ## 🤝 Contributing
 
-1. Fork the repository
+1. Fork repository
 2. Create a feature branch
 3. Make your changes
 4. Test thoroughly
@@ -313,9 +375,9 @@ This project is proprietary and confidential to the organization.
 For technical support or questions:
 - Contact the development team
 - Check the troubleshooting section
-- Review the additional documentation in the `readme/` folder
+- Review the Supabase dashboard for database issues
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: February 2026
 **Version**: 1.0.0
