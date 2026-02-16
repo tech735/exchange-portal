@@ -7,11 +7,13 @@ import { OperationalOverview } from './OperationalOverview';
 import { TeamCollaboration } from './TeamCollaboration';
 import { WeeklyProgress } from './WeeklyProgress';
 import { TimeTracker } from './TimeTracker';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Dashboard() {
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get('search') || undefined;
   const { data: stats } = useTicketStats();
-  const { data: recentTickets } = useTickets();
+  const { data: recentTickets } = useTickets({ search });
   const navigate = useNavigate();
 
   const kpiCards = [
@@ -64,7 +66,7 @@ export default function Dashboard() {
               <h3 className="text-2xl font-semibold mt-3">Follow up on pending exchanges</h3>
               <p className="text-sm text-muted-foreground mt-2">Keep tickets moving to maintain SLA confidence.</p>
             </div>
-            <button 
+            <button
               onClick={() => navigate('/exchange-lodging?filter=pending')}
               className="mt-6 w-full rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
             >

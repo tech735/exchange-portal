@@ -13,40 +13,48 @@ The Exchange Flow Management System is a role-based React application that handl
 - **UI Framework**: shadcn/ui components with Radix UI primitives
 - **Styling**: Tailwind CSS
 - **State Management**: React Query (TanStack Query) for server state
-- **Routing**: React Router DOM
+- **Routing**: React Router DOM (v6)
 - **Forms**: React Hook Form with Zod validation
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
+- **Payments**: Razorpay Integration (Payment Links)
 
 ## 📋 Core Features
 
 ### 1. **Multi-Role Access Control**
-- **Admin**: Full system access and user management
-- **Support**: Create and manage exchange tickets
-- **Warehouse**: Process returns and approve exchanges
-- **Invoicing**: Handle billing and financial operations
+- **Admin**: Full system access, user management, and ticket deletion
+- **Support**: Create, manage, and track exchange tickets
+- **Warehouse**: Process returns, QC checks, and ship exchanges
+- **Invoicing**: Manage payments, refunds, and final ticket closure
 
-### 2. **Ticket Management System**
-- Create exchange requests with detailed customer information
-- Track ticket status through predefined stages
-- SLA monitoring and escalation alerts
-- Comprehensive audit trail with event logging
-- Export functionality (CSV and Excel)
+### 2. **Advanced Ticket Management**
+- **Exchange Logic**: Automated calculation of exchange value (Net Amount)
+- **Payment Handling**: 
+  - "Mark Ass Collected" for positive values
+  - "Send Payment Link" integration
+  - "Send to Refund" for negative values (refunds due)
+- **Status Tracking**: Granular tracking from Lodging to Closure
+- **SLA Monitoring**: Breach alerts and escalation
 
-### 3. **Warehouse Operations**
-- Receive and inspect returned items
-- Approve or deny exchange requests
-- Manage inventory and stock levels
-- Process exchange completions
-- AWB (Air Waybill) tracking
+### 3. **Comprehensive Warehouse Flow**
+- **Five-Stage Processing**:
+  - **New**: Incoming tickets (Paid or Refunded)
+  - **Return Pending**: AWB generated, waiting for pickup
+  - **Return Received**: Items received at warehouse
+  - **QC Processing**: Approve or Deny based on item condition
+  - **Exchange Booked**: Outbound shipment booked
+- **Aggregator Integration**: Direct links to ShipDelight, iThink Logistics, and ShipRocket
+- **QC Actions**: Detailed approval/denial workflows with notes
 
-### 4. **Invoicing & Billing**
-- Generate invoices for approved exchanges
-- Track payment status
-- Handle refund processing
-- Financial reporting and analytics
+### 4. **Financial Operations**
+- **Invoicing**: Generate invoices for completed exchanges
+- **Refund Management**: 
+  - Visual "Refund Due" indicators
+  - "Mark as Refunded" workflow with status tracking
+  - Automated Payment Summary updates
+- **Payment Reconciliation**: Track collected vs refunded amounts
 
 ### 5. **Product Management**
 - Product catalog with SKU management
@@ -54,54 +62,44 @@ The Exchange Flow Management System is a role-based React application that handl
 - Price management system
 - Inventory tracking
 
+### 6. **Global Search**
+- **Smart Navigation**: Instant access to tickets by Order ID or Customer Name
+- **Recent History**: Quick access to previously searched terms
+- **Live Results**: Real-time search suggestions with ticket details
+- **Keyboard Support**: Full keyboard navigation for power users
+
 ## 🔄 Application Workflow
 
-### 1. **Ticket Creation (Support Team)**
+### 1. **Ticket Creation & Lodging (Support)**
 ```
-Customer Request → Support Team Creates Ticket → Ticket Status: LODGED
+Customer Request → Ticket Created → Payment/Refund check → Status: LODGED
 ```
-- Customer contacts support for uniform exchange
-- Support staff creates new ticket with:
-  - Customer details (name, phone, email)
-  - Student information (name, grade, section)
-  - Reason for exchange (wrong size, defective, etc.)
-  - Items to be returned and exchanged
-  - Order reference and notes
+- Support creates ticket with exchange details.
+- System calculates Net Amount:
+  - **Positive**: Customer pays (Payment Link or Cash).
+  - **Negative**: Refund due to customer.
+- Ticket moves to `IN_PROCESS`.
+- Once Payment Collected or Refund Marked, ticket moves to **Warehouse**.
 
-### 2. **Warehouse Processing (Warehouse Team)**
+### 2. **Warehouse Processing (Warehouse)**
 ```
-LODGED → WAREHOUSE_PENDING → WAREHOUSE_APPROVED/DENIED
+New → Return Pending → Received → QC Check → Exchange Booked
 ```
-- Warehouse receives returned items
-- Inspects condition and verifies exchange eligibility
-- Updates ticket status to:
-  - `WAREHOUSE_APPROVED`: Items accepted for exchange
-  - `WAREHOUSE_DENIED`: Items rejected (with reasons)
-- Adds AWB tracking numbers for shipments
+1.  **New**: View paid/refunded tickets. Select Aggregator (ShipDelight/iThink/ShipRocket) to generate Pickup AWB.
+2.  **Return Pending**: Track pickup status. Mark as "Received" when item arrives.
+3.  **Return Received**: Perform QC (Quality Check).
+    - **Approve**: Move to Exchange Booking.
+    - **Deny**: Close ticket or request info.
+4.  **Exchange Booked**: Book outbound shipment for approved items.
 
-### 3. **Exchange Completion**
+### 3. **Invoicing & Closure (Invoicing)**
 ```
-WAREHOUSE_APPROVED → EXCHANGE_COMPLETED
+EXCHANGE_BOOKED → INVOICING_PENDING → INVOICED → CLOSED
 ```
-- Warehouse processes exchange
-- New items are prepared and shipped
-- Ticket status updated to `EXCHANGE_COMPLETED`
-
-### 4. **Invoicing Process (Invoicing Team)**
-```
-EXCHANGE_COMPLETED → INVOICING_PENDING → INVOICED
-```
-- Approved exchanges are sent to invoicing
-- Invoices are generated based on exchange value
-- Payment tracking and status updates
-- Refund processing when applicable
-
-### 5. **Ticket Closure**
-```
-INVOICED → CLOSED
-```
-- Final review and closure of completed tickets
-- Archive for future reference and reporting
+- Invoicing team sees completed exchanges.
+- Generates Invoice.
+- **For Refunds**: If `Refund Due`, clicks "Mark as Refunded". Status updates to `Refunded`.
+- **Closure**: Closes ticket once all financial and physical actions are complete.
 
 ## 📊 Ticket Stages & Status
 
@@ -161,11 +159,9 @@ src/
 ├── components/          # Reusable UI components
 │   ├── ui/             # shadcn/ui components
 │   ├── Layout.tsx      # Main application layout
+│   ├── GlobalSearch.tsx # Global search component
 │   ├── AWBFormDialog.tsx # AWB tracking dialog
 │   ├── ErrorBoundary.tsx # Error handling
-│   ├── NavLink.tsx     # Navigation component
-│   ├── SupabaseTest.tsx # Database testing
-│   └── UserSelector.tsx # User selection component
 ├── pages/              # Page components
 │   ├── Dashboard/      # Main dashboard with KPIs
 │   ├── ExchangeLodging/ # Ticket creation and management

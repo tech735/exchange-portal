@@ -10,7 +10,6 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (roles: UserRole[]) => boolean;
 }
@@ -39,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Skip Supabase auth check for now to avoid bearer token issues
         // const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (isMounted) {
           // setSession(session);
           // setUser(session?.user ?? null);
@@ -48,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           //   // Redirect to dashboard after successful authentication
           //   navigate('/dashboard');
           // } else {
-            setLoading(false);
+          setLoading(false);
           // }
         }
       } catch (error) {
@@ -105,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Don't throw error, just log it and continue
         return;
       }
-      
+
       if (data) {
         setProfile(data as Profile);
       }
@@ -122,12 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Redirect will be handled by Login component
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    // Mock implementation since we're not using Supabase Auth
-    console.log('Mock sign up called');
-    // Redirect will be handled by Login component
-  };
-
   const signOut = async () => {
     // Skip Supabase auth signOut for mock authentication
     // const { error } = await supabase.auth.signOut();
@@ -141,15 +134,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      profile, 
-      session, 
-      loading, 
-      signIn, 
-      signUp, 
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      session,
+      loading,
+      signIn,
       signOut,
-      hasRole 
+      hasRole
     }}>
       {children}
     </AuthContext.Provider>

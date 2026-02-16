@@ -14,7 +14,6 @@ import AuthScreens from '@/pages/auth_screens/AuthScreens';
 import Users from '@/pages/Users';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import SupabaseTest from '@/components/SupabaseTest';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
 
 const queryClient = new QueryClient();
@@ -27,15 +26,15 @@ const roleAccess: Record<DatabaseUserRole, string[]> = {
   INVOICING: ['/', '/dashboard', '/invoicing'],
 };
 
-function ProtectedRoute({ 
-  children, 
-  requiredPaths 
-}: { 
+function ProtectedRoute({
+  children,
+  requiredPaths
+}: {
   children: React.ReactNode
   requiredPaths: string[]
 }) {
   const { user, isLoading, hasFullAccess } = useUser();
-  
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -56,9 +55,9 @@ function ProtectedRoute({
   // Get user role safely - handle both UserContext user and auth user
   const userRole = user?.role || 'SUPPORT';
   const userPaths = roleAccess[userRole as keyof typeof roleAccess] || [];
-  
+
   // Check if user has access to any of the required paths
-  const hasAccess = requiredPaths.some(path => 
+  const hasAccess = requiredPaths.some(path =>
     userPaths.some(userPath => path.startsWith(userPath))
   );
 
@@ -109,70 +108,66 @@ function AppContent() {
               <Toaster />
               <Sonner />
               <Routes>
-              <Route path="/login" element={
-                <PublicRoute>
-                  <AuthScreens />
-                </PublicRoute>
-              } />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute requiredPaths={['/dashboard']}>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/exchange-lodging" 
-                element={
-                  <ProtectedRoute requiredPaths={['/exchange-lodging']}>
-                    <ExchangeLodging />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/warehouse" 
-                element={
-                  <ProtectedRoute requiredPaths={['/warehouse']}>
-                    <Warehouse />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/invoicing" 
-                element={
-                  <ProtectedRoute requiredPaths={['/invoicing']}>
-                    <Invoicing />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/users" 
-                element={
-                  <ProtectedRoute requiredPaths={['/users']}>
-                    <Users />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/test-supabase" 
-                element={<SupabaseTest />} 
-              />
-              <Route 
-                path="/ticket/:id" 
-                element={
-                  <ProtectedRoute requiredPaths={['/ticket']}>
-                    <TicketDetail />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </TooltipProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+                <Route path="/login" element={
+                  <PublicRoute>
+                    <AuthScreens />
+                  </PublicRoute>
+                } />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute requiredPaths={['/dashboard']}>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/exchange-lodging"
+                  element={
+                    <ProtectedRoute requiredPaths={['/exchange-lodging']}>
+                      <ExchangeLodging />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/warehouse"
+                  element={
+                    <ProtectedRoute requiredPaths={['/warehouse']}>
+                      <Warehouse />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/invoicing"
+                  element={
+                    <ProtectedRoute requiredPaths={['/invoicing']}>
+                      <Invoicing />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/users"
+                  element={
+                    <ProtectedRoute requiredPaths={['/users']}>
+                      <Users />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/ticket/:id"
+                  element={
+                    <ProtectedRoute requiredPaths={['/ticket']}>
+                      <TicketDetail />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

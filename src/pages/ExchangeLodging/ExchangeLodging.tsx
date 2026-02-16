@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
-import { useTickets } from '@/hooks/useTickets';
+import { useTickets, useUpdateTicket } from '@/hooks/useTickets';
+import { useToast } from '@/hooks/use-toast';
+import { useProductPrices } from '@/hooks/useProductPrices';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,13 +15,14 @@ import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { ExchangeForm } from './ExchangeForm';
 import { TicketsTable } from './TicketsTable';
-import { ExchangeCalculator } from './ExchangeCalculator.tsx';
+import { ExchangeCalculator } from './ExchangeCalculator';
 import { exportTicketsToCSV, exportTicketsToExcel } from '@/utils/exportUtils';
 
 export default function ExchangeLodging() {
   const [tab, setTab] = useState<'NEW' | 'IN_PROCESS' | 'COMPLETED'>('NEW');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const statusFilters: Record<string, TicketStatus[]> = {
@@ -28,14 +31,65 @@ export default function ExchangeLodging() {
     COMPLETED: ['COMPLETED'],
   };
 
-  const { data: tickets, isLoading } = useTickets({ 
-    status: statusFilters[tab], 
-    search 
+  const { data: tickets, isLoading } = useTickets({
+    status: statusFilters[tab],
+    search
   });
+
+  const updateTicket = useUpdateTicket();
+  const { toast } = useToast();
+  const { data: productPrices } = useProductPrices();
 
   const handleTicketSelect = (ticket: Ticket) => {
     setSelectedTicket(ticket);
-    setTab('IN_PROCESS');
+    setCalculatorOpen(true);
+  };
+
+  const handleMarkCollected = async (ticket: Ticket) => {
+    // Calculate total exchange value
+    const deliveryCharge = 150; // Default delivery charge
+
+    const calculateItemValue = (items: TicketItem[]): number => {
+      return items.reduce((total, item) => {
+        const itemPrice = productPrices?.[item.sku] || 1000;
+        return total + (itemPrice * item.qty);
+      }, 0);
+    };
+
+    const returnItemsValue = calculateItemValue(ticket.return_items || []);
+    const exchangeItemsValue = calculateItemValue(ticket.exchange_items || []);
+    const netAmount = exchangeItemsValue - returnItemsValue + deliveryCharge;
+
+    const isRefund = netAmount < 0;
+    const absAmount = Math.abs(netAmount);
+
+    const message = isRefund
+      ? `Confirm refund due of ₹${absAmount}? This will mark the ticket as processed.`
+      : `Confirm payment collection of ₹${netAmount}?`;
+
+    if (confirm(message)) {
+      try {
+        await updateTicket.mutateAsync({
+          id: ticket.id,
+          stage: 'LODGED',
+          status: 'IN_PROCESS', // Keep in Process tab
+          amount_collected: isRefund ? 0 : netAmount,
+          refund_amount: isRefund ? absAmount : 0,
+          exchange_completed_at: new Date().toISOString(),
+          eventType: 'UPDATED'
+        });
+        toast({
+          title: isRefund ? 'Refund Marked' : 'Payment Collected',
+          description: 'Ticket moved to Warehouse processing',
+        });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to update ticket',
+          variant: 'destructive'
+        });
+      }
+    }
   };
 
   const handleExportCSV = () => {
@@ -119,22 +173,31 @@ export default function ExchangeLodging() {
               <TabsTrigger value="COMPLETED">Completed</TabsTrigger>
             </TabsList>
             <TabsContent value={tab} className="mt-6">
-              {tab === 'IN_PROCESS' && selectedTicket ? (
-                <ExchangeCalculator 
-                  ticket={selectedTicket} 
-                  onProcessed={() => {
-                    setSelectedTicket(null);
-                    setTab('IN_PROCESS');
-                  }}
-                />
-              ) : (
-                <TicketsTable 
-                  tickets={tickets} 
-                  isLoading={isLoading} 
-                  onTicketSelect={handleTicketSelect}
-                />
-              )}
+              <TicketsTable
+                tickets={tickets}
+                isLoading={isLoading}
+                onTicketSelect={handleTicketSelect}
+                onMarkCollected={handleMarkCollected}
+                productPrices={productPrices}
+              />
             </TabsContent>
+
+            <Dialog open={calculatorOpen} onOpenChange={setCalculatorOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Exchange Calculator</DialogTitle>
+                </DialogHeader>
+                {selectedTicket && (
+                  <ExchangeCalculator
+                    ticket={selectedTicket}
+                    onProcessed={() => {
+                      setCalculatorOpen(false);
+                      setSelectedTicket(null);
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </Tabs>
         </div>
       </div>

@@ -9,21 +9,19 @@ import { useState } from 'react';
 interface WarehouseTableProps {
   tickets?: Ticket[];
   isLoading?: boolean;
+  onBookReturn: (ticket: Ticket) => void;
   onReceive: (id: string) => Promise<void>;
-  onApprove: (ticketId: string, orderId: string) => void;
-  onDeny: (id: string) => Promise<void>;
-  onExchangeComplete: (ticketId: string, orderId: string) => void;
-  onSendToInvoicing: (id: string) => Promise<void>;
+  onQCAction: (ticket: Ticket, action: 'APPROVE' | 'DENY') => void;
+  onBookExchange: (ticket: Ticket) => void;
 }
 
 export function WarehouseTable({
   tickets,
   isLoading,
+  onBookReturn,
   onReceive,
-  onApprove,
-  onDeny,
-  onExchangeComplete,
-  onSendToInvoicing,
+  onQCAction,
+  onBookExchange,
 }: WarehouseTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -72,6 +70,20 @@ export function WarehouseTable({
       )
     },
     {
+      key: 'awb_info',
+      label: 'AWB Info',
+      render: (_: unknown, row: Ticket) => (
+        <div className="text-xs space-y-1">
+          {row.return_awb && (
+            <div>Return: <span className="font-mono">{row.return_awb}</span></div>
+          )}
+          {row.exchange_awb && (
+            <div>Exchange: <span className="font-mono">{row.exchange_awb}</span></div>
+          )}
+        </div>
+      )
+    },
+    {
       key: 'stage',
       label: 'Stage',
       render: (value: string) => (
@@ -83,54 +95,49 @@ export function WarehouseTable({
       label: 'Actions',
       render: (_: unknown, row: Ticket) => (
         <div className="flex gap-2">
+          {/* TAB 1: NEW (WAREHOUSE) -> Book Return */}
           {row.stage === 'LODGED' && (
-            <>
-              <Button size="sm" onClick={() => onReceive(row.id)}>
-                <Check className="h-4 w-4 mr-1" />
-                Receive
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => onDeny(row.id)}>
-                <X className="h-4 w-4 mr-1" />
-                Deny
-              </Button>
-            </>
+            <Button size="sm" onClick={() => onBookReturn(row)}>
+              <Package className="h-4 w-4 mr-1" />
+              Book Return
+            </Button>
           )}
-          {row.stage === 'WAREHOUSE_PENDING' && (
+
+          {/* TAB 2: RETURN PENDING -> Mark Received */}
+          {row.stage === 'RETURN_PENDING' && (
+            <Button size="sm" onClick={() => onReceive(row.id)}>
+              <Check className="h-4 w-4 mr-1" />
+              Mark Received
+            </Button>
+          )}
+
+          {/* TAB 3: RETURN RECEIVED -> QC Approve/Deny */}
+          {row.stage === 'RETURN_RECEIVED' && (
             <>
-              <Button size="sm" onClick={() => onApprove(row.id, row.order_id)}>
+              <Button size="sm" onClick={() => onQCAction(row, 'APPROVE')}>
                 <Check className="h-4 w-4 mr-1" />
                 Approve
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => onDeny(row.id)}>
+              <Button size="sm" variant="destructive" onClick={() => onQCAction(row, 'DENY')}>
                 <X className="h-4 w-4 mr-1" />
                 Deny
               </Button>
             </>
           )}
+
+          {/* TAB 4: APPROVED -> Book Exchange */}
           {row.stage === 'WAREHOUSE_APPROVED' && (
-            <Button size="sm" onClick={() => onExchangeComplete(row.id, row.order_id)}>
-              Exchange Done
+            <Button size="sm" onClick={() => onBookExchange(row)}>
+              <Package className="h-4 w-4 mr-1" />
+              Book Exchange
             </Button>
           )}
-          {row.stage === 'EXCHANGE_COMPLETED' && (
-            <Button size="sm" variant="outline" onClick={() => onSendToInvoicing(row.id)}>
-              Send to Invoicing
-            </Button>
-          )}
-          {row.stage === 'INVOICING_PENDING' && (
-            <Button size="sm" variant="secondary" disabled>
-              Sent to Invoicing
-            </Button>
-          )}
-          {row.stage === 'INVOICED' && (
-            <Button size="sm" variant="secondary" disabled>
-              Invoiced
-            </Button>
-          )}
-          {row.stage === 'CLOSED' && (
-            <Button size="sm" variant="secondary" disabled>
-              Closed
-            </Button>
+
+          {/* TAB 6: EXCHANGE BOOKED -> View/Complete (Optional) */}
+          {row.stage === 'EXCHANGE_BOOKED' && (
+            <div className="text-xs text-muted-foreground italic">
+              Exchange Booked
+            </div>
           )}
         </div>
       )
@@ -151,8 +158,8 @@ export function WarehouseTable({
       <div className="flex items-center justify-between px-4 py-3 border-t">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Items per page:</span>
-          <select 
-            value={itemsPerPage} 
+          <select
+            value={itemsPerPage}
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
             className="w-20 px-2 py-1 border rounded text-sm"
           >
@@ -160,9 +167,9 @@ export function WarehouseTable({
             <option value="25">25</option>
             <option value="50">50</option>
             <option value="100">100</option>
-          </select>
-        </div>
-        
+          </select >
+        </div >
+
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -174,13 +181,13 @@ export function WarehouseTable({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Button>
-          
+
           <div className="flex items-center gap-1">
             <span className="text-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
             </span>
           </div>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -192,7 +199,7 @@ export function WarehouseTable({
             </svg>
           </Button>
         </div>
-      </div>
+      </div >
     </DataTable>
   );
 }

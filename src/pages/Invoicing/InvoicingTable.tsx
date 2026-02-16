@@ -38,7 +38,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     const returnItemsValue = calculateItemValue(ticket.return_items || []);
     const exchangeItemsValue = calculateItemValue(ticket.exchange_items || []);
     const deliveryCharge = 150; // Default delivery charge
-    
+
     // Refund is needed when return items value > exchange items value
     const netAmount = exchangeItemsValue - returnItemsValue + deliveryCharge;
     return netAmount < 0 ? Math.abs(netAmount) : 0;
@@ -81,26 +81,40 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
       key: 'payment_collected',
       label: 'Payment/Refund',
       render: (_: unknown, row: Ticket) => {
-        const isCollected = row.sent_to_invoicing_at ? true : false;
+        const isCollected = row.sent_to_invoicing_at || (row.amount_collected || 0) > 0;
         const refundAmount = calculateRefundAmount(row);
         const needsRefund = refundAmount > 0;
-        
+        const collectedDate = row.sent_to_invoicing_at || row.exchange_completed_at;
+        const isRefunded = row.refund_status === 'PROCESSED';
+
         return (
           <div className="flex flex-col gap-1">
             {needsRefund ? (
-              <div className="flex items-center gap-2">
-                <div>
-                  <div className="text-sm font-medium text-orange-500">Refund ₹{refundAmount.toLocaleString()}</div>
-                  <div className="text-xs text-muted-foreground">To be refunded</div>
+              isRefunded ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <div className="text-sm font-medium text-orange-500">Refunded ₹{refundAmount.toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.refund_sent_at ? format(new Date(row.refund_sent_at), 'MMM d, HH:mm') : '-'}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div>
+                    <div className="text-sm font-medium text-orange-500">Refund ₹{refundAmount.toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">To be refunded</div>
+                  </div>
+                </div>
+              )
             ) : isCollected ? (
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <div>
                   <div className="text-sm font-medium text-green-600">Collected</div>
                   <div className="text-xs text-muted-foreground">
-                    {format(new Date(row.sent_to_invoicing_at!), 'MMM d, HH:mm')}
+                    {collectedDate ? format(new Date(collectedDate), 'MMM d, HH:mm') : '-'}
                   </div>
                 </div>
               </div>
@@ -127,10 +141,10 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
       render: (_: unknown, row: Ticket) => {
         const refundAmount = calculateRefundAmount(row);
         const needsRefund = refundAmount > 0;
-        
+
         return (
           <div className="flex gap-2">
-            {['EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(row.stage) && (
+            {['EXCHANGE_BOOKED', 'EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(row.stage) && (
               <Button size="sm" onClick={() => onInvoiceDone(row.id)}>
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Invoice Done

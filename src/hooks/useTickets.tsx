@@ -40,6 +40,13 @@ interface UpdateTicketData {
   exchange_awb?: string;
   assigned_team?: string;
   eventType?: EventType;
+  return_aggregator?: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null;
+  exchange_aggregator?: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null;
+  return_booked_at?: string;
+  return_received_at?: string;
+  qc_decision?: 'APPROVED' | 'DENIED' | null;
+  qc_notes?: string;
+  exchange_booked_at?: string;
 }
 
 function parseTicketItems(items: unknown): TicketItem[] {
@@ -92,6 +99,13 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     amount_collected: Number(data.amount_collected || 0),
     closed_at: data.closed_at ? String(data.closed_at) : null,
     updated_at: String(data.updated_at),
+    return_aggregator: data.return_aggregator ? (data.return_aggregator as any) : null,
+    exchange_aggregator: data.exchange_aggregator ? (data.exchange_aggregator as any) : null,
+    return_booked_at: data.return_booked_at ? String(data.return_booked_at) : null,
+    return_received_at: data.return_received_at ? String(data.return_received_at) : null,
+    qc_decision: data.qc_decision ? (data.qc_decision as any) : null,
+    qc_notes: data.qc_notes ? String(data.qc_notes) : null,
+    exchange_booked_at: data.exchange_booked_at ? String(data.exchange_booked_at) : null,
   };
 }
 
@@ -126,7 +140,7 @@ export function useTickets(filters?: {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map(d => mapTicket(d as unknown as Record<string, unknown>));
+      return (data || []).map((d: any) => mapTicket(d));
     },
   });
 }
@@ -138,7 +152,7 @@ export function useTicket(id: string | undefined) {
       if (!id) return null;
       const { data, error } = await supabase.from('tickets').select('*').eq('id', id).single();
       if (error) throw error;
-      return mapTicket(data as unknown as Record<string, unknown>);
+      return mapTicket(data as any);
     },
     enabled: !!id,
   });
@@ -149,9 +163,10 @@ export function useTicketEvents(ticketId: string | undefined) {
     queryKey: ['ticket-events', ticketId],
     queryFn: async () => {
       if (!ticketId) return [];
+      if (!ticketId) return [];
       const { data, error } = await supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('event_at', { ascending: true });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!ticketId,
   });
@@ -164,7 +179,7 @@ export function useCreateTicket() {
   return useMutation({
     mutationFn: async (data: CreateTicketData) => {
       try {
-        const { data: tickets, error } = await supabase.from('tickets').insert({
+        const { data: tickets, error } = await (supabase.from('tickets') as any).insert({
           order_id: data.order_id,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
@@ -194,11 +209,11 @@ export function useCreateTicket() {
         }
 
         try {
-          await supabase.from('ticket_events').insert({
+          await (supabase.from('ticket_events') as any).insert({
             ticket_id: ticket.id,
             event_type: 'CREATED' as const,
             event_by_user_id: user?.id || null,
-            event_payload: { 
+            event_payload: {
               order_id: data.order_id,
               customer_name: data.customer_name,
               reason_code: data.reason_code
@@ -225,15 +240,15 @@ export function useUpdateTicket() {
 
   return useMutation({
     mutationFn: async ({ id, eventType, ...updates }: UpdateTicketData & { eventType?: EventType }) => {
-      const { data: ticket, error } = await supabase.from('tickets').update(updates).eq('id', id).select().single();
+      const { data: ticket, error } = await (supabase.from('tickets') as any).update(updates).eq('id', id).select().single();
       if (error) throw error;
 
       if (eventType) {
-        await supabase.from('ticket_events').insert({
+        await (supabase.from('ticket_events') as any).insert({
           ticket_id: id,
           event_type: eventType,
           event_by_user_id: user?.id || null,
-          event_payload: { 
+          event_payload: {
             stage: updates.stage,
             updated_fields: Object.keys(updates)
           },
@@ -241,10 +256,25 @@ export function useUpdateTicket() {
       }
       return ticket;
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       queryClient.invalidateQueries({ queryKey: ['ticket'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-events'] });
+    },
+  });
+}
+
+export function useDeleteTicket() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('tickets').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
     },
   });
 }
@@ -255,15 +285,16 @@ export function useTicketStats() {
     queryFn: async () => {
       const { data, error } = await supabase.from('tickets').select('stage, status, sla_breached, created_at');
       if (error) throw error;
+      const tickets = data as any[];
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       return {
-        totalOpen: data.filter(t => !['CLOSED', 'INVOICED'].includes(t.stage)).length,
-        pendingWarehouse: data.filter(t => ['LODGED', 'WAREHOUSE_PENDING'].includes(t.stage)).length,
-        pendingInvoicing: data.filter(t => ['EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(t.stage)).length,
-        slaBreached: data.filter(t => t.sla_breached).length,
-        completedThisWeek: data.filter(t => t.status === 'COMPLETED' && new Date(t.created_at) >= weekAgo).length,
-        denied: data.filter(t => t.status === 'DENIED').length,
+        totalOpen: tickets.filter(t => !['CLOSED', 'INVOICED'].includes(t.stage)).length,
+        pendingWarehouse: tickets.filter(t => ['LODGED', 'WAREHOUSE_PENDING'].includes(t.stage)).length,
+        pendingInvoicing: tickets.filter(t => ['EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(t.stage)).length,
+        slaBreached: tickets.filter(t => t.sla_breached).length,
+        completedThisWeek: tickets.filter(t => t.status === 'COMPLETED' && new Date(t.created_at) >= weekAgo).length,
+        denied: tickets.filter(t => t.status === 'DENIED').length,
       };
     },
   });

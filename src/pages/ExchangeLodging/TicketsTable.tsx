@@ -1,26 +1,59 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { AlertTriangle, Calculator } from 'lucide-react';
+import { AlertTriangle, Calculator, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { REASON_LABELS, STAGE_LABELS, type Ticket } from '@/types/database';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import { useUser } from '@/contexts/UserContext';
+import { useDeleteTicket } from '@/hooks/useTickets';
+import { useToast } from '@/hooks/use-toast';
 
 interface TicketsTableProps {
   tickets?: Ticket[];
   isLoading?: boolean;
   onTicketSelect?: (ticket: Ticket) => void;
+  onMarkCollected?: (ticket: Ticket) => void;
+  productPrices?: Record<string, number>;
 }
 
-export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTableProps) {
+export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollected, productPrices }: TicketsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const { user, hasFullAccess } = useUser();
+  const deleteTicket = useDeleteTicket();
+  const { toast } = useToast();
 
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
+      try {
+        await deleteTicket.mutateAsync(id);
+        toast({ title: 'Ticket Deleted', description: 'The ticket has been successfully deleted.' });
+      } catch (error) {
+        toast({ title: 'Error', description: 'Failed to delete ticket', variant: 'destructive' });
+      }
+    }
+  };
+
+  const calculateNetAmount = (ticket: Ticket): number => {
+    const deliveryCharge = 150;
+    const calculateItemValue = (items: any[]): number => {
+      return items.reduce((total, item) => {
+        const itemPrice = productPrices?.[item.sku] || 1000;
+        return total + (itemPrice * (item.qty || 0));
+      }, 0);
+    };
+
+    const returnItemsValue = calculateItemValue(ticket.return_items || []);
+    const exchangeItemsValue = calculateItemValue(ticket.exchange_items || []);
+    return exchangeItemsValue - returnItemsValue + deliveryCharge;
+  };
 
   const columns = [
     {
@@ -31,7 +64,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
           <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
             {value}
           </Link>
-          {onTicketSelect && (
+          {onTicketSelect && row.status !== 'IN_PROCESS' && (
             <Button
               variant="ghost"
               size="sm"
@@ -81,6 +114,57 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
           {format(new Date(value), 'MMM d, HH:mm')}
         </div>
       )
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_: unknown, row: Ticket) => {
+        const netAmount = calculateNetAmount(row);
+        const isRefund = netAmount < 0;
+
+        return (
+          <div className="flex items-center gap-2">
+            {row.status === 'IN_PROCESS' && (
+              (row.amount_collected || 0) > 0 ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                  Paid
+                </Badge>
+              ) : (row.refund_amount || 0) > 0 ? (
+                <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                  Refunded
+                </Badge>
+              ) : (
+                onMarkCollected && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkCollected(row);
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    {isRefund ? "Send to Refund" : "Mark Paid"}
+                  </Button>
+                )
+              )
+            )}
+            {(hasFullAccess() || user?.role === 'ADMIN') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(row.id);
+                }}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      }
     }
   ];
 
@@ -98,8 +182,8 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
       <div className="flex items-center justify-between px-4 py-3 border-t">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Items per page:</span>
-          <select 
-            value={itemsPerPage} 
+          <select
+            value={itemsPerPage}
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
             className="w-20 px-2 py-1 border rounded text-sm"
           >
@@ -109,7 +193,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
             <option value="100">100</option>
           </select>
         </div>
-        
+
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -121,13 +205,13 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect }: TicketsTabl
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Button>
-          
+
           <div className="flex items-center gap-1">
             <span className="text-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
             </span>
           </div>
-          
+
           <Button
             variant="outline"
             size="sm"

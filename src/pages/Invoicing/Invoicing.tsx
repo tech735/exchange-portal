@@ -17,7 +17,7 @@ export default function Invoicing() {
   const updateTicket = useUpdateTicket();
 
   const stageFilters: Record<string, TicketStage[]> = {
-    pending: ['EXCHANGE_COMPLETED', 'INVOICING_PENDING', 'INVOICED', 'TO_BE_REFUNDED'],
+    pending: ['EXCHANGE_BOOKED', 'EXCHANGE_COMPLETED', 'INVOICING_PENDING', 'INVOICED', 'TO_BE_REFUNDED'],
     done: ['CLOSED'],
   };
 

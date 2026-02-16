@@ -70,10 +70,10 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       onSuccess();
     } catch (error: unknown) {
       console.error('Error creating ticket:', error);
-      toast({ 
-        title: 'Error', 
-        description: error instanceof Error ? error.message : 'Failed to create ticket', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create ticket',
+        variant: 'destructive'
       });
     }
   };

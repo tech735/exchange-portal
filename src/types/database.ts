@@ -1,8 +1,10 @@
-export type TicketStage = 
+export type TicketStage =
   | 'LODGED'
-  | 'WAREHOUSE_PENDING'
+  | 'RETURN_PENDING'
+  | 'RETURN_RECEIVED'
   | 'WAREHOUSE_APPROVED'
   | 'WAREHOUSE_DENIED'
+  | 'EXCHANGE_BOOKED'
   | 'EXCHANGE_COMPLETED'
   | 'INVOICING_PENDING'
   | 'INVOICED'
@@ -12,7 +14,7 @@ export type TicketStage =
 
 export type TicketStatus = 'NEW' | 'IN_PROCESS' | 'COMPLETED' | 'DENIED' | 'ESCALATED';
 
-export type ReasonCode = 
+export type ReasonCode =
   | 'WRONG_SIZE'
   | 'DEFECTIVE'
   | 'WRONG_ITEM'
@@ -20,7 +22,7 @@ export type ReasonCode =
   | 'QUALITY_ISSUE'
   | 'OTHER';
 
-export type EventType = 
+export type EventType =
   | 'CREATED'
   | 'UPDATED'
   | 'RECEIVED'
@@ -64,6 +66,16 @@ export interface Ticket {
   reason_notes: string | null;
   stage: TicketStage;
   status: TicketStatus;
+
+  // New fields for strict flow
+  return_aggregator: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null;
+  exchange_aggregator: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null;
+  return_booked_at: string | null;
+  return_received_at: string | null;
+  qc_decision: 'APPROVED' | 'DENIED' | null;
+  qc_notes: string | null;
+  exchange_booked_at: string | null;
+
   return_items: TicketItem[];
   exchange_items: TicketItem[];
   notes: string | null;
@@ -119,9 +131,11 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
 
 export const STAGE_LABELS: Record<TicketStage, string> = {
   LODGED: 'Lodged',
-  WAREHOUSE_PENDING: 'Warehouse Pending',
+  RETURN_PENDING: 'Return Pending',
+  RETURN_RECEIVED: 'Return Received',
   WAREHOUSE_APPROVED: 'Warehouse Approved',
   WAREHOUSE_DENIED: 'Warehouse Denied',
+  EXCHANGE_BOOKED: 'Exchange Booked',
   EXCHANGE_COMPLETED: 'Exchange Completed',
   INVOICING_PENDING: 'Invoicing Pending',
   INVOICED: 'Invoiced',

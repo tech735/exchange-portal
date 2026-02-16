@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { 
-  Calculator, 
-  IndianRupee, 
-  Plus, 
-  Minus, 
+import {
+  Calculator,
+  IndianRupee,
+  Plus,
+  Minus,
   CheckCircle,
   Package,
-  ArrowLeft
+  ArrowLeft,
+  Link
 } from 'lucide-react';
 import { type TicketItem } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
@@ -49,33 +50,60 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
 
   const handleProcessExchange = async () => {
     if (!ticket?.id) return;
-    
+
     try {
       // Update ticket status and move to warehouse
       await updateTicket.mutateAsync({
         id: ticket.id,
-        stage: 'WAREHOUSE_PENDING',
-        status: 'IN_PROCESS',
+        stage: 'LODGED',
+        status: 'IN_PROCESS', // Keep in Process tab for visibility
+        amount_collected: totalExchangeValue,
         exchange_completed_at: new Date().toISOString(),
-        sent_to_invoicing_at: new Date().toISOString(),
-        eventType: 'SENT_TO_INVOICE'
+        eventType: 'UPDATED' // Or PAYMENT_COLLECTED if that event type is desired
       });
-      
+
       setIsProcessed(true);
-      toast({ 
-        title: totalExchangeValue === 0 ? 'Refund sent to invoicing team' : 'Amount Collected', 
-        description: 'Ticket processed successfully' 
+      toast({
+        title: totalExchangeValue === 0 ? 'Refund sent to invoicing team' : 'Payment Collected',
+        description: 'Ticket moved to Warehouse processing',
       });
-      
+
       // Notify parent component and navigate immediately
       onProcessed?.();
       navigate('/exchange-lodging?tab=IN_PROCESS');
-      
+
     } catch (error) {
-      toast({ 
-        title: 'Error', 
+      toast({
+        title: 'Error',
         description: 'Failed to process exchange',
         variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSendPaymentLink = async () => {
+    if (!ticket?.id) return;
+
+    try {
+      // Open Razorpay payment links dashboard
+      window.open('https://accounts.razorpay.com/auth/?auth_intent=login&redirecturl=https%3A%2F%2Fdashboard.razorpay.com%2Fapp%2Fpaymentlinks', '_blank');
+
+      await updateTicket.mutateAsync({
+        id: ticket.id,
+        status: 'IN_PROCESS', // Move to In Process tab
+        eventType: 'UPDATED',
+      });
+      toast({
+        title: "Payment Link Sent",
+        description: "Ticket moved to In Process. Awaiting payment.",
+      });
+      onProcessed?.(); // Close dialog
+      navigate('/exchange-lodging?tab=IN_PROCESS');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update ticket status",
+        variant: "destructive",
       });
     }
   };
@@ -167,12 +195,12 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
               <span className="font-medium">Exchange Items Value:</span>
               <span className="font-bold text-green-600">+₹{exchangeItemsValue.toLocaleString()}</span>
             </div>
-            
+
             <div className="flex items-center justify-between">
               <span className="font-medium">Return Items Value:</span>
               <span className="font-bold text-red-600">-₹{returnItemsValue.toLocaleString()}</span>
             </div>
-            
+
             <div className="flex items-center justify-between">
               <span className="font-medium">Delivery Charge:</span>
               <div className="flex items-center gap-2">
@@ -227,7 +255,7 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
                     <span className="font-medium">Refund Processed Successfully</span>
                   </div>
                 ) : (
-                  <Button 
+                  <Button
                     onClick={handleProcessExchange}
                     className="w-full"
                     size="lg"
@@ -249,14 +277,17 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
                     <span className="font-medium">Amount Collected Successfully</span>
                   </div>
                 ) : (
-                  <Button 
-                    onClick={handleProcessExchange}
-                    className="w-full"
-                    size="lg"
-                  >
-                    <IndianRupee className="h-4 w-4 mr-2" />
-                    Mark as Collected
-                  </Button>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handleSendPaymentLink}
+                      className="w-full"
+                      size="lg"
+                      variant="outline"
+                    >
+                      <Link className="h-4 w-4 mr-2" />
+                      Send Payment Link
+                    </Button>
+                  </div>
                 )}
               </>
             )}

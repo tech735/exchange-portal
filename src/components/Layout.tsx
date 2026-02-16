@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X, Bell, Mail, Search } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X, Bell, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GlobalSearch } from './GlobalSearch';
 
 interface NavItem {
   to: string;
@@ -54,12 +55,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="app-shell">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-4 left-4 z-50 w-64 flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0",
@@ -116,7 +117,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-      
+
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-background border-b border-border">
         <div className="flex items-center justify-between p-4">
@@ -138,13 +139,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto lg:pt-0 pt-16">
         <div className="hidden lg:block app-header">
           <div className="flex items-center gap-4 w-full">
-            <div className="relative max-w-md flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                className="h-11 w-full rounded-full bg-white px-10 text-sm text-foreground placeholder:text-muted-foreground shadow-sm border border-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="Search tickets, orders, people"
-              />
-            </div>
+            <GlobalSearch />
             <div className="flex items-center gap-3 ml-auto">
               <button className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition">
                 <Mail className="h-4 w-4" />

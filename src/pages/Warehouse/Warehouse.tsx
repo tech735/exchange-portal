@@ -6,117 +6,168 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
-import { type TicketStage } from '@/types/database';
+import { type TicketStage, type Ticket } from '@/types/database';
 import { WarehouseTable } from './WarehouseTable';
-import { AWBFormDialog } from '@/components/AWBFormDialog';
+import { AggregatorSelector } from '@/components/AggregatorSelector';
+import { QCActionDialog } from '@/components/QCActionDialog';
 
 export default function Warehouse() {
-  const [tab, setTab] = useState('pending');
+  const [tab, setTab] = useState('new_warehouse');
   const [search, setSearch] = useState('');
-  const [awbDialogOpen, setAwbDialogOpen] = useState(false);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [awbType, setAwbType] = useState<'return' | 'exchange'>('return');
+
+  // Dialog States
+  const [aggregatorDialogOpen, setAggregatorDialogOpen] = useState(false);
+  const [qcDialogOpen, setQcDialogOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+
+  // To track which action opened the aggregator dialog (RETURN or EXCHANGE)
+  const [aggregatorActionType, setAggregatorActionType] = useState<'RETURN' | 'EXCHANGE'>('RETURN');
+
+  // To track QC action
+  const [qcActionType, setQcActionType] = useState<'APPROVE' | 'DENY'>('APPROVE');
+
   const { toast } = useToast();
   const updateTicket = useUpdateTicket();
 
   const stageFilters: Record<string, TicketStage[]> = {
-    pending: ['LODGED', 'WAREHOUSE_PENDING'],
+    new_warehouse: ['LODGED'], // AND payment collected (handled by backend or assumed for now based on flow)
+    return_pending: ['RETURN_PENDING'],
+    return_received: ['RETURN_RECEIVED'],
     approved: ['WAREHOUSE_APPROVED'],
-    completed: ['EXCHANGE_COMPLETED', 'INVOICING_PENDING', 'INVOICED', 'CLOSED'],
     denied: ['WAREHOUSE_DENIED'],
+    exchange_booked: ['EXCHANGE_BOOKED'], // Removed EXCHANGE_COMPLETED to avoid potential query issues if enum missing
   };
 
-  const { data: tickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
+  const { data: rawTickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
 
-  const handleReceive = async (id: string) => {
-    await updateTicket.mutateAsync({
-      id,
-      stage: 'WAREHOUSE_PENDING',
-      status: 'IN_PROCESS',
-      warehouse_received_at: new Date().toISOString(),
-      assigned_team: 'warehouse',
-      eventType: 'RECEIVED',
-    });
-    toast({ title: 'Received', description: 'Items received at warehouse' });
+  // Filter tickets: For 'new_warehouse', only show tickets where payment is collected.
+  const tickets = rawTickets?.filter(ticket => {
+    if (tab === 'new_warehouse') {
+      // Show tickets that have been processed by Exchange team (either Paid or Refund Marked)
+      return ticket.status === 'IN_PROCESS';
+    }
+    return true;
+  });
+
+  // HANDLERS
+
+  const handleBookReturn = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setAggregatorActionType('RETURN');
+    setAggregatorDialogOpen(true);
   };
 
-  const handleApprove = (ticketId: string, orderId: string) => {
-    setSelectedTicketId(ticketId);
-    setSelectedOrderId(orderId);
-    setAwbType('return');
-    setAwbDialogOpen(true);
-  };
+  const handleAggregatorSubmit = async (aggregator: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET', awb: string) => {
+    if (!selectedTicket) {
+      toast({ title: 'Error', description: 'No ticket selected', variant: 'destructive' });
+      return;
+    }
 
-  const handleAwbSubmit = async (awb: string) => {
-    if (!selectedTicketId) return;
-    
-    if (awbType === 'return') {
-      await updateTicket.mutateAsync({
-        id: selectedTicketId,
-        stage: 'WAREHOUSE_APPROVED',
-        warehouse_approved_at: new Date().toISOString(),
-        return_awb: awb,
-        eventType: 'APPROVED',
+    try {
+      if (aggregatorActionType === 'RETURN') {
+        await updateTicket.mutateAsync({
+          id: selectedTicket.id,
+          stage: 'RETURN_PENDING',
+          return_aggregator: aggregator,
+          return_awb: awb,
+          return_booked_at: new Date().toISOString(),
+          eventType: 'UPDATED',
+        });
+        toast({ title: 'Return Booked', description: 'Ticket moved to Return Pending' });
+      } else {
+        await updateTicket.mutateAsync({
+          id: selectedTicket.id,
+          stage: 'EXCHANGE_BOOKED',
+          exchange_aggregator: aggregator,
+          exchange_awb: awb,
+          exchange_booked_at: new Date().toISOString(),
+          eventType: 'EXCHANGE_DONE',
+        });
+        toast({ title: 'Exchange Booked', description: 'Ticket moved to Exchange Booked' });
+      }
+      setAggregatorDialogOpen(false); // Close dialog on success
+    } catch (error: any) {
+      console.error('Aggregator Submit Error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to submit booking. Please check console.',
+        variant: 'destructive'
       });
-      toast({ title: 'Approved', description: `Return approved with AWB: ${awb}` });
-    } else {
-      await updateTicket.mutateAsync({
-        id: selectedTicketId,
-        stage: 'EXCHANGE_COMPLETED',
-        exchange_completed_at: new Date().toISOString(),
-        exchange_awb: awb,
-        eventType: 'EXCHANGE_DONE',
-      });
-      toast({ title: 'Completed', description: `Exchange completed with AWB: ${awb}` });
+      throw error;
     }
   };
 
-  const handleExchangeComplete = async (ticketId: string, orderId: string) => {
-    // Update ticket stage immediately to EXCHANGE_COMPLETED
-    await updateTicket.mutateAsync({
-      id: ticketId,
-      stage: 'EXCHANGE_COMPLETED',
-      exchange_completed_at: new Date().toISOString(),
-      eventType: 'EXCHANGE_DONE',
-    });
-    toast({ title: 'Exchange Completed', description: 'Exchange marked as completed' });
-    
-    // Optionally open AWB dialog for tracking
-    setSelectedTicketId(ticketId);
-    setSelectedOrderId(orderId);
-    setAwbType('exchange');
-    setAwbDialogOpen(true);
+  const handleReceive = async (id: string) => {
+    try {
+      await updateTicket.mutateAsync({
+        id,
+        stage: 'RETURN_RECEIVED',
+        return_received_at: new Date().toISOString(),
+        eventType: 'RECEIVED',
+      });
+      toast({ title: 'Received', description: 'Return received. Moved to QC Pending.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: 'Failed to receive return.', variant: 'destructive' });
+    }
   };
 
-  const handleDeny = async (id: string) => {
-    await updateTicket.mutateAsync({
-      id,
-      stage: 'WAREHOUSE_DENIED',
-      status: 'DENIED',
-      warehouse_denied_at: new Date().toISOString(),
-      eventType: 'DENIED',
-    });
-    toast({ title: 'Denied', description: 'Return denied' });
+  const handleQCAction = (ticket: Ticket, action: 'APPROVE' | 'DENY') => {
+    setSelectedTicket(ticket);
+    setQcActionType(action);
+    setQcDialogOpen(true);
   };
 
-  const handleSendToInvoicing = async (id: string) => {
-    await updateTicket.mutateAsync({
-      id,
-      stage: 'INVOICING_PENDING',
-      sent_to_invoicing_at: new Date().toISOString(),
-      assigned_team: 'invoicing',
-      eventType: 'SENT_TO_INVOICE',
-    });
-    toast({ title: 'Sent to Invoicing', description: 'Exchange sent to invoicing team' });
+  const handleQCSubmit = async (decision: 'APPROVED' | 'DENIED', notes: string) => {
+    if (!selectedTicket) {
+      toast({ title: 'Error', description: 'No ticket selected', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      if (decision === 'APPROVED') {
+        await updateTicket.mutateAsync({
+          id: selectedTicket.id,
+          stage: 'WAREHOUSE_APPROVED',
+          qc_decision: 'APPROVED',
+          qc_notes: notes,
+          eventType: 'APPROVED',
+        });
+        toast({ title: 'Approved', description: 'Ticket moved to Approved tab.' });
+      } else {
+        await updateTicket.mutateAsync({
+          id: selectedTicket.id,
+          stage: 'WAREHOUSE_DENIED',
+          qc_decision: 'DENIED',
+          qc_notes: notes,
+          eventType: 'DENIED',
+        });
+        toast({ title: 'Denied', description: 'Ticket moved to Denied tab.' });
+      }
+      setQcDialogOpen(false); // Close dialog on success
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to submit QC decision.',
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  };
+
+  const handleBookExchange = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setAggregatorActionType('EXCHANGE');
+    setAggregatorDialogOpen(true);
   };
 
   return (
     <Layout>
       <div className="page-shell animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-semibold">Warehouse Processing</h1>
-          <p className="text-muted-foreground mt-2">Process returns and exchanges</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-semibold">Warehouse Processing</h1>
+            <p className="text-muted-foreground mt-2">Process returns and exchanges</p>
+          </div>
         </div>
 
         <div className="card-base">
@@ -126,32 +177,44 @@ export default function Warehouse() {
           </div>
 
           <Tabs value={tab} onValueChange={setTab} className="mt-6">
-            <TabsList>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="approved">Approved</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="denied">Denied</TabsTrigger>
+            <TabsList className="inline-flex h-auto w-auto items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
+              <TabsTrigger value="new_warehouse" className="rounded-md px-3 py-1.5">New</TabsTrigger>
+              <TabsTrigger value="return_pending" className="rounded-md px-3 py-1.5">Return Pending</TabsTrigger>
+              <TabsTrigger value="return_received" className="rounded-md px-3 py-1.5">QC Pending</TabsTrigger>
+              <TabsTrigger value="approved" className="rounded-md px-3 py-1.5">Approved</TabsTrigger>
+              <TabsTrigger value="denied" className="rounded-md px-3 py-1.5">Denied</TabsTrigger>
+              <TabsTrigger value="exchange_booked" className="rounded-md px-3 py-1.5">Exchange Booked</TabsTrigger>
             </TabsList>
             <TabsContent value={tab} className="mt-6">
               <WarehouseTable
                 tickets={tickets}
                 isLoading={isLoading}
+                onBookReturn={handleBookReturn}
                 onReceive={handleReceive}
-                onApprove={handleApprove}
-                onDeny={handleDeny}
-                onExchangeComplete={handleExchangeComplete}
-                onSendToInvoicing={handleSendToInvoicing}
+                onQCAction={handleQCAction}
+                onBookExchange={handleBookExchange}
               />
             </TabsContent>
           </Tabs>
         </div>
 
-        <AWBFormDialog
-          open={awbDialogOpen}
-          onOpenChange={setAwbDialogOpen}
-          onSubmit={handleAwbSubmit}
-          orderId={selectedOrderId || ''}
-          awbType={awbType}
+        <AggregatorSelector
+          open={aggregatorDialogOpen}
+          onOpenChange={setAggregatorDialogOpen}
+          onSubmit={handleAggregatorSubmit}
+          title={aggregatorActionType === 'RETURN' ? 'Book Return Request' : 'Book Exchange Shipment'}
+          description={aggregatorActionType === 'RETURN'
+            ? 'Select an aggregator to book the return pickup. You must enter the generated Return AWB.'
+            : 'Select an aggregator to ship the exchange item. You must enter the generated Exchange AWB.'}
+          isLoading={updateTicket.isPending}
+        />
+
+        <QCActionDialog
+          open={qcDialogOpen}
+          onOpenChange={setQcDialogOpen}
+          onSubmit={handleQCSubmit}
+          title={qcActionType === 'APPROVE' ? 'Approve Return' : 'Deny Return'}
+          actionType={qcActionType}
           isLoading={updateTicket.isPending}
         />
       </div>

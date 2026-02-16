@@ -10,7 +10,7 @@ interface PaymentSummaryProps {
 
 export function PaymentSummary({ ticket }: PaymentSummaryProps) {
   const { data: productPrices } = useProductPrices();
-  
+
   // Calculate item values using actual prices
   const calculateItemValue = (items: TicketItem[]): number => {
     return items.reduce((total, item) => {
@@ -22,9 +22,10 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
   const returnItemsValue = calculateItemValue(ticket.return_items || []);
   const exchangeItemsValue = calculateItemValue(ticket.exchange_items || []);
   const deliveryCharge = 150; // Default delivery charge
-  const totalAmountToCollect = Math.max(0, exchangeItemsValue - returnItemsValue + deliveryCharge);
+  const netAmount = exchangeItemsValue - returnItemsValue + deliveryCharge;
 
-  const isPaymentCollected = ticket.sent_to_invoicing_at ? true : false;
+  const isPaymentCollected = ticket.sent_to_invoicing_at || (ticket.amount_collected || 0) > 0;
+  const isRefunded = (ticket.refund_amount || 0) > 0;
 
   return (
     <Card>
@@ -50,21 +51,37 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
           </div>
           <div>
             <span className="text-muted-foreground">Total Amount:</span>
-            <div className="font-bold text-primary">₹{totalAmountToCollect.toLocaleString()}</div>
+            <div className={`font-bold ${netAmount < 0 ? 'text-orange-600' : 'text-primary'}`}>
+              {netAmount < 0 ? '-' : ''}₹{Math.abs(netAmount).toLocaleString()}
+            </div>
           </div>
         </div>
 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Payment Status:</span>
-            {isPaymentCollected ? (
+            {isRefunded ? (
+              <div className="flex items-center gap-2 text-orange-600">
+                <CheckCircle className="h-4 w-4" />
+                <div>
+                  <div className="font-medium">Refunded</div>
+                  {ticket.exchange_completed_at && (
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(ticket.exchange_completed_at), 'MMM d, yyyy HH:mm')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : isPaymentCollected ? (
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
                 <div>
                   <div className="font-medium">Collected</div>
-                  <div className="text-xs text-muted-foreground">
-                    {format(new Date(ticket.sent_to_invoicing_at!), 'MMM d, yyyy HH:mm')}
-                  </div>
+                  {(ticket.sent_to_invoicing_at || ticket.exchange_completed_at) && (
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(ticket.sent_to_invoicing_at || ticket.exchange_completed_at!), 'MMM d, yyyy HH:mm')}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
