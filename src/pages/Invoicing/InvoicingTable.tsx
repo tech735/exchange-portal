@@ -145,10 +145,18 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
         return (
           <div className="flex gap-2">
             {['EXCHANGE_BOOKED', 'EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(row.stage) && (
-              <Button size="sm" onClick={() => onInvoiceDone(row.id)}>
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Invoice Done
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button size="sm" onClick={() => {
+                  window.open("https://books.zoho.in/app/852503254#/salesorders", "_blank");
+                  onClose(row.id);
+                }}>
+                  Process Invoice
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onInvoiceDone(row.id)}>
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Invoice Done
+                </Button>
+              </div>
             )}
             {row.stage === 'INVOICED' && needsRefund && (
               <Button size="sm" onClick={() => onSendToRefund(row.id)}>

@@ -59,7 +59,7 @@ export default function Users() {
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as User[];
     }
@@ -104,7 +104,7 @@ export default function Users() {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -127,7 +127,7 @@ export default function Users() {
         .from('profiles')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -236,7 +236,7 @@ export default function Users() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold">User Management</h1>
+            <h1 className="text-3xl font-semibold text-foreground mt-2">User Management</h1>
             <p className="text-muted-foreground mt-2">Manage system users and their roles</p>
           </div>
 

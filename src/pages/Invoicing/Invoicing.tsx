@@ -79,7 +79,7 @@ export default function Invoicing() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold">Invoicing</h1>
+            <h1 className="text-3xl font-semibold text-foreground mt-2">Invoicing</h1>
             <p className="text-muted-foreground mt-2">Complete invoicing for exchanges</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

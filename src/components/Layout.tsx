@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X, Bell, Mail } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, Receipt, LogOut, User, Menu, X, Bell, Mail, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlobalSearch } from './GlobalSearch';
 
@@ -16,7 +16,8 @@ interface NavItem {
 
 const allNavItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SUPPORT', 'WAREHOUSE', 'INVOICING'] },
-  { to: '/exchange-lodging', label: 'Exchange Lodging', icon: Package, roles: ['ADMIN', 'SUPPORT'] },
+  { to: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['ADMIN', 'SUPPORT'] },
+  { to: '/exchange-lodging', label: 'Exchange Tickets', icon: Package, roles: ['ADMIN', 'SUPPORT'] },
   { to: '/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['ADMIN', 'WAREHOUSE'] },
   { to: '/invoicing', label: 'Invoicing', icon: Receipt, roles: ['ADMIN', 'INVOICING'] },
   { to: '/users', label: 'Users', icon: User, roles: ['ADMIN'] },

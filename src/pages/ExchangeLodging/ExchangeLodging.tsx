@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, AlertTriangle, Calculator, IndianRupee, CheckCircle, Clock, Download, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Calculator, IndianRupee, CheckCircle, Clock, Download, FileSpreadsheet, Package } from 'lucide-react';
 import { REASON_LABELS, STAGE_LABELS, type TicketStatus, type Ticket, type TicketItem } from '@/types/database';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -17,11 +17,13 @@ import { ExchangeForm } from './ExchangeForm';
 import { TicketsTable } from './TicketsTable';
 import { ExchangeCalculator } from './ExchangeCalculator';
 import { exportTicketsToCSV, exportTicketsToExcel } from '@/utils/exportUtils';
+import { ShopifyExchangeCreate } from './ShopifyExchangeCreate';
 
 export default function ExchangeLodging() {
   const [tab, setTab] = useState<'NEW' | 'IN_PROCESS' | 'COMPLETED'>('NEW');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [shopifyOpen, setShopifyOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
@@ -113,7 +115,7 @@ export default function ExchangeLodging() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold">Exchange Lodging</h1>
+            <h1 className="text-3xl font-semibold text-foreground mt-2">Exchange Tickets</h1>
             <p className="text-muted-foreground mt-2">Create and manage exchange requests</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -139,16 +141,31 @@ export default function ExchangeLodging() {
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button variant="outline">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Exchange
+                  Manual Exchange
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>New Exchange Request</DialogTitle>
+                  <DialogTitle>New Manual Exchange Request</DialogTitle>
                 </DialogHeader>
                 <ExchangeForm onSuccess={() => setOpen(false)} />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={shopifyOpen} onOpenChange={setShopifyOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Package className="h-4 w-4 mr-2" />
+                  Create Exchange
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
+                </DialogHeader>
+                <ShopifyExchangeCreate onSuccess={() => setShopifyOpen(false)} />
               </DialogContent>
             </Dialog>
           </div>

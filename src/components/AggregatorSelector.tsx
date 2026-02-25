@@ -13,6 +13,7 @@ interface AggregatorSelectorProps {
     title: string;
     description?: string;
     isLoading?: boolean;
+    previousAggregatorInfo?: string | null;
 }
 
 const AGGREGATORS = [
@@ -27,7 +28,8 @@ export function AggregatorSelector({
     onSubmit,
     title,
     description,
-    isLoading
+    isLoading,
+    previousAggregatorInfo
 }: AggregatorSelectorProps) {
     const [selectedAggregator, setSelectedAggregator] = useState<'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null>(null);
     const [awb, setAwb] = useState('');
@@ -58,6 +60,13 @@ export function AggregatorSelector({
                     <DialogTitle>{title}</DialogTitle>
                     {description && <DialogDescription>{description}</DialogDescription>}
                 </DialogHeader>
+
+                {previousAggregatorInfo && previousAggregatorInfo !== 'Order not yet fulfilled.' && (
+                    <div className="bg-muted/50 p-3 rounded-md border text-sm mt-2">
+                        <span className="font-semibold text-foreground">Previous Fulfillment:</span>
+                        <p className="text-muted-foreground mt-1">{previousAggregatorInfo}</p>
+                    </div>
+                )}
 
                 <div className="space-y-6 py-4">
                     <div className="space-y-3">

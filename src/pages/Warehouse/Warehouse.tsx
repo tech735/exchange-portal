@@ -165,7 +165,7 @@ export default function Warehouse() {
       <div className="page-shell animate-fade-in">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-semibold">Warehouse Processing</h1>
+            <h1 className="text-3xl font-semibold text-foreground mt-2">Warehouse Processing</h1>
             <p className="text-muted-foreground mt-2">Process returns and exchanges</p>
           </div>
         </div>
@@ -207,6 +207,7 @@ export default function Warehouse() {
             ? 'Select an aggregator to book the return pickup. You must enter the generated Return AWB.'
             : 'Select an aggregator to ship the exchange item. You must enter the generated Exchange AWB.'}
           isLoading={updateTicket.isPending}
+          previousAggregatorInfo={selectedTicket?.notes}
         />
 
         <QCActionDialog
