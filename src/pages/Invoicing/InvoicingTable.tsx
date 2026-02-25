@@ -20,15 +20,29 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const { data: productPrices } = useProductPrices();
-  const [processingInvoices, setProcessingInvoices] = useState<Set<string>>(new Set());
+  const [processingInvoices, setProcessingInvoices] = useState<Set<string>>(() => {
+    const saved = sessionStorage.getItem('processingInvoices');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
 
   const handleStartProcessing = (id: string) => {
     setProcessingInvoices((prev) => {
       const newSet = new Set(prev);
       newSet.add(id);
+      sessionStorage.setItem('processingInvoices', JSON.stringify(Array.from(newSet)));
       return newSet;
     });
-    window.open("https://books.zoho.in/app/852503254#/salesorders", "_blank");
+    window.open("https://books.zoho.in/app/852503254#/salesorders", "_blank", "noopener,noreferrer");
+  };
+
+  const handleInvoiceDone = async (id: string) => {
+    setProcessingInvoices((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      sessionStorage.setItem('processingInvoices', JSON.stringify(Array.from(newSet)));
+      return newSet;
+    });
+    await onInvoiceDone(id);
   };
 
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
@@ -161,7 +175,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
                     Process Invoice
                   </Button>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => onInvoiceDone(row.id)}>
+                  <Button size="sm" variant="outline" onClick={() => handleInvoiceDone(row.id)}>
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Invoice Done
                   </Button>

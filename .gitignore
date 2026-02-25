@@ -24,4 +24,5 @@ dist-ssr
 *.sw?
 knip_report.json
 secrets.txt
-*.txt
+build_error_cmd.txt
+build*.log
