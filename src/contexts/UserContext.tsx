@@ -2,10 +2,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserRole } from '@/types/database';
 
-// Re-export UserRole for convenience
-export type { UserRole } from '@/types/database';
-
-export interface User {
+interface User {
   id: string;
   name: string;
   role: UserRole;
@@ -45,12 +42,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const persistedUser = localStorage.getItem('user');
         const persistedOriginalAdmin = localStorage.getItem('originalAdminUser');
-        
+
         if (persistedUser) {
           const parsedUser = JSON.parse(persistedUser);
           setUser(parsedUser);
         }
-        
+
         if (persistedOriginalAdmin) {
           const parsedOriginalAdmin = JSON.parse(persistedOriginalAdmin);
           setOriginalAdminUser(parsedOriginalAdmin);
@@ -61,7 +58,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('user');
         localStorage.removeItem('originalAdminUser');
       }
-      
+
       setIsLoading(false);
     };
 

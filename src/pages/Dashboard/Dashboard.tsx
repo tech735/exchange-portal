@@ -8,6 +8,8 @@ import { TeamCollaboration } from './TeamCollaboration';
 import { WeeklyProgress } from './WeeklyProgress';
 import { TimeTracker } from './TimeTracker';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PendingItemsDialog } from './PendingItemsDialog';
+import { useState } from 'react';
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -15,6 +17,7 @@ export default function Dashboard() {
   const { data: stats } = useTicketStats();
   const { data: recentTickets } = useTickets({ search });
   const navigate = useNavigate();
+  const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
 
   const kpiCards = [
     { title: 'Total Open', value: stats?.totalOpen ?? 0, icon: Package, color: 'text-info' },
@@ -67,13 +70,18 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground mt-2">Keep tickets moving to maintain SLA confidence.</p>
             </div>
             <button
-              onClick={() => navigate('/exchange-lodging?filter=pending')}
+              onClick={() => setIsPendingDialogOpen(true)}
               className="mt-6 w-full rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
             >
               Review Pending Items
             </button>
           </div>
         </div>
+
+        <PendingItemsDialog
+          open={isPendingDialogOpen}
+          onOpenChange={setIsPendingDialogOpen}
+        />
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-7">

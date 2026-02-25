@@ -20,6 +20,16 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const { data: productPrices } = useProductPrices();
+  const [processingInvoices, setProcessingInvoices] = useState<Set<string>>(new Set());
+
+  const handleStartProcessing = (id: string) => {
+    setProcessingInvoices((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(id);
+      return newSet;
+    });
+    window.open("https://books.zoho.in/app/852503254#/salesorders", "_blank");
+  };
 
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -146,16 +156,16 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
           <div className="flex gap-2">
             {['EXCHANGE_BOOKED', 'EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(row.stage) && (
               <div className="flex flex-col gap-2">
-                <Button size="sm" onClick={() => {
-                  window.open("https://books.zoho.in/app/852503254#/salesorders", "_blank");
-                  onClose(row.id);
-                }}>
-                  Process Invoice
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => onInvoiceDone(row.id)}>
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Invoice Done
-                </Button>
+                {!processingInvoices.has(row.id) ? (
+                  <Button size="sm" onClick={() => handleStartProcessing(row.id)}>
+                    Process Invoice
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => onInvoiceDone(row.id)}>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Invoice Done
+                  </Button>
+                )}
               </div>
             )}
             {row.stage === 'INVOICED' && needsRefund && (

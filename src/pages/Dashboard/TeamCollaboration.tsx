@@ -22,7 +22,7 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
       const { data: tickets, error } = await supabase
         .from('tickets')
         .select('stage, status, created_at, updated_at')
-        .in('stage', ['LODGED', 'WAREHOUSE_PENDING', 'INVOICING_PENDING'])
+        .in('stage', ['LODGED', 'RETURN_PENDING', 'INVOICING_PENDING'])
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -42,8 +42,8 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
         },
         {
           name: 'Warehouse Queue',
-          count: ticketData.filter(t => t.stage === 'WAREHOUSE_PENDING').length,
-          status: ticketData.filter(t => t.stage === 'WAREHOUSE_PENDING').length > 0 ? 'active' : 'idle'
+          count: ticketData.filter(t => t.stage === 'RETURN_PENDING').length,
+          status: ticketData.filter(t => t.stage === 'RETURN_PENDING').length > 0 ? 'active' : 'idle'
         },
         {
           name: 'Invoicing Queue',
@@ -102,7 +102,7 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
         {queueStats?.map((queue) => {
           const Icon = getIcon(queue.name);
           const statusBadge = getStatusBadge(queue.status, queue.count);
-          
+
           return (
             <div key={queue.name} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -122,7 +122,7 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
             </div>
           );
         })}
-        
+
         {queueStats?.length === 0 && (
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground">All queues are clear</p>
