@@ -42,6 +42,7 @@ export interface TicketItem {
   product_name: string;
   size: string;
   qty: number;
+  price?: number; // Captures price at the time of ticket creation
 }
 
 export interface Profile {
@@ -66,6 +67,7 @@ export interface Ticket {
   reason_notes: string | null;
   stage: TicketStage;
   status: TicketStatus;
+  is_paid: boolean;
 
   // New fields for strict flow
   return_aggregator: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET' | null;
@@ -114,10 +116,18 @@ export interface ProductCatalog {
   id: string;
   sku: string;
   product_name: string;
+  product_description: string | null;
+  category: string | null;
   variants: string[];
+  variant_skus: string[];
   school_tags: string[] | null;
+  price: number | null;
   active: boolean;
+  shopify_product_id: number | null;
+  shopify_variant_id: number | null;
+  last_synced_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export const REASON_LABELS: Record<ReasonCode, string> = {

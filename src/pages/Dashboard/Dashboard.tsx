@@ -7,6 +7,7 @@ import { OperationalOverview } from './OperationalOverview';
 import { TeamCollaboration } from './TeamCollaboration';
 import { WeeklyProgress } from './WeeklyProgress';
 import { TimeTracker } from './TimeTracker';
+import { ProductSyncButton } from '@/components/ProductSyncButton';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PendingItemsDialog } from './PendingItemsDialog';
 import { useState } from 'react';
@@ -88,6 +89,7 @@ export default function Dashboard() {
             <RecentTicketsTable tickets={recentTickets} />
           </div>
           <div className="xl:col-span-5 grid gap-6">
+            <ProductSyncButton />
             <TeamCollaboration />
             <WeeklyProgress />
             <TimeTracker />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
-import { mockUsers } from '@/contexts/UserContext';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
 import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
@@ -16,6 +16,7 @@ export default function AuthScreens() {
   const [showContactAdmin, setShowContactAdmin] = useState(false);
   const navigate = useNavigate();
   const { setUser, setOriginalAdminUser } = useUser();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,42 +30,38 @@ export default function AuthScreens() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      setIsLoading(false);
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Handle sign in logic
+      // Emergency Mock Check: allow admin@kotu.com login even if auth isn't seeded yet
       if (email === 'admin@kotu.com' && password === 'test123') {
-        console.log('Using mock authentication');
-        const adminUser = mockUsers.admin;
+        const adminUser = {
+          id: 'admin-fallback-id',
+          name: 'System Admin (Fallback)',
+          email: 'admin@kotu.com',
+          role: 'ADMIN' as DatabaseUserRole
+        };
         setUser(adminUser);
         setOriginalAdminUser(adminUser);
         navigate('/dashboard');
         return;
       }
 
-      const { data: profile, error } = await supabase
+      // 1. Sign in with Supabase Auth
+      await signIn(email, password);
+
+      // 2. Fetch profile from public.profiles
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('email', email)
         .single();
 
-      if (error || !profile) {
-        setError('Invalid credentials');
+      if (profileError || !profile) {
+        setError('Login successful, but profile not found. Please contact admin.');
+        setIsLoading(false);
         return;
       }
 
-      // Type assertion for the profile data
+      // 3. Sync with UserContext for current APP navigation logic
       const typedProfile = profile as {
         id: string;
         full_name: string | null;
@@ -80,10 +77,16 @@ export default function AuthScreens() {
       };
 
       setUser(userFromProfile);
+      
+      // If Admin, also set original admin for switching logic support
+      if (typedProfile.role === 'ADMIN') {
+        setOriginalAdminUser(userFromProfile);
+      }
+
       navigate('/dashboard');
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Auth error:', err);
-      setError('Login failed. Please try again.');
+      setError(err.message || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }

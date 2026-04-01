@@ -77,12 +77,22 @@ export interface Database {
       };
       product_catalog: {
         Row: {
+          id: string;
           sku: string;
           product_name: string;
+          product_description: string | null;
+          category: string | null;
+          variants: Json;
+          school_tags: string[] | null;
           price: number | null;
           active: boolean;
+          shopify_product_id: number | null;
+          shopify_variant_id: number | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
         };
-        Insert: Database['public']['Tables']['product_catalog']['Row'];
+        Insert: Omit<Database['public']['Tables']['product_catalog']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['product_catalog']['Insert']>;
       };
     };

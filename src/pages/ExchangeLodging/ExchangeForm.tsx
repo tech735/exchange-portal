@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import { REASON_LABELS, type ReasonCode, type TicketItem } from '@/types/database';
 import { useCreateTicket } from '@/hooks/useTickets';
 import { ImprovedItemSelector } from './ImprovedItemSelector';
+import { useProductPrices } from '@/hooks/useProductPrices';
 
 // Mock schools for dropdown
 const MOCK_SCHOOLS = [
@@ -36,10 +37,18 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
   const [returnItems, setReturnItems] = useState<TicketItem[]>([]);
   const [exchangeItems, setExchangeItems] = useState<TicketItem[]>([]);
   const createTicket = useCreateTicket();
+  const { data: productPrices } = useProductPrices();
   const { toast } = useToast();
 
   const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string }, size: string, qty: number) => {
-    const item: TicketItem = { sku: product.sku, product_name: product.product_name, size, qty };
+    const price = productPrices?.[product.sku];
+    const item: TicketItem = { 
+      sku: product.sku, 
+      product_name: product.product_name, 
+      size, 
+      qty,
+      price 
+    };
     if (list === 'return') {
       setReturnItems([...returnItems, item]);
     } else {

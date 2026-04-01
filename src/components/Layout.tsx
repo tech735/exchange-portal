@@ -39,9 +39,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
 
   const handleSignOut = async () => {
-    await signOut();
-    logout(); // Clear user state
-    navigate('/login');
+    try {
+      await signOut();
+    } finally {
+      logout(); // Clear user state even if signOut fails
+      navigate('/login');
+    }
   };
 
   if (!user) {

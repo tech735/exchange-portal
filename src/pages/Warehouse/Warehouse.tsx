@@ -40,11 +40,10 @@ export default function Warehouse() {
 
   const { data: rawTickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
 
-  // Filter tickets: For 'new_warehouse', only show tickets where payment is collected.
+  // Filter tickets: For 'new_warehouse', show tickets where payment is confirmed OR status is In Process
   const tickets = rawTickets?.filter(ticket => {
     if (tab === 'new_warehouse') {
-      // Show tickets that have been processed by Exchange team (either Paid or Refund Marked)
-      return ticket.status === 'IN_PROCESS';
+      return ticket.is_paid === true || ticket.status === 'IN_PROCESS';
     }
     return true;
   });

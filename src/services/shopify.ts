@@ -74,6 +74,14 @@ export interface ShopifyOrder {
     }>;
 }
 
+export interface SyncResult {
+    success: boolean;
+    synced: number;
+    deactivated: number;
+    errors: number;
+    totalShopifyProducts: number;
+}
+
 export const shopifyService = {
     /**
      * Fetch a Shopify order by its name/ID (e.g., KO-1256)
@@ -113,5 +121,26 @@ export const shopifyService = {
         }
 
         return (data.orders || []) as ShopifyOrder[];
-    }
+    },
+
+    /**
+     * Sync the entire Shopify product catalogue into the product_catalog table.
+     * Returns a summary of how many products were synced/deactivated.
+     */
+    async syncProducts(): Promise<SyncResult> {
+        const { data, error } = await supabase.functions.invoke('shopify', {
+            body: { action: 'syncProducts' },
+        });
+
+        if (error) {
+            console.error('Error invoking shopify sync:', error);
+            throw new Error(error.message || 'Failed to sync products');
+        }
+
+        if (data?.error) {
+            throw new Error(data.error);
+        }
+
+        return data as SyncResult;
+    },
 };

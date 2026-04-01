@@ -29,79 +29,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        // Add 2 second timeout for auth initialization
-        timeoutId = setTimeout(() => {
-          if (isMounted && loading) {
-            setLoading(false);
-          }
-        }, 2000);
-
-        // Skip Supabase auth check for now to avoid bearer token issues
-        // const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (isMounted) {
-          // setSession(session);
-          // setUser(session?.user ?? null);
-          // if (session?.user) {
-          //   await fetchProfile(session.user.id);
-          //   // Redirect to dashboard after successful authentication
-          //   navigate('/dashboard');
-          // } else {
-          setLoading(false);
-          // }
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setLoading(false);
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (isMounted) {
           setLoading(false);
         }
-      } finally {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
       }
     };
 
     initAuth();
 
-    // Skip Supabase auth listener for now
-    // const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    //   async (_event, session) => {
-    //     if (isMounted) {
-    //       setSession(session);
-    //       setUser(session?.user ?? null);
-    //       if (session?.user) {
-    //         await fetchProfile(session.user.id);
-    //         // Redirect to dashboard after successful authentication
-    //         navigate('/dashboard');
-    //       } else {
-    //         setProfile(null);
-    //         setLoading(false);
-    //       }
-    //     }
-    //   }
-    // );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+            setLoading(false);
+          }
+        }
+      }
+    );
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      // subscription?.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, [navigate, loading]);
+  }, [navigate]);
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching profile for userId:', userId);
+      
+      // Safety timeout for profile fetch
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
       if (error) {
         console.error('Profile fetch error:', error);
-        // Don't throw error, just log it and continue
         return;
       }
 
@@ -116,16 +104,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    // Mock implementation since we're not using Supabase Auth
-    console.log('Mock sign in called');
-    // Redirect will be handled by Login component
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setLoading(false);
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    // Skip Supabase auth signOut for mock authentication
-    // const { error } = await supabase.auth.signOut();
-    // if (error) throw error;
-    console.log('Mock sign out successful');
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Supabase sign out error:', error);
+    } finally {
+      setProfile(null);
+      setUser(null);
+      setSession(null);
+      setLoading(false);
+    }
   };
 
   const hasRole = (roles: UserRole[]) => {

@@ -59,7 +59,14 @@ export function ImprovedItemSelector({
     const product = validProducts.find(p => p.sku === sku);
     if (product) {
       setSelectedProduct(product);
-      setSelectedSize('');
+      
+      // Auto-select size if there's only one variant
+      if (product.variants && product.variants.length === 1) {
+        setSelectedSize(product.variants[0]);
+      } else {
+        setSelectedSize('');
+      }
+      
       setQuantity('1');
       setSearchTerm('');
       setIsOpen(false);

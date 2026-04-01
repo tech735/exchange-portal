@@ -47,6 +47,7 @@ interface UpdateTicketData {
   qc_decision?: 'APPROVED' | 'DENIED' | null;
   qc_notes?: string;
   exchange_booked_at?: string;
+  is_paid?: boolean;
 }
 
 function parseTicketItems(items: unknown): TicketItem[] {
@@ -57,6 +58,7 @@ function parseTicketItems(items: unknown): TicketItem[] {
       product_name: String(item?.product_name || ''),
       size: String(item?.size || ''),
       qty: Number(item?.qty || 0),
+      price: item?.price ? Number(item?.price) : undefined,
     }));
   }
   return [];
@@ -76,6 +78,7 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     reason_notes: data.reason_notes ? String(data.reason_notes) : null,
     stage: data.stage as TicketStage,
     status: data.status as TicketStatus,
+    is_paid: Boolean(data.is_paid),
     return_items: parseTicketItems(data.return_items),
     exchange_items: parseTicketItems(data.exchange_items),
     notes: data.notes ? String(data.notes) : null,
