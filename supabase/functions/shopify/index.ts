@@ -62,6 +62,73 @@ async function fetchAllShopifyProducts(
     return allProducts;
 }
 
+/**
+ * Fetch all locations and find the primary one.
+ */
+async function getPrimaryLocationId(storeUrl: string, accessToken: string): Promise<number | null> {
+    const url = `https://${storeUrl}/admin/api/2024-01/locations.json`;
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': accessToken,
+        },
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const locations = data.locations || [];
+    
+    // Try to find the primary location or one named "Online Store"
+    const onlineStore = locations.find((l: any) => l.name.toLowerCase().includes('online store'));
+    const primary = onlineStore || locations.find((l: any) => l.legacy_primary === true) || locations[0];
+    return primary ? primary.id : null;
+}
+
+/**
+ * Fetch all inventory levels for a specific location.
+ * Returns a map of inventory_item_id -> available quantity.
+ */
+async function fetchInventoryMapForLocation(
+    storeUrl: string,
+    accessToken: string,
+    locationId: number,
+): Promise<Map<number, number>> {
+    const inventoryMap = new Map<number, number>();
+    let url: string | null = `https://${storeUrl}/admin/api/2024-01/locations/${locationId}/inventory_levels.json?limit=250`;
+
+    while (url) {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+            },
+        });
+
+        if (!response.ok) {
+            console.error('Error fetching inventory levels:', response.status);
+            break;
+        }
+
+        const data = await response.json();
+        if (data.inventory_levels && Array.isArray(data.inventory_levels)) {
+            data.inventory_levels.forEach((level: any) => {
+                inventoryMap.set(level.inventory_item_id, level.available || 0);
+            });
+        }
+
+        url = null;
+        const linkHeader = response.headers.get('link');
+        if (linkHeader) {
+            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+            if (nextMatch) url = nextMatch[1];
+        }
+    }
+
+    return inventoryMap;
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -168,6 +235,35 @@ serve(async (req) => {
         }
 
         // ─────────────────────────────────────────────
+        // ACTION: getLocations
+        // ─────────────────────────────────────────────
+        if (action === 'getLocations') {
+            const locationsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/locations.json`;
+
+            const response = await fetch(locationsUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Access-Token': shopifyAccessToken,
+                },
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                return new Response(JSON.stringify({ error: `Shopify API error: ${errorText}` }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: response.status,
+                });
+            }
+
+            const data = await response.json();
+            return new Response(JSON.stringify({ locations: data.locations || [] }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        // ─────────────────────────────────────────────
         // ACTION: syncProducts (Updated Strategy: Group by Product)
         // ─────────────────────────────────────────────
         if (action === 'syncProducts') {
@@ -189,6 +285,17 @@ serve(async (req) => {
             // 1. Fetch all products from Shopify
             const products = await fetchAllShopifyProducts(cleanStoreUrl, shopifyAccessToken);
             console.log(`Fetched ${products.length} products from Shopify`);
+
+            // 1b. Fetch inventory map for primary location
+            const primaryLocationId = await getPrimaryLocationId(cleanStoreUrl, shopifyAccessToken);
+            let inventoryMap = null;
+            if (primaryLocationId) {
+                console.log(`Fetching inventory levels for primary location: ${primaryLocationId}`);
+                inventoryMap = await fetchInventoryMapForLocation(cleanStoreUrl, shopifyAccessToken, primaryLocationId);
+                console.log(`Fetched ${inventoryMap.size} inventory levels`);
+            } else {
+                console.warn('Could not find primary location ID, falling back to global inventory quantity');
+            }
 
             // 2. Map each Shopify product to a product_catalog row
             //    (Variants are grouped within the row)
@@ -215,7 +322,10 @@ serve(async (req) => {
                 variants.forEach(v => {
                     if (v.sku) {
                         variantPrices[v.sku] = parseFloat(v.price) || 0;
-                        variantInventory[v.sku] = parseInt(v.inventory_quantity) || 0;
+                        
+                        // Use location-specific inventory if available, otherwise fallback to global quantity
+                        const locationStock = inventoryMap ? inventoryMap.get(v.inventory_item_id) : null;
+                        variantInventory[v.sku] = locationStock !== null ? (locationStock || 0) : (parseInt(v.inventory_quantity) || 0);
                     }
                 });
 

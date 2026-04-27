@@ -23,7 +23,7 @@ export function ImprovedItemSelector({
   filterOutOfStock = false,
 }: ImprovedItemSelectorProps) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<ProductCatalog | null>(null);
+  const [selectedProductSku, setSelectedProductSku] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState('1');
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +32,10 @@ export function ImprovedItemSelector({
   const { data: products } = useProducts();
   const validProducts = Array.isArray(products) ? products : [];
   
+  const selectedProduct = selectedProductSku 
+    ? validProducts.find(p => p.sku === selectedProductSku) || null 
+    : null;
+
   const filteredProducts = validProducts.filter(product => {
     if (!searchTerm.trim()) return true;
     const searchLower = searchTerm.toLowerCase();
@@ -44,25 +48,25 @@ export function ImprovedItemSelector({
     );
   });
 
-  // Calculate available sizes for the selected product
-  const getAvailableSizes = () => {
-    if (!selectedProduct) return [];
+  // Calculate available sizes for a product
+  const getAvailableSizes = (product: ProductCatalog | null) => {
+    if (!product) return [];
     
-    const variants = selectedProduct.variants || [];
+    const variants = product.variants || [];
     
     if (!filterOutOfStock) {
       return variants;
     }
 
     // Filter based on inventory mapping
-    return variants.filter((size, index) => {
-      const variantSkus = selectedProduct.variant_skus || [];
-      const inventoryMap = selectedProduct.variant_inventory || {};
+    return variants.filter((_, index) => {
+      const variantSkus = product.variant_skus || [];
+      const inventoryMap = product.variant_inventory || {};
       
       const vSku = variantSkus[index];
       
       // If we don't have an SKU for this variant, we can't reliably check stock.
-      // In strict filtering mode, we hide it. Otherwise, we show it.
+      // In strict filtering mode, we hide it.
       if (!vSku) {
         return false; 
       }
@@ -72,14 +76,14 @@ export function ImprovedItemSelector({
     });
   };
 
-  const availableSizes = getAvailableSizes();
+  const availableSizes = getAvailableSizes(selectedProduct);
 
   const handleAddItem = () => {
     if (selectedProduct && selectedSize && quantity) {
       const qty = parseInt(quantity) || 1;
       onAdd(selectedProduct, selectedSize, qty);
       // Reset form
-      setSelectedProduct(null);
+      setSelectedProductSku(null);
       setSelectedSize('');
       setQuantity('1');
       setSearchTerm('');
@@ -90,18 +94,10 @@ export function ImprovedItemSelector({
   const handleProductSelect = (sku: string) => {
     const product = validProducts.find(p => p.sku === sku);
     if (product) {
-      setSelectedProduct(product);
+      setSelectedProductSku(sku);
       
-      // We need to calculate available sizes dynamically here to auto-select
-      let sizes = product.variants || [];
-      if (filterOutOfStock && product.variant_skus && product.variant_inventory) {
-        sizes = sizes.filter((size, index) => {
-          const vSku = product.variant_skus?.[index];
-          if (!vSku) return true;
-          const inventory = product.variant_inventory?.[vSku] || 0;
-          return inventory > 0;
-        });
-      }
+      // Calculate available sizes for the NEWLY selected product
+      const sizes = getAvailableSizes(product);
       
       // Auto-select size if there's only one variant available
       if (sizes.length === 1) {
@@ -117,7 +113,7 @@ export function ImprovedItemSelector({
   };
 
   const handleCancel = () => {
-    setSelectedProduct(null);
+    setSelectedProductSku(null);
     setSelectedSize('');
     setQuantity('1');
     setSearchTerm('');
