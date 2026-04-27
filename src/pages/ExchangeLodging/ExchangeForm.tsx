@@ -40,10 +40,20 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
   const { data: productPrices } = useProductPrices();
   const { toast } = useToast();
 
-  const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string }, size: string, qty: number) => {
-    const price = productPrices?.[product.sku];
+  const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string; variants?: string[]; variant_skus?: string[] }, size: string, qty: number) => {
+    // Determine the actual SKU to save (variant SKU if available, otherwise base SKU)
+    let itemSku = product.sku;
+    
+    if (product.variants && product.variant_skus) {
+      const sizeIndex = product.variants.indexOf(size);
+      if (sizeIndex !== -1 && product.variant_skus[sizeIndex]) {
+        itemSku = product.variant_skus[sizeIndex];
+      }
+    }
+
+    const price = productPrices?.[itemSku];
     const item: TicketItem = { 
-      sku: product.sku, 
+      sku: itemSku, 
       product_name: product.product_name, 
       size, 
       qty,
@@ -134,7 +144,7 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       <div className="space-y-2"><Label>Reason Notes</Label><Textarea value={formData.reason_notes} onChange={(e) => setFormData({ ...formData, reason_notes: e.target.value })} /></div>
 
       <ImprovedItemSelector title="Return Line Items" items={returnItems} onRemove={(i) => removeItem('return', i)} onAdd={(p, s, q) => addItem('return', p, s, q)} />
-      <ImprovedItemSelector title="Exchange Deliverables" items={exchangeItems} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} />
+      <ImprovedItemSelector title="Exchange Deliverables" items={exchangeItems} filterOutOfStock={true} onRemove={(i) => removeItem('exchange', i)} onAdd={(p, s, q) => addItem('exchange', p, s, q)} />
 
       <div className="space-y-2"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
       <Button type="submit" className="w-full" disabled={createTicket.isPending}>{createTicket.isPending ? 'Creating...' : 'Create Exchange Ticket'}</Button>

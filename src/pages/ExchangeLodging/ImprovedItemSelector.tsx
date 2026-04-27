@@ -11,7 +11,8 @@ interface ImprovedItemSelectorProps {
   title: string;
   items: TicketItem[];
   onRemove: (index: number) => void;
-  onAdd: (product: { sku: string; product_name: string; variants: string[]; school_tags?: string[] }, size: string, qty: number) => void;
+  onAdd: (product: { sku: string; product_name: string; variants: string[]; school_tags?: string[]; variant_skus?: string[]; variant_inventory?: Record<string, number> }, size: string, qty: number) => void;
+  filterOutOfStock?: boolean;
 }
 
 export function ImprovedItemSelector({
@@ -19,9 +20,10 @@ export function ImprovedItemSelector({
   items,
   onRemove,
   onAdd,
+  filterOutOfStock = false,
 }: ImprovedItemSelectorProps) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<{ sku: string; product_name: string; variants: string[]; school_tags?: string[] } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{ sku: string; product_name: string; variants: string[]; school_tags?: string[]; variant_skus?: string[]; variant_inventory?: Record<string, number> } | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState('1');
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +44,24 @@ export function ImprovedItemSelector({
     );
   });
 
+  // Calculate available sizes for the selected product
+  const getAvailableSizes = () => {
+    if (!selectedProduct) return [];
+    
+    if (!filterOutOfStock || !selectedProduct.variant_skus || !selectedProduct.variant_inventory) {
+      return selectedProduct.variants;
+    }
+
+    return selectedProduct.variants.filter((size, index) => {
+      const vSku = selectedProduct.variant_skus?.[index];
+      if (!vSku) return true; // If no SKU mapping, don't filter it out
+      const inventory = selectedProduct.variant_inventory?.[vSku] || 0;
+      return inventory > 0;
+    });
+  };
+
+  const availableSizes = getAvailableSizes();
+
   const handleAddItem = () => {
     if (selectedProduct && selectedSize && quantity) {
       const qty = parseInt(quantity) || 1;
@@ -60,9 +80,20 @@ export function ImprovedItemSelector({
     if (product) {
       setSelectedProduct(product);
       
-      // Auto-select size if there's only one variant
-      if (product.variants && product.variants.length === 1) {
-        setSelectedSize(product.variants[0]);
+      // We need to calculate available sizes dynamically here to auto-select
+      let sizes = product.variants || [];
+      if (filterOutOfStock && product.variant_skus && product.variant_inventory) {
+        sizes = sizes.filter((size, index) => {
+          const vSku = product.variant_skus?.[index];
+          if (!vSku) return true;
+          const inventory = product.variant_inventory?.[vSku] || 0;
+          return inventory > 0;
+        });
+      }
+      
+      // Auto-select size if there's only one variant available
+      if (sizes.length === 1) {
+        setSelectedSize(sizes[0]);
       } else {
         setSelectedSize('');
       }
@@ -227,18 +258,24 @@ export function ImprovedItemSelector({
           {selectedProduct && (
             <div className="space-y-2">
               <Label className="text-sm">Size</Label>
-              <Select value={selectedSize} onValueChange={setSelectedSize}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select size" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedProduct.variants.map((size) => (
-                    <SelectItem key={size} value={size}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {availableSizes.length === 0 ? (
+                <div className="text-sm text-red-500 p-2 border border-red-200 bg-red-50 rounded">
+                  No sizes available in stock.
+                </div>
+              ) : (
+                <Select value={selectedSize} onValueChange={setSelectedSize}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSizes.map((size) => (
+                      <SelectItem key={size} value={size}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
 

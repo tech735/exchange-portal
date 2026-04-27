@@ -215,11 +215,13 @@ serve(async (req) => {
                     .map(v => v.sku)
                     .filter(Boolean);
                 
-                // Build a map of variant SKU -> price
+                // Build maps of variant SKU -> price & inventory
                 const variantPrices: Record<string, number> = {};
+                const variantInventory: Record<string, number> = {};
                 variants.forEach(v => {
                     if (v.sku) {
                         variantPrices[v.sku] = parseFloat(v.price) || 0;
+                        variantInventory[v.sku] = parseInt(v.inventory_quantity) || 0;
                     }
                 });
                 
@@ -234,6 +236,7 @@ serve(async (req) => {
                     variants: sizes, // CRITICAL: Send as JS array for JSONB column
                     variant_skus: allVariantSkus,
                     variant_prices: variantPrices,
+                    variant_inventory: variantInventory,
                     school_tags: product.tags
                         ? product.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
                         : null,
@@ -246,11 +249,11 @@ serve(async (req) => {
 
                 // Upsert by SKU (handle)
                 if (synced === 0) {
-                    console.log(`Sample data for SKU ${sku}:`, {
+                    console.log(`Sample data for SKU ${sku}: ` + JSON.stringify({
                         product_name: productName,
                         variant_skus: allVariantSkus,
                         variant_prices: variantPrices
-                    });
+                    }));
                 }
 
                 const { error: upsertError } = await supabaseAdmin
