@@ -14,7 +14,7 @@ export function useProducts(search?: string) {
 
       if (error) throw error;
       
-        return (data || []).map(product => {
+        return (data || []).map((product: any) => {
           let variants: string[] = [];
           if (Array.isArray(product.variants)) {
             variants = product.variants.map(v => String(v));

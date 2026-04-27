@@ -95,8 +95,17 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
         }
     };
 
-    const addExchangeItem = (product: { sku: string; product_name: string }, size: string, qty: number) => {
-        setExchangeItems([...exchangeItems, { sku: product.sku, product_name: product.product_name, size, qty }]);
+    const addExchangeItem = (product: { sku: string; product_name: string; variants?: string[]; variant_skus?: string[] }, size: string, qty: number) => {
+        let itemSku = product.sku;
+        
+        if (product.variants && product.variant_skus) {
+            const sizeIndex = product.variants.indexOf(size);
+            if (sizeIndex !== -1 && product.variant_skus[sizeIndex]) {
+                itemSku = product.variant_skus[sizeIndex];
+            }
+        }
+        
+        setExchangeItems([...exchangeItems, { sku: itemSku, product_name: product.product_name, size, qty }]);
     };
 
     const removeExchangeItem = (index: number) => {
@@ -301,6 +310,7 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
                             <ImprovedItemSelector
                                 title=""
                                 items={exchangeItems}
+                                filterOutOfStock={true}
                                 onRemove={(i) => removeExchangeItem(i)}
                                 onAdd={(p, s, q) => addExchangeItem(p, s, q)}
                             />
