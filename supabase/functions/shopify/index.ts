@@ -245,6 +245,14 @@ serve(async (req) => {
                 };
 
                 // Upsert by SKU (handle)
+                if (synced === 0) {
+                    console.log(`Sample data for SKU ${sku}:`, {
+                        product_name: productName,
+                        variant_skus: allVariantSkus,
+                        variant_prices: variantPrices
+                    });
+                }
+
                 const { error: upsertError } = await supabaseAdmin
                     .from('product_catalog')
                     .upsert(row, { onConflict: 'sku' });
