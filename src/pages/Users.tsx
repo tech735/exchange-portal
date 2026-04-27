@@ -283,7 +283,7 @@ export default function Users() {
           <Button
             size="sm"
             variant="outline"
-            className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 h-8"
+            className="h-8"
             onClick={() => {
               setResetTarget(row);
               setShowResetDialog(true);
@@ -461,7 +461,7 @@ export default function Users() {
                 <Button 
                   type="submit" 
                   disabled={resetPasswordMutation.isPending || resetTarget?.id === 'admin-fallback-id'}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {resetPasswordMutation.isPending ? 'Updating...' : 'Update Password'}
                 </Button>

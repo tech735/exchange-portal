@@ -215,6 +215,14 @@ serve(async (req) => {
                     .map(v => v.sku)
                     .filter(Boolean);
                 
+                // Build a map of variant SKU -> price
+                const variantPrices: Record<string, number> = {};
+                variants.forEach(v => {
+                    if (v.sku) {
+                        variantPrices[v.sku] = parseFloat(v.price) || 0;
+                    }
+                });
+                
                 // If it was "Default Title", replace with "Standard"
                 if (sizes.length === 0) sizes.push('Standard');
 
@@ -225,6 +233,7 @@ serve(async (req) => {
                     category: product.product_type || null,
                     variants: sizes, // CRITICAL: Send as JS array for JSONB column
                     variant_skus: allVariantSkus,
+                    variant_prices: variantPrices,
                     school_tags: product.tags
                         ? product.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
                         : null,

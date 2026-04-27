@@ -22,7 +22,7 @@ export function useProductPrices() {
         // Try to fetch with price column first
         const { data, error } = await supabase
           .from('product_catalog')
-          .select('sku, price, product_name, variant_skus')
+          .select('sku, price, product_name, variant_skus, variant_prices')
           .eq('active', true);
         
         if (error) {
@@ -33,7 +33,7 @@ export function useProductPrices() {
             console.log('Price column not found, fetching products without prices...');
             const { data: productsWithoutPrice, error: fallbackError } = await supabase
               .from('product_catalog')
-              .select('sku, product_name, variant_skus')
+              .select('sku, product_name, variant_skus, variant_prices')
               .eq('active', true);
             
             if (fallbackError) {
@@ -45,12 +45,15 @@ export function useProductPrices() {
             const priceMap: Record<string, number> = {};
             if (productsWithoutPrice && Array.isArray(productsWithoutPrice)) {
               productsWithoutPrice.forEach((product: any) => {
-                const price = getDefaultPrice(product.sku);
-                priceMap[product.sku] = price;
-                // Also index by variant SKUs
+                const basePrice = getDefaultPrice(product.sku);
+                priceMap[product.sku] = basePrice;
+                
+                // Index by variant SKUs
                 if (product.variant_skus && Array.isArray(product.variant_skus)) {
                   product.variant_skus.forEach((vSku: string) => {
-                    priceMap[vSku] = price;
+                    // Check if variant has a specific price in variant_prices
+                    const vPrice = product.variant_prices?.[vSku];
+                    priceMap[vSku] = vPrice !== undefined ? Number(vPrice) : basePrice;
                   });
                 }
               });
@@ -69,15 +72,17 @@ export function useProductPrices() {
         const priceMap: Record<string, number> = {};
         if (data && Array.isArray(data)) {
           data.forEach((product: any) => {
-            const price = Number(product.price) || getDefaultPrice(product.sku);
+            const basePrice = Number(product.price) || getDefaultPrice(product.sku);
             
             // 1. Index by primary SKU (handle)
-            priceMap[product.sku] = price;
+            priceMap[product.sku] = basePrice;
             
             // 2. Index by all associated variant SKUs
             if (product.variant_skus && Array.isArray(product.variant_skus)) {
               product.variant_skus.forEach((vSku: string) => {
-                priceMap[vSku] = price;
+                // Use variant-specific price if available, otherwise fallback to basePrice
+                const vPrice = product.variant_prices?.[vSku];
+                priceMap[vSku] = vPrice !== undefined ? Number(vPrice) : basePrice;
               });
             }
           });
