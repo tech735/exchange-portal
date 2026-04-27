@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { shopifyService, ShopifyOrder, ShopifyOrderLineItem } from '@/services/shopify';
 import { Search, Package, AlertCircle, X, Plus, Minus } from 'lucide-react';
-import { REASON_LABELS, type ReasonCode, type TicketItem } from '@/types/database';
+import { REASON_LABELS, type ReasonCode, type TicketItem, type ProductCatalog } from '@/types/database';
 import { ImprovedItemSelector } from './ImprovedItemSelector';
 import { useCreateTicket } from '@/hooks/useTickets';
 import { useProductPrices } from '@/hooks/useProductPrices';
@@ -95,7 +95,7 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
         }
     };
 
-    const addExchangeItem = (product: { sku: string; product_name: string; variants?: string[]; variant_skus?: string[] }, size: string, qty: number) => {
+    const addExchangeItem = (product: ProductCatalog, size: string, qty: number) => {
         let itemSku = product.sku;
         
         if (product.variants && product.variant_skus) {

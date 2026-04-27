@@ -120,6 +120,8 @@ export interface ProductCatalog {
   category: string | null;
   variants: string[];
   variant_skus: string[];
+  variant_prices: Record<string, number>;
+  variant_inventory: Record<string, number>;
   school_tags: string[] | null;
   price: number | null;
   active: boolean;

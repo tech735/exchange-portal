@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, Plus, Search, Tag } from 'lucide-react';
-import { type TicketItem } from '@/types/database';
+import { type TicketItem, type ProductCatalog } from '@/types/database';
 import { useProducts } from '@/hooks/useProducts';
 
 interface ImprovedItemSelectorProps {
   title: string;
   items: TicketItem[];
   onRemove: (index: number) => void;
-  onAdd: (product: { sku: string; product_name: string; variants: string[]; school_tags?: string[]; variant_skus?: string[]; variant_inventory?: Record<string, number> }, size: string, qty: number) => void;
+  onAdd: (product: ProductCatalog, size: string, qty: number) => void;
   filterOutOfStock?: boolean;
 }
 
@@ -23,7 +23,7 @@ export function ImprovedItemSelector({
   filterOutOfStock = false,
 }: ImprovedItemSelectorProps) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<{ sku: string; product_name: string; variants: string[]; school_tags?: string[]; variant_skus?: string[]; variant_inventory?: Record<string, number> } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductCatalog | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState('1');
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,15 +48,27 @@ export function ImprovedItemSelector({
   const getAvailableSizes = () => {
     if (!selectedProduct) return [];
     
-    if (!filterOutOfStock || !selectedProduct.variant_skus || !selectedProduct.variant_inventory) {
-      return selectedProduct.variants;
+    const variants = selectedProduct.variants || [];
+    
+    if (!filterOutOfStock) {
+      return variants;
     }
 
-    return selectedProduct.variants.filter((size, index) => {
-      const vSku = selectedProduct.variant_skus?.[index];
-      if (!vSku) return true; // If no SKU mapping, don't filter it out
-      const inventory = selectedProduct.variant_inventory?.[vSku] || 0;
-      return inventory > 0;
+    // Filter based on inventory mapping
+    return variants.filter((size, index) => {
+      const variantSkus = selectedProduct.variant_skus || [];
+      const inventoryMap = selectedProduct.variant_inventory || {};
+      
+      const vSku = variantSkus[index];
+      
+      // If we don't have an SKU for this variant, we can't reliably check stock.
+      // In strict filtering mode, we hide it. Otherwise, we show it.
+      if (!vSku) {
+        return false; 
+      }
+      
+      const stock = inventoryMap[vSku] ?? 0;
+      return stock > 0;
     });
   };
 

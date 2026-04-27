@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const fetchingProfileRef = useRef<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -72,12 +73,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   const fetchProfile = async (userId: string) => {
+    // Prevent concurrent fetches for the same user
+    if (fetchingProfileRef.current === userId) {
+      return;
+    }
+    
     try {
+      fetchingProfileRef.current = userId;
       console.log('Fetching profile for userId:', userId);
       
-      // Safety timeout for profile fetch
+      // Safety timeout for profile fetch (increased to 15s to handle serverless cold starts)
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
       );
 
       const fetchPromise = supabase
@@ -99,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
+      fetchingProfileRef.current = null;
       setLoading(false);
     }
   };

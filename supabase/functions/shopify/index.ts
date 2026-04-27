@@ -205,15 +205,9 @@ serve(async (req) => {
                 const sku = product.handle;
                 const productName = product.title || 'Untitled Product';
 
-                // Collect all variant titles (usually sizes)
-                // Also collect all variant SKUs for lookup mapping
-                const sizes = variants
-                    .map(v => v.title)
-                    .filter(t => t !== 'Default Title');
-                
-                const allVariantSkus = variants
-                    .map(v => v.sku)
-                    .filter(Boolean);
+                // Align titles and SKUs by index
+                const sizes = variants.map(v => v.title === 'Default Title' ? 'Standard' : v.title);
+                const allVariantSkus = variants.map(v => v.sku || '');
                 
                 // Build maps of variant SKU -> price & inventory
                 const variantPrices: Record<string, number> = {};
@@ -224,9 +218,6 @@ serve(async (req) => {
                         variantInventory[v.sku] = parseInt(v.inventory_quantity) || 0;
                     }
                 });
-                
-                // If it was "Default Title", replace with "Standard"
-                if (sizes.length === 0) sizes.push('Standard');
 
                 const row = {
                     sku,

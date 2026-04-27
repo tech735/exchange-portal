@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2 } from 'lucide-react';
-import { REASON_LABELS, type ReasonCode, type TicketItem } from '@/types/database';
+import { REASON_LABELS, type ReasonCode, type TicketItem, type ProductCatalog } from '@/types/database';
 import { useCreateTicket } from '@/hooks/useTickets';
 import { ImprovedItemSelector } from './ImprovedItemSelector';
 import { useProductPrices } from '@/hooks/useProductPrices';
@@ -40,7 +40,7 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
   const { data: productPrices } = useProductPrices();
   const { toast } = useToast();
 
-  const addItem = (list: 'return' | 'exchange', product: { sku: string; product_name: string; variants?: string[]; variant_skus?: string[] }, size: string, qty: number) => {
+  const addItem = (list: 'return' | 'exchange', product: ProductCatalog, size: string, qty: number) => {
     // Determine the actual SKU to save (variant SKU if available, otherwise base SKU)
     let itemSku = product.sku;
     

@@ -27,6 +27,10 @@ export function useProducts(search?: string) {
           if (product.variant_inventory && typeof product.variant_inventory === 'object') {
             variant_inventory = product.variant_inventory;
           }
+          let variant_prices: Record<string, number> = {};
+          if (product.variant_prices && typeof product.variant_prices === 'object') {
+            variant_prices = product.variant_prices;
+          }
           
           return {
             id: product.id,
@@ -35,10 +39,11 @@ export function useProducts(search?: string) {
             variants,
             variant_skus,
             variant_inventory,
+            variant_prices,
             school_tags: product.school_tags,
             active: product.active,
             created_at: product.created_at,
-          } as ProductCatalog & { variant_skus?: string[]; variant_inventory?: Record<string, number> };
+          } as ProductCatalog;
         });
     },
   });
