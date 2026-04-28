@@ -7,6 +7,7 @@ interface CreateTicketData {
   order_id: string;
   customer_name: string;
   customer_phone: string;
+  customer_email?: string;
   student_name?: string;
   student_grade?: string;
   student_section?: string;
@@ -70,6 +71,7 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     order_id: String(data.order_id),
     customer_name: String(data.customer_name),
     customer_phone: String(data.customer_phone),
+    customer_email: data.customer_email ? String(data.customer_email) : null,
     student_name: data.student_name ? String(data.student_name) : null,
     student_grade: data.student_grade ? String(data.student_grade) : null,
     student_section: data.student_section ? String(data.student_section) : null,
@@ -78,7 +80,7 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     reason_notes: data.reason_notes ? String(data.reason_notes) : null,
     stage: data.stage as TicketStage,
     status: data.status as TicketStatus,
-    is_paid: Boolean(data.is_paid),
+    is_paid: data.is_paid === true || data.is_paid === 'true' || data.is_paid === 1,
     return_items: parseTicketItems(data.return_items),
     exchange_items: parseTicketItems(data.exchange_items),
     notes: data.notes ? String(data.notes) : null,
@@ -186,6 +188,7 @@ export function useCreateTicket() {
           order_id: data.order_id,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
+          customer_email: data.customer_email || null,
           student_name: data.student_name || null,
           student_grade: data.student_grade || null,
           student_section: data.student_section || null,

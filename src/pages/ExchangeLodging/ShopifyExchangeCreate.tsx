@@ -171,6 +171,7 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
                 order_id: order.name,
                 customer_name: order.customer?.first_name ? `${order.customer.first_name} ${order.customer.last_name || ''}`.trim() : (order.email || 'Unknown'),
                 customer_phone: order.phone || order.customer?.phone || 'N/A',
+                customer_email: order.email || order.customer?.email || '',
                 student_name: 'N/A', // Mapped from somewhere if available in tags/notes
                 student_grade: 'N/A',
                 student_section: 'N/A',

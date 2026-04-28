@@ -59,6 +59,7 @@ export interface Ticket {
   order_id: string;
   customer_name: string;
   customer_phone: string;
+  customer_email: string | null;
   student_name: string | null;
   student_grade: string | null;
   student_section: string | null;

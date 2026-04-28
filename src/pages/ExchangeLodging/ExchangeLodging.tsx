@@ -74,10 +74,11 @@ export default function ExchangeLodging() {
         await updateTicket.mutateAsync({
           id: ticket.id,
           stage: 'LODGED',
-          status: 'IN_PROCESS', // Keep in Process tab
+          status: 'COMPLETED', // Move to Completed tab once paid
           amount_collected: isRefund ? 0 : netAmount,
           refund_amount: isRefund ? absAmount : 0,
           exchange_completed_at: new Date().toISOString(),
+          is_paid: true,
           eventType: 'UPDATED'
         });
         toast({

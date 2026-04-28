@@ -35,7 +35,7 @@ export default function TicketDetail() {
               )}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {ticket.customer_name} • {ticket.customer_phone}
+              {ticket.customer_name} • {ticket.customer_phone} {ticket.customer_email && `• ${ticket.customer_email}`}
             </p>
           </div>
           <div className="flex gap-2">

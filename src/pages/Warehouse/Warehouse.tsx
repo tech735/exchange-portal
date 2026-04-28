@@ -40,10 +40,10 @@ export default function Warehouse() {
 
   const { data: rawTickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
 
-  // Filter tickets: For 'new_warehouse', show tickets where payment is confirmed OR status is In Process
+  // Filter tickets: For 'new_warehouse', show tickets where payment is confirmed OR status is In Process and marked as paid
   const tickets = rawTickets?.filter(ticket => {
     if (tab === 'new_warehouse') {
-      return ticket.is_paid === true || ticket.status === 'IN_PROCESS';
+      return ticket.is_paid === true || (ticket.status === 'IN_PROCESS' && ticket.exchange_completed_at != null);
     }
     return true;
   });
@@ -177,7 +177,7 @@ export default function Warehouse() {
 
           <Tabs value={tab} onValueChange={setTab} className="mt-6">
             <TabsList className="inline-flex h-auto w-auto items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
-              <TabsTrigger value="new_warehouse" className="rounded-md px-3 py-1.5">New</TabsTrigger>
+              <TabsTrigger value="new_warehouse" className="rounded-md px-3 py-1.5">New Requests</TabsTrigger>
               <TabsTrigger value="return_pending" className="rounded-md px-3 py-1.5">Return Pending</TabsTrigger>
               <TabsTrigger value="return_received" className="rounded-md px-3 py-1.5">QC Pending</TabsTrigger>
               <TabsTrigger value="approved" className="rounded-md px-3 py-1.5">Approved</TabsTrigger>

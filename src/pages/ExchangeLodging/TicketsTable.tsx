@@ -83,9 +83,12 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
       render: (value: string, row: Ticket) => (
         <div>
           <div>{value}</div>
-          <div className="text-xs text-muted-foreground">{row.customer_phone}</div>
+          <div className="text-xs text-muted-foreground flex flex-col">
+            <span>{row.customer_phone}</span>
+            {row.customer_email && <span>{row.customer_email}</span>}
+          </div>
           {row.sla_breached && (
-            <span className="sla-breach-badge ml-2">
+            <span className="sla-breach-badge ml-2 mt-1">
               <AlertTriangle className="h-3 w-3" />
             </span>
           )}
@@ -124,15 +127,17 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
 
         return (
           <div className="flex items-center gap-2">
-            {row.status === 'IN_PROCESS' && (
-              (row.amount_collected || 0) > 0 ? (
-                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                  Paid
-                </Badge>
-              ) : (row.refund_amount || 0) > 0 ? (
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
-                  Refunded
-                </Badge>
+            {(row.status === 'IN_PROCESS' || row.status === 'NEW') && (
+              (row.is_paid || row.exchange_completed_at) ? (
+                (row.refund_amount || 0) > 0 ? (
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                    Refunded
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                    Paid
+                  </Badge>
+                )
               ) : (
                 onMarkCollected && (
                   <Button

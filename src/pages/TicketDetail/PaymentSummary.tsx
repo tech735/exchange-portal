@@ -61,17 +61,6 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
           <IndianRupee className="h-5 w-5" />
           Payment Summary
         </CardTitle>
-        {!ticket.is_paid && (
-          <Button 
-            size="sm" 
-            onClick={handleConfirmPayment}
-            disabled={updateTicket.isPending}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <CreditCard className="h-4 w-4 mr-2" />
-            {updateTicket.isPending ? 'Processing...' : 'Confirm Payment'}
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm mt-4">
@@ -105,7 +94,7 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
                   <div className="font-medium">Refunded</div>
                 </div>
               </div>
-            ) : ticket.is_paid ? (
+            ) : (ticket.is_paid || ticket.exchange_completed_at) ? (
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
                 <div className="font-medium">Paid / Confirmed</div>

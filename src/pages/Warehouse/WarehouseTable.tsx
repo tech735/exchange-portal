@@ -47,8 +47,12 @@ export function WarehouseTable({
       render: (value: string, row: Ticket) => (
         <div>
           <div>{value}</div>
+          <div className="text-xs text-muted-foreground flex flex-col">
+            <span>{row.customer_phone}</span>
+            {row.customer_email && <span>{row.customer_email}</span>}
+          </div>
           {row.sla_breached && (
-            <span className="sla-breach-badge ml-2">
+            <span className="sla-breach-badge ml-2 mt-1">
               <AlertTriangle className="h-3 w-3" />
             </span>
           )}

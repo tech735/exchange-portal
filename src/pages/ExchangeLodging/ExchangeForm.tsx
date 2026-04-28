@@ -26,6 +26,7 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
     order_id: '',
     customer_name: '',
     customer_phone: '',
+    customer_email: '',
     student_name: '',
     student_grade: '',
     student_section: '',
@@ -109,9 +110,15 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
           <Input value={formData.customer_phone} onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })} required />
         </div>
       </div>
-      <div className="space-y-2">
-        <Label>Customer Name *</Label>
-        <Input value={formData.customer_name} onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })} required />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Customer Name *</Label>
+          <Input value={formData.customer_name} onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })} required />
+        </div>
+        <div className="space-y-2">
+          <Label>Customer Email</Label>
+          <Input type="email" value={formData.customer_email} onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })} />
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="space-y-2"><Label>Student Name</Label><Input value={formData.student_name} onChange={(e) => setFormData({ ...formData, student_name: e.target.value })} /></div>

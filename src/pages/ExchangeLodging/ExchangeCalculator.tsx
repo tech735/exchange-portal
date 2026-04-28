@@ -56,9 +56,10 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
       await updateTicket.mutateAsync({
         id: ticket.id,
         stage: 'LODGED',
-        status: 'IN_PROCESS', // Keep in Process tab for visibility
+        status: 'COMPLETED', // Move to Completed tab once paid
         amount_collected: totalExchangeValue,
         exchange_completed_at: new Date().toISOString(),
+        is_paid: true,
         eventType: 'UPDATED' // Or PAYMENT_COLLECTED if that event type is desired
       });
 
@@ -70,7 +71,7 @@ export function ExchangeCalculator({ ticket, onProcessed }: ExchangeCalculatorPr
 
       // Notify parent component and navigate immediately
       onProcessed?.();
-      navigate('/exchange-lodging?tab=IN_PROCESS');
+      navigate('/exchange-lodging?tab=COMPLETED');
 
     } catch (error) {
       toast({
