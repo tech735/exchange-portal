@@ -167,8 +167,8 @@ export default function Orders() {
                                                     <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
                                                         {customer} · {itemCount} {itemCount === 1 ? 'item' : 'items'} · {time}
                                                     </p>
-                                                    {/* Row 3: status badge */}
-                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                    {/* Row 3: status badge + exchange button */}
+                                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                                         <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0.5 h-auto rounded-full">
                                                             {financialLabel}
                                                         </Badge>
@@ -177,9 +177,20 @@ export default function Orders() {
                                                                 {order.fulfillment_status}
                                                             </span>
                                                         )}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            className="h-6 text-[11px] px-2.5 rounded-full"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedOrderForExchange(order);
+                                                                setExchangeOpen(true);
+                                                            }}
+                                                        >
+                                                            <Package className="h-3 w-3 mr-1" />
+                                                            Exchange
+                                                        </Button>
                                                     </div>
-                                                    {/* Row 4: shipping type */}
-                                                    <p className="text-[12px] text-muted-foreground mt-0.5">Standard</p>
                                                 </div>
                                                 <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
                                             </div>
