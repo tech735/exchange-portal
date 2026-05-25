@@ -72,7 +72,7 @@ export function WarehouseTable({
             {items.map((item, idx) => (
               <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1">
                 <Package className="h-3 w-3 inline mr-1" />
-                {item.product_name} ({item.qty})
+                {item.product_name}{item.size}({item.qty})
               </div>
             ))}
           </div>
