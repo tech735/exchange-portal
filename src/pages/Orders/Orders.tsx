@@ -371,7 +371,7 @@ export default function Orders() {
                 </div>
 
                 <Dialog open={exchangeOpen} onOpenChange={setExchangeOpen}>
-                    <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] sm:max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
                         </DialogHeader>
@@ -385,7 +385,7 @@ export default function Orders() {
                 </Dialog>
 
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                    <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-5xl sm:max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Order Details: {selectedOrderDetails?.name}</DialogTitle>
                         </DialogHeader>

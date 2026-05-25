@@ -150,7 +150,7 @@ export default function ExchangeLodging() {
                   Manual Exchange
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>New Manual Exchange Request</DialogTitle>
                 </DialogHeader>
@@ -165,7 +165,7 @@ export default function ExchangeLodging() {
                   Create Exchange
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] sm:max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
                 </DialogHeader>
@@ -204,7 +204,7 @@ export default function ExchangeLodging() {
             </TabsContent>
 
             <Dialog open={calculatorOpen} onOpenChange={setCalculatorOpen}>
-              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-4xl sm:max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Exchange Calculator</DialogTitle>
                 </DialogHeader>
