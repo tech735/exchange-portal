@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useTicket, useTicketEvents } from '@/hooks/useTickets';
 import { Badge } from '@/components/ui/badge';
@@ -10,18 +10,27 @@ import { PaymentSummary } from './PaymentSummary';
 import { Timeline } from './Timeline';
 import { AuditLog } from './AuditLog';
 
+const BACK_LABELS: Record<string, string> = {
+  '/warehouse': 'Warehouse',
+  '/exchange-lodging': 'Exchange Lodging',
+};
+
 export default function TicketDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const { data: ticket, isLoading } = useTicket(id);
   const { data: events } = useTicketEvents(id);
+
+  const fromPath = (location.state as { from?: string } | null)?.from ?? '/exchange-lodging';
+  const backLabel = BACK_LABELS[fromPath] ?? 'Back';
 
   if (!ticket) return <Layout><div className="page-shell">Ticket not found</div></Layout>;
 
   return (
     <Layout>
       <div className="page-shell animate-fade-in">
-        <Link to="/exchange-lodging" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to tickets
+        <Link to={fromPath} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to {backLabel}
         </Link>
 
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">

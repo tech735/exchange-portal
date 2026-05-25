@@ -48,20 +48,28 @@ export default function AuthScreens() {
       // 1. Sign in with Supabase Auth
       await signIn(email, password);
 
-      // 2. Fetch profile from public.profiles
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (profileError || !profile) {
-        setError('Login successful, but profile not found. Please contact admin.');
+      // 2. Get the auth user ID from the active session (avoids relying on email match)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        setError('Sign in failed. Please try again.');
         setIsLoading(false);
         return;
       }
 
-      // 3. Sync with UserContext for current APP navigation logic
+      // 3. Fetch profile by ID — more reliable than by email with RLS policies
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileError || !profile) {
+        setError('Login successful, but your profile was not found. Please contact your administrator to ensure your account is fully set up.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 4. Sync with UserContext for current APP navigation logic
       const typedProfile = profile as {
         id: string;
         full_name: string | null;
@@ -86,7 +94,14 @@ export default function AuthScreens() {
       navigate('/dashboard');
     } catch (err: any) {
       console.error('Auth error:', err);
-      setError(err.message || 'Invalid email or password');
+      const msg: string = err.message || '';
+      if (msg.includes('Invalid login credentials') || err.status === 400) {
+        setError('Incorrect email or password. If you need access, contact your administrator to ensure your account exists in the system.');
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Your account email is not confirmed. Please contact your administrator.');
+      } else {
+        setError(msg || 'Sign in failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

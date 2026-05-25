@@ -2,8 +2,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
 import { AlertTriangle, Check, Package, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
+import { Link, useLocation } from 'react-router-dom';
+import { STAGE_LABELS, type Ticket } from '@/types/database';
 import { useState } from 'react';
 
 interface WarehouseTableProps {
@@ -25,6 +25,7 @@ export function WarehouseTable({
 }: WarehouseTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const location = useLocation();
 
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -36,7 +37,7 @@ export function WarehouseTable({
       key: 'order_id',
       label: 'Order ID',
       render: (value: string, row: Ticket) => (
-        <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
+        <Link to={`/ticket/${row.id}`} state={{ from: location.pathname }} className="text-primary hover:underline font-medium">
           {value}
         </Link>
       )
@@ -62,16 +63,21 @@ export function WarehouseTable({
     {
       key: 'return_items',
       label: 'Items',
-      render: (value: TicketItem[]) => (
-        <div className="max-w-xs">
-          {value.map((item, idx) => (
-            <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1">
-              <Package className="h-3 w-3 inline mr-1" />
-              {item.product_name} ({item.qty})
-            </div>
-          ))}
-        </div>
-      )
+      render: (_: unknown, row: Ticket) => {
+        const showExchange = row.stage === 'WAREHOUSE_APPROVED' || row.stage === 'EXCHANGE_BOOKED';
+        const items = showExchange ? row.exchange_items : row.return_items;
+        return (
+          <div className="max-w-xs">
+            <div className="text-xs text-muted-foreground mb-1">{showExchange ? 'Exchange' : 'Return'} Items</div>
+            {items.map((item, idx) => (
+              <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1">
+                <Package className="h-3 w-3 inline mr-1" />
+                {item.product_name} ({item.qty})
+              </div>
+            ))}
+          </div>
+        );
+      }
     },
     {
       key: 'awb_info',

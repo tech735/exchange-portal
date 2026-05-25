@@ -20,6 +20,7 @@ The Exchange Flow Management System is a role-based React application that handl
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
 - **Payments**: Razorpay Integration (Payment Links)
+- **Integrations**: Shopify API (Order Data Sync)
 
 ## 📋 Core Features
 
@@ -32,15 +33,16 @@ The Exchange Flow Management System is a role-based React application that handl
 ### 2. **Advanced Ticket Management**
 - **Exchange Logic**: Automated calculation of exchange value (Net Amount)
 - **Payment Handling**: 
-  - "Mark Ass Collected" for positive values
-  - "Send Payment Link" integration
-  - "Send to Refund" for negative values (refunds due)
-- **Status Tracking**: Granular tracking from Lodging to Closure
+  - "Mark As Collected" for positive values (Fixed typo)
+  - "Send Payment Link" integration (Moves ticket to In Process)
+  - "Send to Refund" for negative values (Refunds due)
+- **Customer Email**: Automated extraction from Shopify or manual entry
+- **Status Tracking**: Granular tracking across New, In-Process, and Completed states
 - **SLA Monitoring**: Breach alerts and escalation
 
 ### 3. **Comprehensive Warehouse Flow**
 - **Five-Stage Processing**:
-  - **New**: Incoming tickets (Paid or Refunded)
+  - **New Requests**: Incoming tickets awaiting warehouse action (Only Paid or Refunded tickets)
   - **Return Pending**: AWB generated, waiting for pickup
   - **Return Received**: Items received at warehouse
   - **QC Processing**: Approve or Deny based on item condition
@@ -67,6 +69,9 @@ The Exchange Flow Management System is a role-based React application that handl
 - **Recent History**: Quick access to previously searched terms
 - **Live Results**: Real-time search suggestions with ticket details
 - **Keyboard Support**: Full keyboard navigation for power users
+- **Shopify Sync**: Automated data fetching from Shopify orders
+- **Real-time KPIs**: Live operational dashboard with ticket statistics
+- **Product Sync**: Integrated catalog synchronization with external sources
 
 ## 🔄 Application Workflow
 
@@ -74,12 +79,14 @@ The Exchange Flow Management System is a role-based React application that handl
 ```
 Customer Request → Ticket Created → Payment/Refund check → Status: LODGED
 ```
-- Support creates ticket with exchange details.
+- Support creates ticket (Manually or via Shopify Sync).
 - System calculates Net Amount:
   - **Positive**: Customer pays (Payment Link or Cash).
   - **Negative**: Refund due to customer.
-- Ticket moves to `IN_PROCESS`.
-- Once Payment Collected or Refund Marked, ticket moves to **Warehouse**.
+- **Workflow Tabs**:
+  - **New**: Recently lodged tickets awaiting payment action.
+  - **In Process**: Tickets where "Send Payment Link" was clicked; awaiting customer payment.
+  - **Completed**: Tickets "Marked As Paid" or with confirmed collection; moves to Warehouse queue.
 
 ### 2. **Warehouse Processing (Warehouse)**
 ```
@@ -200,9 +207,10 @@ src/
 
 #### Tickets
 - Primary table for exchange requests
-- Contains customer information, items, and workflow status
+- Contains customer information (Name, Phone, Email), items, and workflow status
 - Tracks timestamps for each stage transition
 - AWB tracking for shipments
+- **customer_email**: Captured from Shopify or Manual entry for communication
 
 #### Ticket Events
 - Audit trail for all ticket activities
@@ -266,11 +274,13 @@ src/
 The dashboard tracks important metrics:
 
 - **Total Open Tickets**: Active tickets across all stages
-- **Pending Warehouse**: Tickets awaiting warehouse processing
-- **Pending Invoicing**: Tickets ready for invoicing
-- **SLA Breached**: Tickets exceeding time limits
-- **Completed This Week**: Successfully resolved tickets
-- **Denied Tickets**: Rejected exchange requests
+- **Pending Warehouse**: Tickets awaiting warehouse processing (Paid/Refunded)
+- **Pending Invoicing**: Tickets ready for invoice generation
+- **SLA Breached**: Tickets exceeding time limits (High Priority)
+- **Completed This Week**: Weekly resolution throughput
+- **Denied Tickets**: Rejected exchange requests for auditing
+- **Operational Overview**: Real-time activity map and team collaboration metrics
+- **Time Tracker**: Monitoring ticket age and processing speed
 
 ## 🔐 Security Features
 

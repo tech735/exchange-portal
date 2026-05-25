@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
 import { AlertTriangle, Calculator, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { REASON_LABELS, STAGE_LABELS, type Ticket } from '@/types/database';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -21,6 +21,7 @@ interface TicketsTableProps {
 export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollected, productPrices }: TicketsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const location = useLocation();
   const { user, hasFullAccess } = useUser();
   const deleteTicket = useDeleteTicket();
   const { toast } = useToast();
@@ -61,7 +62,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
       label: 'Order ID',
       render: (value: string, row: Ticket) => (
         <div className="flex items-center gap-2">
-          <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
+          <Link to={`/ticket/${row.id}`} state={{ from: location.pathname }} className="text-primary hover:underline font-medium">
             {value}
           </Link>
           {onTicketSelect && row.status !== 'IN_PROCESS' && (

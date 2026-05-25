@@ -147,6 +147,7 @@ export function useTickets(filters?: {
       if (error) throw error;
       return (data || []).map((d: any) => mapTicket(d));
     },
+    staleTime: 60 * 1000,
   });
 }
 
@@ -160,6 +161,7 @@ export function useTicket(id: string | undefined) {
       return mapTicket(data as any);
     },
     enabled: !!id,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -168,12 +170,12 @@ export function useTicketEvents(ticketId: string | undefined) {
     queryKey: ['ticket-events', ticketId],
     queryFn: async () => {
       if (!ticketId) return [];
-      if (!ticketId) return [];
       const { data, error } = await supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('event_at', { ascending: true });
       if (error) throw error;
       return data as any[];
     },
     enabled: !!ticketId,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -288,6 +290,7 @@ export function useDeleteTicket() {
 export function useTicketStats() {
   return useQuery({
     queryKey: ['ticket-stats'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from('tickets').select('stage, status, sla_breached, created_at');
       if (error) throw error;
