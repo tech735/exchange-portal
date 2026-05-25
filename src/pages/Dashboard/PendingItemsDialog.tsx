@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { STAGE_LABELS, STATUS_LABELS, Ticket } from '@/types/database';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface PendingItemsDialogProps {
@@ -114,9 +114,9 @@ export function PendingItemsDialog({ open, onOpenChange }: PendingItemsDialogPro
 
                 {loading ? (
                     <div className="flex h-[300px] items-center justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <div className="loader" />
                     </div>
-                ) : error ? (
+                ) :error ? (
                     <div className="flex h-[200px] flex-col items-center justify-center text-destructive">
                         <AlertCircle className="h-8 w-8 mb-2" />
                         <p className="font-medium text-center">{error}</p>

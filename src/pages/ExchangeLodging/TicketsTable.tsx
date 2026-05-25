@@ -1,11 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { AlertTriangle, Calculator, Trash2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { AlertTriangle, Calculator, ChevronRight, Trash2 } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { REASON_LABELS, STAGE_LABELS, type Ticket } from '@/types/database';
-import { format } from 'date-fns';
-import { useState } from 'react';
+import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
+import { useState, useMemo } from 'react';
 import { useUser } from '@/contexts/UserContext';
 import { useDeleteTicket } from '@/hooks/useTickets';
 import { useToast } from '@/hooks/use-toast';
@@ -26,10 +26,29 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
   const deleteTicket = useDeleteTicket();
   const { toast } = useToast();
 
+  const navigate = useNavigate();
+
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];
+
+  const groupedTickets = useMemo(() => {
+    const groups: { label: string; key: string; tickets: Ticket[] }[] = [];
+    const seen: Record<string, number> = {};
+    paginatedTickets.forEach(ticket => {
+      const date = new Date(ticket.created_at);
+      const key = format(date, 'yyyy-MM-dd');
+      let label: string;
+      if (isToday(date)) label = 'Today';
+      else if (isYesterday(date)) label = 'Yesterday';
+      else if (isThisWeek(date, { weekStartsOn: 1 })) label = format(date, 'EEEE');
+      else label = format(date, 'MMMM d');
+      if (seen[key] === undefined) { seen[key] = groups.length; groups.push({ label, key, tickets: [] }); }
+      groups[seen[key]].tickets.push(ticket);
+    });
+    return groups;
+  }, [paginatedTickets]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
@@ -125,6 +144,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
       render: (_: unknown, row: Ticket) => {
         const netAmount = calculateNetAmount(row);
         const isRefund = netAmount < 0;
+        const isZero = netAmount === 0;
 
         return (
           <div className="flex items-center gap-2">
@@ -141,17 +161,27 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
                 )
               ) : (
                 onMarkCollected && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkCollected(row);
-                    }}
-                    className="whitespace-nowrap"
-                  >
-                    {isRefund ? "Send to Refund" : "Mark Paid"}
-                  </Button>
+                  isZero ? (
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer hover:bg-blue-100 whitespace-nowrap"
+                      onClick={(e) => { e.stopPropagation(); onMarkCollected(row); }}
+                    >
+                      No Amount to Collect
+                    </Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkCollected(row);
+                      }}
+                      className="whitespace-nowrap"
+                    >
+                      {isRefund ? "Send to Refund" : "Mark Paid"}
+                    </Button>
+                  )
                 )
               )
             )}
@@ -175,61 +205,139 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
   ];
 
   return (
-    <DataTable
-      title="Exchange Tickets"
-      data={paginatedTickets}
-      columns={columns}
-      isLoading={isLoading}
-      emptyMessage="No tickets found"
-      onSelectionChange={(selectedRows) => {
-        console.log('Selected exchange tickets:', selectedRows);
-      }}
-    >
-      <div className="flex items-center justify-between px-4 py-3 border-t">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Items per page:</span>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="w-20 px-2 py-1 border rounded text-sm"
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </div>
+    <>
+      {/* Mobile list (< lg) */}
+      <div className="block lg:hidden rounded-2xl overflow-hidden border border-border bg-card">
+        {isLoading ? (
+          <div className="flex justify-center py-16"><div className="loader" /></div>
+        ) : paginatedTickets.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">No tickets found</p>
+        ) : (
+          <>
+            {groupedTickets.map(({ label, key, tickets: group }) => (
+              <div key={key}>
+                <div className="px-4 py-1.5 bg-muted/40 border-b border-border">
+                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                </div>
+                {group.map((ticket, idx) => {
+                  const netAmount = calculateNetAmount(ticket);
+                  const isRefund = netAmount < 0;
+                  const isZero = netAmount === 0;
+                  const isPaid = !!(ticket.is_paid || ticket.exchange_completed_at);
+                  const isRefundedAlready = (ticket.refund_amount || 0) > 0;
+                  const itemCount = ticket.return_items?.length || 0;
+                  const time = format(new Date(ticket.created_at), 'h:mma');
+                  const amountLabel = isPaid
+                    ? (isRefundedAlready ? 'Refunded' : 'Paid')
+                    : isZero ? 'No amount'
+                    : isRefund ? `₹${Math.abs(netAmount)} refund`
+                    : `₹${netAmount} due`;
 
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Button>
-
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Button>
-        </div>
+                  return (
+                    <div
+                      key={ticket.id}
+                      className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
+                      onClick={() => navigate(`/ticket/${ticket.id}`, { state: { from: location.pathname } })}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-[15px] text-foreground leading-snug">#{ticket.order_id}</span>
+                          <span className={`text-[14px] font-medium shrink-0 ${isPaid && isRefundedAlready ? 'text-orange-600' : isPaid ? 'text-green-600' : isRefund && !isPaid ? 'text-orange-600' : 'text-foreground'}`}>
+                            {amountLabel}
+                          </span>
+                        </div>
+                        <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
+                          {ticket.customer_name} · {itemCount} {itemCount === 1 ? 'item' : 'items'} · {time}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <Badge variant="outline" className="text-[11px] px-2 py-0.5 h-auto rounded-full">
+                            {STAGE_LABELS[ticket.stage as keyof typeof STAGE_LABELS] || ticket.stage}
+                          </Badge>
+                          {isPaid ? (
+                            <Badge variant="secondary" className={`text-[11px] px-2 py-0.5 h-auto rounded-full ${isRefundedAlready ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}`}>
+                              {isRefundedAlready ? 'Refunded' : 'Paid'}
+                            </Badge>
+                          ) : (ticket.status === 'IN_PROCESS' || ticket.status === 'NEW') && onMarkCollected && (
+                            isZero ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer hover:bg-blue-100 text-[11px] px-2 py-0.5 h-auto rounded-full"
+                                onClick={(e) => { e.stopPropagation(); onMarkCollected(ticket); }}
+                              >
+                                No Amount to Collect
+                              </Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[11px] px-2 rounded-full"
+                                onClick={(e) => { e.stopPropagation(); onMarkCollected(ticket); }}
+                              >
+                                {isRefund ? 'Send to Refund' : 'Mark Paid'}
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </DataTable>
+
+      {/* Desktop table (≥ lg) */}
+      <div className="hidden lg:block">
+        <DataTable
+          title="Exchange Tickets"
+          data={paginatedTickets}
+          columns={columns}
+          isLoading={isLoading}
+          emptyMessage="No tickets found"
+          onSelectionChange={(selectedRows) => {
+            console.log('Selected exchange tickets:', selectedRows);
+          }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="w-20 px-2 py-1 border rounded text-sm"
+              >
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">Page {currentPage} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </Button>
+            </div>
+          </div>
+        </DataTable>
+      </div>
+    </>
   );
 }

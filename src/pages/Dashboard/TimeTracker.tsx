@@ -86,8 +86,9 @@ export function TimeTracker({ className }: TimeTrackerProps) {
     return (
       <div className={`rounded-2xl p-6 bg-slate-900 text-white shadow-lg ${className}`}>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Time Tracker</p>
-        <div className="h-8 w-20 bg-slate-700 rounded mt-3 mb-1 animate-pulse"></div>
-        <div className="h-4 w-32 bg-slate-700 rounded mt-1 animate-pulse"></div>
+        <div className="mt-6 flex justify-center py-4">
+          <div className="loader" style={{ color: '#a5b4fc' }} />
+        </div>
       </div>
     );
   }

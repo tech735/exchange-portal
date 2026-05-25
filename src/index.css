@@ -121,7 +121,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
@@ -243,6 +243,15 @@
     @apply bg-border rounded-full;
   }
 
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .gradient-border {
     @apply relative;
   }
@@ -256,4 +265,26 @@
     -webkit-mask-composite: xor;
     mask-composite: exclude;
   }
+}
+
+/* Custom bar loader */
+.loader {
+  width: 120px;
+  height: 22px;
+  border-radius: 20px;
+  color: hsl(var(--primary));
+  border: 2px solid;
+  position: relative;
+}
+.loader::before {
+  content: "";
+  position: absolute;
+  margin: 2px;
+  inset: 0 100% 0 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: loader-fill 2s infinite;
+}
+@keyframes loader-fill {
+  100% { inset: 0; }
 }

@@ -15,6 +15,7 @@ import Users from '@/pages/Users';
 import Orders from '@/pages/Orders/Orders';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { PageLoader } from '@/components/ui/Loader';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
 
 const queryClient = new QueryClient();
@@ -36,13 +37,7 @@ function ProtectedRoute({
 }) {
   const { user, isLoading, hasFullAccess } = useUser();
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  if (isLoading) return <PageLoader />;
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -84,13 +79,7 @@ function ProtectedRoute({
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  if (isLoading) return <PageLoader />;
 
   if (user) {
     return <Navigate to="/dashboard" replace />;

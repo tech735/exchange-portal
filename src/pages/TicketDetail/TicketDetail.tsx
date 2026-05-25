@@ -35,7 +35,7 @@ export default function TicketDetail() {
 
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold flex items-center gap-3">
+            <h1 className="text-2xl lg:text-3xl font-semibold flex items-center gap-3">
               Order {ticket.order_id}
               {ticket.sla_breached && (
                 <span className="sla-breach-badge">

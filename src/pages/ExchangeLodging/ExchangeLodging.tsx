@@ -63,10 +63,13 @@ export default function ExchangeLodging() {
     const netAmount = exchangeItemsValue - returnItemsValue + deliveryCharge;
 
     const isRefund = netAmount < 0;
+    const isZero = netAmount === 0;
     const absAmount = Math.abs(netAmount);
 
     const message = isRefund
       ? `Confirm refund due of ₹${absAmount}? This will mark the ticket as processed.`
+      : isZero
+      ? `No amount to collect or pay. Mark this ticket as settled?`
       : `Confirm payment collection of ₹${netAmount}?`;
 
     if (confirm(message)) {
@@ -116,7 +119,7 @@ export default function ExchangeLodging() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground mt-2">Exchange Tickets</h1>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">Exchange Tickets</h1>
             <p className="text-muted-foreground mt-2">Create and manage exchange requests</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -147,7 +150,7 @@ export default function ExchangeLodging() {
                   Manual Exchange
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>New Manual Exchange Request</DialogTitle>
                 </DialogHeader>
@@ -162,7 +165,7 @@ export default function ExchangeLodging() {
                   Create Exchange
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
                 </DialogHeader>
@@ -201,7 +204,7 @@ export default function ExchangeLodging() {
             </TabsContent>
 
             <Dialog open={calculatorOpen} onOpenChange={setCalculatorOpen}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Exchange Calculator</DialogTitle>
                 </DialogHeader>

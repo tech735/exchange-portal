@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { shopifyService, type ShopifyOrder } from '@/services/shopify';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, ExternalLink, RefreshCw, Package, Search } from 'lucide-react';
+import { ExternalLink, RefreshCw, Package, Search, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -64,12 +64,37 @@ export default function Orders() {
         setCurrentPage(1);
     }, [searchQuery]);
 
+    // Group paginated orders by date for the mobile list view
+    const groupedOrders = useMemo(() => {
+        const groups: { label: string; key: string; orders: ShopifyOrder[] }[] = [];
+        const seen: Record<string, number> = {};
+
+        paginatedOrders.forEach(order => {
+            const date = new Date(order.created_at);
+            const key = format(date, 'yyyy-MM-dd');
+
+            let label: string;
+            if (isToday(date)) label = 'Today';
+            else if (isYesterday(date)) label = 'Yesterday';
+            else if (isThisWeek(date, { weekStartsOn: 1 })) label = format(date, 'EEEE');
+            else label = format(date, 'MMMM d');
+
+            if (seen[key] === undefined) {
+                seen[key] = groups.length;
+                groups.push({ label, key, orders: [] });
+            }
+            groups[seen[key]].orders.push(order);
+        });
+
+        return groups;
+    }, [paginatedOrders]);
+
     return (
         <Layout>
             <div className="page-shell animate-fade-in">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div>
-                        <h1 className="text-3xl font-semibold text-foreground mt-2">
+                        <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">
                             {/* <ShoppingCart className="h-8 w-8 text-primary" /> */}
                             Shopify Orders
                         </h1>
@@ -92,13 +117,97 @@ export default function Orders() {
                             disabled={isLoading}
                             className="flex items-center gap-2 whitespace-nowrap h-10"
                         >
-                            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            <RefreshCw className="h-4 w-4" />
                             Refresh Sync
                         </Button>
                     </div>
                 </div>
 
-                <div className="card-base mt-8">
+                {/* ── Mobile list (< lg) ────────────────────────────── */}
+                <div className="block lg:hidden mt-6 rounded-2xl overflow-hidden border border-border bg-card">
+                    {isLoading ? (
+                        <div className="flex justify-center py-16">
+                            <div className="loader" />
+                        </div>
+                    ) : paginatedOrders.length === 0 ? (
+                        <p className="py-10 text-center text-sm text-muted-foreground">
+                            {orders.length === 0 ? 'No orders found in Shopify.' : `No orders matching "${searchQuery}".`}
+                        </p>
+                    ) : (
+                        <>
+                            {groupedOrders.map(({ label, key, orders: group }) => (
+                                <div key={key}>
+                                    {/* Date group header */}
+                                    <div className="px-4 py-1.5 bg-muted/40 border-b border-border">
+                                        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                                    </div>
+
+                                    {group.map((order, idx) => {
+                                        const itemCount = order.line_items.reduce((s, i) => s + i.quantity, 0);
+                                        const time = format(new Date(order.created_at), 'hh:mma');
+                                        const customer = [order.customer?.first_name, order.customer?.last_name].filter(Boolean).join(' ') || order.email || '—';
+                                        const price = `₹${parseFloat(order.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                                        const financialLabel = order.financial_status
+                                            ? order.financial_status.charAt(0).toUpperCase() + order.financial_status.slice(1)
+                                            : 'Unknown';
+
+                                        return (
+                                            <div
+                                                key={order.id}
+                                                className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
+                                                onClick={() => { setSelectedOrderDetails(order); setDetailsOpen(true); }}
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    {/* Row 1: order # + price */}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-semibold text-[15px] text-foreground leading-snug">{order.name}</span>
+                                                        <span className="text-[15px] text-foreground font-medium shrink-0">{price}</span>
+                                                    </div>
+                                                    {/* Row 2: customer • items • time */}
+                                                    <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
+                                                        {customer} · {itemCount} {itemCount === 1 ? 'item' : 'items'} · {time}
+                                                    </p>
+                                                    {/* Row 3: status badge */}
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0.5 h-auto rounded-full">
+                                                            {financialLabel}
+                                                        </Badge>
+                                                        {order.fulfillment_status && (
+                                                            <span className="text-[11px] text-muted-foreground capitalize">
+                                                                {order.fulfillment_status}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Row 4: shipping type */}
+                                                    <p className="text-[12px] text-muted-foreground mt-0.5">Standard</p>
+                                                </div>
+                                                <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+
+                            {/* Mobile pagination */}
+                            {orders.length > 0 && (
+                                <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                                    <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* ── Desktop table (≥ lg) ───────────────────────────── */}
+                <div className="hidden lg:block card-base mt-8">
                     <div className="rounded-md border overflow-hidden">
                         <Table>
                             <TableHeader>
@@ -116,14 +225,13 @@ export default function Orders() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
-                                            <div className="flex flex-col items-center justify-center space-y-3">
-                                                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                                                <p>Syncing orders from Shopify...</p>
+                                        <TableCell colSpan={8} className="h-48 text-center">
+                                            <div className="flex justify-center">
+                                                <div className="loader" />
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ) : orders.length === 0 && !searchQuery ? (
+                                ) :orders.length === 0 && !searchQuery ? (
                                     <TableRow>
                                         <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                                             No orders found in Shopify.
@@ -252,7 +360,7 @@ export default function Orders() {
                 </div>
 
                 <Dialog open={exchangeOpen} onOpenChange={setExchangeOpen}>
-                    <DialogContent className="max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
                         </DialogHeader>
@@ -266,7 +374,7 @@ export default function Orders() {
                 </Dialog>
 
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                    <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Order Details: {selectedOrderDetails?.name}</DialogTitle>
                         </DialogHeader>

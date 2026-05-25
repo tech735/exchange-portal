@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Loader } from './Loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -221,7 +222,15 @@ export function DataTable<T extends { id: string | number }>({
                 </tr>
               </thead>
               <tbody>
-                {data?.length === 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="py-12 text-center">
+                      <div className="flex justify-center">
+                        <Loader />
+                      </div>
+                    </td>
+                  </tr>
+                ) : data?.length === 0 ? (
                   <tr>
                     <td colSpan={columns.length + 1} className="py-8 text-center text-muted-foreground">
                       {emptyMessage}
@@ -253,7 +262,7 @@ export function DataTable<T extends { id: string | number }>({
       </Card>
       
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Export Selected Records</DialogTitle>
           </DialogHeader>
@@ -261,7 +270,7 @@ export function DataTable<T extends { id: string | number }>({
             <p className="text-sm text-muted-foreground mb-4">
               You have selected {selectedRows.length} record(s) to export.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-end sm:gap-2">
               <Button variant="outline" onClick={() => setShowExportDialog(false)}>
                 Cancel
               </Button>

@@ -162,10 +162,10 @@ export default function Warehouse() {
   return (
     <Layout>
       <div className="page-shell animate-fade-in">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground mt-2">Warehouse Processing</h1>
-            <p className="text-muted-foreground mt-2">Process returns and exchanges</p>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">Warehouse Processing</h1>
+            <p className="text-muted-foreground mt-1">Process returns and exchanges</p>
           </div>
         </div>
 
@@ -176,7 +176,7 @@ export default function Warehouse() {
           </div>
 
           <Tabs value={tab} onValueChange={setTab} className="mt-6">
-            <TabsList className="inline-flex h-auto w-auto items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
+            <TabsList className="flex h-auto w-full items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto scrollbar-hide">
               <TabsTrigger value="new_warehouse" className="rounded-md px-3 py-1.5">New Requests</TabsTrigger>
               <TabsTrigger value="return_pending" className="rounded-md px-3 py-1.5">Return Pending</TabsTrigger>
               <TabsTrigger value="return_received" className="rounded-md px-3 py-1.5">QC Pending</TabsTrigger>

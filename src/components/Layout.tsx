@@ -140,7 +140,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-1 overflow-auto lg:pt-0 pt-16">
+      <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto lg:pt-0 pt-16">
         <div className="hidden lg:block app-header">
           <div className="flex items-center gap-4 w-full">
             <GlobalSearch />

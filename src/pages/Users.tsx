@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +34,29 @@ const roles = [
   { value: 'INVOICING', label: 'Accounts' }
 ];
 
+const PASSWORDS_KEY = 'exchange_flow_user_passwords';
+
+function loadStoredPasswords(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(PASSWORDS_KEY) || '{}'); } catch { return {}; }
+}
+function saveStoredPassword(email: string, password: string) {
+  const passwords = loadStoredPasswords();
+  passwords[email] = password;
+  localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
+}
+
+function PasswordCell({ password }: { password: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="flex items-center gap-1">
+      <span className="font-mono text-xs text-foreground">{visible ? password : '••••••••'}</span>
+      <button type="button" onClick={() => setVisible(v => !v)} className="text-muted-foreground hover:text-foreground ml-1">
+        {visible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+      </button>
+    </div>
+  );
+}
+
 export default function Users() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -49,6 +72,12 @@ export default function Users() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [storedPasswords, setStoredPasswords] = useState<Record<string, string>>(loadStoredPasswords);
+
+  const updateStoredPassword = useCallback((email: string, password: string) => {
+    saveStoredPassword(email, password);
+    setStoredPasswords(loadStoredPasswords());
+  }, []);
 
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
@@ -102,7 +131,8 @@ export default function Users() {
       if (error) throw (error.message ? error : new Error('Failed to invoke function'));
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      updateStoredPassword(variables.email, variables.password);
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setSuccess('User created successfully! They can now log in with their email and password.');
       setError('');
@@ -130,7 +160,8 @@ export default function Users() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      if (resetTarget?.email) updateStoredPassword(resetTarget.email, variables.password);
       toast({
         title: "Success",
         description: `Password for ${resetTarget?.email} has been updated.`,
@@ -242,6 +273,16 @@ export default function Users() {
       )
     },
     {
+      key: 'password_display',
+      label: 'Password',
+      render: (_: unknown, row: User) => {
+        const password = storedPasswords[row.email];
+        return password
+          ? <PasswordCell password={password} />
+          : <span className="text-xs text-muted-foreground italic">Not on record</span>;
+      }
+    },
+    {
       key: 'role',
       label: 'Role',
       render: (value: string, row: User) => (
@@ -323,7 +364,7 @@ export default function Users() {
                   Create User
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Create New User</DialogTitle>
                 </DialogHeader>
@@ -404,7 +445,7 @@ export default function Users() {
                     </Select>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-6">
+                  <div className="grid grid-cols-2 gap-3 pt-6 sm:flex sm:justify-end sm:gap-2">
                     <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
                       Cancel
                     </Button>
@@ -420,11 +461,17 @@ export default function Users() {
 
         {/* Reset Password Dialog */}
         <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Reset Password for {resetTarget?.full_name}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleResetPassword} className="space-y-4 pt-4">
+              {resetTarget && storedPasswords[resetTarget.email] && (
+                <div className="bg-muted/40 border rounded-lg px-4 py-3">
+                  <p className="text-xs text-muted-foreground mb-1">Current recorded password</p>
+                  <PasswordCell password={storedPasswords[resetTarget.email]} />
+                </div>
+              )}
               {resetTarget?.id === 'admin-fallback-id' ? (
                 <div className="bg-amber-50 border border-amber-100 text-amber-700 px-4 py-3 rounded-xl text-sm font-medium">
                   This user is a temporary "System Fallback" account. You cannot reset its password. 

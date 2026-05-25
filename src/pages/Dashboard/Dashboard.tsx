@@ -34,7 +34,7 @@ export default function Dashboard() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground mt-2">Dashboard</h1>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">Dashboard</h1>
             <p className="text-muted-foreground mt-2">Overview of exchange ticket status</p>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -43,7 +43,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6">
           {kpiCards.map(({ title, value, icon, color }, index) => (
             <KPICard
               key={title}

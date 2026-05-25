@@ -1,11 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableProps, Pagination } from '@/components/ui/DataTable';
-import { AlertTriangle, CheckCircle, Clock, IndianRupee } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { AlertTriangle, CheckCircle, ChevronRight, Clock, IndianRupee } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
-import { format } from 'date-fns';
-import { useState } from 'react';
+import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
+import { useState, useMemo } from 'react';
 import { useProductPrices } from '@/hooks/useProductPrices';
 
 interface InvoicingTableProps {
@@ -45,10 +45,30 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     await onInvoiceDone(id);
   };
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];
+
+  const groupedTickets = useMemo(() => {
+    const groups: { label: string; key: string; tickets: Ticket[] }[] = [];
+    const seen: Record<string, number> = {};
+    paginatedTickets.forEach(ticket => {
+      const date = new Date(ticket.created_at);
+      const key = format(date, 'yyyy-MM-dd');
+      let label: string;
+      if (isToday(date)) label = 'Today';
+      else if (isYesterday(date)) label = 'Yesterday';
+      else if (isThisWeek(date, { weekStartsOn: 1 })) label = format(date, 'EEEE');
+      else label = format(date, 'MMMM d');
+      if (seen[key] === undefined) { seen[key] = groups.length; groups.push({ label, key, tickets: [] }); }
+      groups[seen[key]].tickets.push(ticket);
+    });
+    return groups;
+  }, [paginatedTickets]);
 
   // Calculate refund amount for a ticket
   const calculateRefundAmount = (ticket: Ticket): number => {
@@ -210,23 +230,123 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
   ];
 
   return (
-    <DataTable
-      title="Invoicing Tickets"
-      data={paginatedTickets}
-      columns={columns}
-      isLoading={isLoading}
-      emptyMessage="No tickets found"
-      onSelectionChange={(selectedRows) => {
-        console.log('Selected invoicing tickets:', selectedRows);
-      }}
-    >
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={itemsPerPage}
-        onItemsPerPageChange={setItemsPerPage}
-      />
-    </DataTable>
+    <>
+      {/* Mobile list (< lg) */}
+      <div className="block lg:hidden rounded-2xl overflow-hidden border border-border bg-card">
+        {isLoading ? (
+          <div className="flex justify-center py-16"><div className="loader" /></div>
+        ) : paginatedTickets.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">No tickets found</p>
+        ) : (
+          <>
+            {groupedTickets.map(({ label, key, tickets: group }) => (
+              <div key={key}>
+                <div className="px-4 py-1.5 bg-muted/40 border-b border-border">
+                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                </div>
+                {group.map((ticket, idx) => {
+                  const refundAmount = calculateRefundAmount(ticket);
+                  const needsRefund = refundAmount > 0;
+                  const isRefunded = ticket.refund_status === 'PROCESSED';
+                  const exchangedAt = ticket.exchange_completed_at
+                    ? format(new Date(ticket.exchange_completed_at), 'MMM d')
+                    : null;
+                  const time = format(new Date(ticket.created_at), 'h:mma');
+                  const paymentLabel = needsRefund
+                    ? (isRefunded ? `₹${refundAmount} refunded` : `₹${refundAmount} refund due`)
+                    : 'Collected';
+
+                  return (
+                    <div
+                      key={ticket.id}
+                      className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
+                      onClick={() => navigate(`/ticket/${ticket.id}`, { state: { from: location.pathname } })}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-[15px] text-foreground leading-snug">#{ticket.order_id}</span>
+                          <span className={`text-[14px] font-medium shrink-0 ${needsRefund && !isRefunded ? 'text-orange-600' : isRefunded ? 'text-green-600' : 'text-foreground'}`}>
+                            {paymentLabel}
+                          </span>
+                        </div>
+                        <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
+                          {ticket.customer_name}
+                          {exchangedAt ? ` · Exchanged ${exchangedAt}` : ` · ${time}`}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                          <Badge variant="outline" className="text-[11px] px-2 py-0.5 h-auto rounded-full">
+                            {STAGE_LABELS[ticket.stage] || ticket.stage}
+                          </Badge>
+                          {['EXCHANGE_BOOKED', 'EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(ticket.stage) && (
+                            !processingInvoices.has(ticket.id) ? (
+                              <Button size="sm" className="h-6 text-[11px] px-2 rounded-full" onClick={() => handleStartProcessing(ticket.id)}>
+                                Process Invoice
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" className="h-6 text-[11px] px-2 rounded-full" onClick={() => handleInvoiceDone(ticket.id)}>
+                                <CheckCircle className="h-3 w-3 mr-1" />Invoice Done
+                              </Button>
+                            )
+                          )}
+                          {ticket.stage === 'INVOICED' && needsRefund && (
+                            <Button size="sm" className="h-6 text-[11px] px-2 rounded-full" onClick={() => onSendToRefund(ticket.id)}>
+                              Mark Refunded
+                            </Button>
+                          )}
+                          {ticket.stage === 'INVOICED' && !needsRefund && (
+                            <Button size="sm" variant="outline" className="h-6 text-[11px] px-2 rounded-full" onClick={() => onClose(ticket.id)}>
+                              Close
+                            </Button>
+                          )}
+                          {(ticket.stage === 'TO_BE_REFUNDED' || ticket.stage === 'CLOSED') && (
+                            <Button size="sm" variant="outline" className="h-6 text-[11px] px-2 rounded-full" onClick={() => onClose(ticket.id)}>
+                              Close
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop table (≥ lg) */}
+      <div className="hidden lg:block">
+        <DataTable
+          title="Invoicing Tickets"
+          data={paginatedTickets}
+          columns={columns}
+          isLoading={isLoading}
+          emptyMessage="No tickets found"
+          onSelectionChange={(selectedRows) => {
+            console.log('Selected invoicing tickets:', selectedRows);
+          }}
+        >
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
+        </DataTable>
+      </div>
+    </>
   );
 }
