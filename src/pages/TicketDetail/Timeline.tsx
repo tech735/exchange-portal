@@ -22,14 +22,14 @@ export function Timeline({ ticket }: TimelineProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Timeline</CardTitle>
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-base sm:text-lg">Timeline</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+        <div className="space-y-3">
           {milestones.map((m, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary" />
+              <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium">{m.label}</p>
                 <p className="text-xs text-muted-foreground">{format(new Date(m.date!), 'MMM d, yyyy HH:mm')}</p>

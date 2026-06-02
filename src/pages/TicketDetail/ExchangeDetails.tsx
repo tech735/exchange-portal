@@ -11,12 +11,12 @@ interface ExchangeDetailsProps {
 export function ExchangeDetails({ ticket }: ExchangeDetailsProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Exchange Details</CardTitle>
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-base sm:text-lg">Exchange Details</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 text-sm px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
         <div>
-          <span className="text-sm text-muted-foreground">Reason:</span>{' '}
+          <span className="text-muted-foreground">Reason:</span>{' '}
           <span className="font-medium">{REASON_LABELS[ticket.reason_code]}</span>
         </div>
         {ticket.reason_notes && (

@@ -56,14 +56,14 @@ export function PaymentSummary({ ticket }: PaymentSummaryProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg font-bold">
-          <IndianRupee className="h-5 w-5" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2 sm:p-6 sm:pb-2">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-bold">
+          <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" />
           Payment Summary
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm mt-4">
+      <CardContent className="space-y-3 px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+        <div className="grid grid-cols-2 gap-3 text-sm mt-2">
           <div>
             <span className="text-muted-foreground">Return Items Value:</span>
             <div className="font-medium text-red-600">-₹{returnItemsValue.toLocaleString()}</div>
