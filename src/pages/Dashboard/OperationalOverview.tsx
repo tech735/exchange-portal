@@ -60,7 +60,8 @@ export function OperationalOverview({ className }: OperationalOverviewProps) {
 
       return dailyData;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 
   if (isLoading) {

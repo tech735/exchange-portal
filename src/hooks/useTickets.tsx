@@ -122,6 +122,8 @@ export function useTickets(filters?: {
 }) {
   return useQuery({
     queryKey: ['tickets', filters],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       let query = supabase
         .from('tickets')
@@ -147,7 +149,6 @@ export function useTickets(filters?: {
       if (error) throw error;
       return (data || []).map((d: any) => mapTicket(d));
     },
-    staleTime: 60 * 1000,
   });
 }
 
@@ -162,6 +163,7 @@ export function useTicket(id: string | undefined) {
     },
     enabled: !!id,
     staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
 
@@ -176,6 +178,7 @@ export function useTicketEvents(ticketId: string | undefined) {
     },
     enabled: !!ticketId,
     staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
 
@@ -290,20 +293,20 @@ export function useDeleteTicket() {
 export function useTicketStats() {
   return useQuery({
     queryKey: ['ticket-stats'],
-    staleTime: 2 * 60 * 1000,
+    // Match the server-side Redis TTL so we refetch exactly when the cache expires
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('tickets').select('stage, status, sla_breached, created_at');
+      const { data, error } = await supabase.functions.invoke('ticket-stats');
       if (error) throw error;
-      const tickets = data as any[];
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return {
-        totalOpen: tickets.filter(t => !['CLOSED', 'INVOICED'].includes(t.stage)).length,
-        pendingWarehouse: tickets.filter(t => ['LODGED', 'WAREHOUSE_PENDING'].includes(t.stage)).length,
-        pendingInvoicing: tickets.filter(t => ['EXCHANGE_COMPLETED', 'INVOICING_PENDING'].includes(t.stage)).length,
-        slaBreached: tickets.filter(t => t.sla_breached).length,
-        completedThisWeek: tickets.filter(t => t.status === 'COMPLETED' && new Date(t.created_at) >= weekAgo).length,
-        denied: tickets.filter(t => t.status === 'DENIED').length,
+      if (data?.error) throw new Error(data.error);
+      return data as {
+        totalOpen: number;
+        pendingWarehouse: number;
+        pendingInvoicing: number;
+        slaBreached: number;
+        completedThisWeek: number;
+        denied: number;
       };
     },
   });

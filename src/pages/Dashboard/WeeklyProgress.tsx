@@ -62,7 +62,8 @@ export function WeeklyProgress({ className }: WeeklyProgressProps) {
         avgProcessingTime: Math.round(avgProcessingTime * 10) / 10
       };
     },
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 
   if (isLoading) {

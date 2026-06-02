@@ -5,6 +5,8 @@ import type { ProductCatalog } from '@/types/database';
 export function useProducts(search?: string) {
   return useQuery({
     queryKey: ['products'],
+    staleTime: 5 * 60 * 1000,  // products only change after an explicit Shopify sync
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('product_catalog')

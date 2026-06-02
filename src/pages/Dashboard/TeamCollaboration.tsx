@@ -54,7 +54,8 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
 
       return queues.sort((a, b) => b.count - a.count).slice(0, 3);
     },
-    refetchInterval: 30000,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 
   const getStatusBadge = (status: QueueStats['status'], count: number) => {

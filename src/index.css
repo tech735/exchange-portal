@@ -7,45 +7,45 @@
 @layer base {
   :root {
     /* Clean professional SaaS palette */
-    --background: 210 20% 98%;
-    --foreground: 222 47% 12%;
+    --background: #f9fafb;
+    --foreground: #10192d;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: #ffffff;
+    --card-foreground: #0f1729;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover: #ffffff;
+    --popover-foreground: #0f1729;
 
     /* Calm blue primary */
-    --primary: 215 60% 32%;
-    --primary-foreground: 210 40% 98%;
+    --primary: #214983;
+    --primary-foreground: #f8fafc;
 
     /* Soft gray secondary */
-    --secondary: 214 32% 91%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: #e1e7ef;
+    --secondary-foreground: #0f1729;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 45%;
+    --muted: #f3f5f7;
+    --muted-foreground: #627084;
 
-    --accent: 214 80% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: #edf4fd;
+    --accent-foreground: #0f1729;
 
     /* Status colors */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: #ef4343;
+    --destructive-foreground: #ffffff;
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    --success: #16a249;
+    --success-foreground: #ffffff;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: #f59f0a;
+    --warning-foreground: #ffffff;
 
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
+    --info: #0da2e7;
+    --info-foreground: #ffffff;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 222 47% 20%;
+    --border: #e0e5eb;
+    --input: #e0e5eb;
+    --ring: #1b294b;
 
     --radius: 0.75rem;
 
@@ -60,58 +60,58 @@
     --space-8: 3rem;
 
     /* Custom tokens */
-    --sla-breach: 0 84% 60%;
-    --stage-lodged: 199 89% 48%;
-    --stage-warehouse: 38 92% 50%;
-    --stage-invoicing: 263 70% 50%;
-    --stage-completed: 142 76% 36%;
-    --stage-denied: 0 84% 60%;
+    --sla-breach: #ef4343;
+    --stage-lodged: #0da2e7;
+    --stage-warehouse: #f59f0a;
+    --stage-invoicing: #6b26d9;
+    --stage-completed: #16a249;
+    --stage-denied: #ef4343;
 
-    --sidebar-background: 215 60% 32%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 215 60% 32%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 65% 42%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 214 20% 90%;
-    --sidebar-ring: 215 60% 32%;
+    --sidebar-background: #214983;
+    --sidebar-foreground: #f8fafc;
+    --sidebar-primary: #214983;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #255fb1;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #e0e5eb;
+    --sidebar-ring: #214983;
 
     /* Card styling */
-    --card-shadow: 0 12px 30px -24px hsl(215 40% 20% / 0.6);
-    --card-shadow-soft: 0 8px 20px -16px hsl(215 40% 20% / 0.5);
+    --card-shadow: 0 12px 30px -24px rgba(31, 48, 71, 0.6);
+    --card-shadow-soft: 0 8px 20px -16px rgba(31, 48, 71, 0.5);
   }
 
   .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    --background: #0b111e;
+    --foreground: #f8fafc;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: #0f1729;
+    --card-foreground: #f8fafc;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: #0f1729;
+    --popover-foreground: #f8fafc;
 
-    --primary: 199 89% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: #3ebaf4;
+    --primary-foreground: #0f1729;
 
-    --secondary: 222 47% 18%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: #182543;
+    --secondary-foreground: #f8fafc;
 
-    --muted: 222 47% 18%;
-    --muted-foreground: 215 20% 65%;
+    --muted: #182543;
+    --muted-foreground: #94a3b8;
 
-    --accent: 222 47% 18%;
-    --accent-foreground: 210 40% 98%;
+    --accent: #182543;
+    --accent-foreground: #f8fafc;
 
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: #7c1d1d;
+    --destructive-foreground: #f8fafc;
 
-    --success: 142 76% 30%;
-    --success-foreground: 0 0% 100%;
+    --success: #12873d;
+    --success-foreground: #ffffff;
 
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
-    --ring: 199 89% 60%;
+    --border: #1b294b;
+    --input: #1b294b;
+    --ring: #3ebaf4;
   }
 }
 
@@ -166,7 +166,7 @@
 
   .kpi-card-primary {
     @apply text-white border-transparent;
-    background: linear-gradient(135deg, hsl(215 60% 40%), hsl(210 80% 48%));
+    background: linear-gradient(135deg, #295ca3, #187adc);
     box-shadow: var(--card-shadow);
   }
 
@@ -259,7 +259,7 @@
   .gradient-border::before {
     content: '';
     @apply absolute inset-0 rounded-lg p-[1px];
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--info)));
+    background: linear-gradient(135deg, var(--primary), var(--info));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -272,7 +272,7 @@
   width: 120px;
   height: 22px;
   border-radius: 20px;
-  color: hsl(var(--primary));
+  color: var(--primary);
   border: 2px solid;
   position: relative;
 }

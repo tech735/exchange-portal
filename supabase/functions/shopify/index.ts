@@ -2,24 +2,24 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import * as redis from '../_shared/redis.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/**
- * Strip HTML tags from a string for plain-text product descriptions.
- */
+// Cache TTLs (seconds)
+const TTL_LOCATIONS = 3600;       // 1 hour  — locations almost never change
+const TTL_RECENT_ORDERS = 120;    // 2 min   — orders update frequently
+const TTL_PRODUCTS = 600;         // 10 min  — product list during sync
+const TTL_INVENTORY = 600;        // 10 min  — inventory levels during sync
+
 function stripHtml(html: string | null): string | null {
     if (!html) return null;
     return html.replace(/<[^>]*>/g, '').trim();
 }
 
-/**
- * Fetch all pages of Shopify products using Link-header pagination.
- * Returns an array of all product objects.
- */
 async function fetchAllShopifyProducts(
     storeUrl: string,
     accessToken: string,
@@ -48,7 +48,6 @@ async function fetchAllShopifyProducts(
             allProducts.push(...data.products);
         }
 
-        // Follow pagination via the Link header
         url = null;
         const linkHeader = response.headers.get('link');
         if (linkHeader) {
@@ -62,9 +61,6 @@ async function fetchAllShopifyProducts(
     return allProducts;
 }
 
-/**
- * Fetch all locations and find the primary one.
- */
 async function getPrimaryLocationId(storeUrl: string, accessToken: string): Promise<number | null> {
     const url = `https://${storeUrl}/admin/api/2024-01/locations.json`;
     const response = await fetch(url, {
@@ -78,17 +74,12 @@ async function getPrimaryLocationId(storeUrl: string, accessToken: string): Prom
     if (!response.ok) return null;
     const data = await response.json();
     const locations = data.locations || [];
-    
-    // Try to find the primary location or one named "Online Store"
+
     const onlineStore = locations.find((l: any) => l.name.toLowerCase().includes('online store'));
     const primary = onlineStore || locations.find((l: any) => l.legacy_primary === true) || locations[0];
     return primary ? primary.id : null;
 }
 
-/**
- * Fetch all inventory levels for a specific location.
- * Returns a map of inventory_item_id -> available quantity.
- */
 async function fetchInventoryMapForLocation(
     storeUrl: string,
     accessToken: string,
@@ -135,7 +126,8 @@ serve(async (req) => {
     }
 
     try {
-        const { action, orderId } = await req.json();
+        const body = await req.json();
+        const { action, orderId, forceRefresh = false } = body;
 
         if (!action) {
             return new Response(JSON.stringify({ error: 'Action is required' }), {
@@ -154,11 +146,12 @@ serve(async (req) => {
             });
         }
 
-        // Ensure the store URL does not contain protocol and path, just the myshopify.com domain or custom domain
         const cleanStoreUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        // Use a short hash of the store URL as a safe cache key segment
+        const storeKey = cleanStoreUrl.replace(/[^a-zA-Z0-9]/g, '_');
 
         // ─────────────────────────────────────────────
-        // ACTION: getOrder
+        // ACTION: getOrder  (not cached — each order is unique)
         // ─────────────────────────────────────────────
         if (action === 'getOrder') {
             if (!orderId) {
@@ -204,9 +197,22 @@ serve(async (req) => {
         }
 
         // ─────────────────────────────────────────────
-        // ACTION: getRecentOrders
+        // ACTION: getRecentOrders  — cached 2 min
         // ─────────────────────────────────────────────
         if (action === 'getRecentOrders') {
+            const cacheKey = `shopify:recent_orders:${storeKey}`;
+
+            if (!forceRefresh) {
+                const cached = await redis.get<any[]>(cacheKey);
+                if (cached) {
+                    console.log('Cache HIT: getRecentOrders');
+                    return new Response(JSON.stringify({ orders: cached, _cache: 'HIT' }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 200,
+                    });
+                }
+            }
+
             const listUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&limit=50`;
 
             const response = await fetch(listUrl, {
@@ -227,17 +233,34 @@ serve(async (req) => {
             }
 
             const data = await response.json();
+            const orders = data.orders || [];
 
-            return new Response(JSON.stringify({ orders: data.orders || [] }), {
+            await redis.set(cacheKey, orders, TTL_RECENT_ORDERS);
+            console.log(`Cache MISS: getRecentOrders — cached ${orders.length} orders for ${TTL_RECENT_ORDERS}s`);
+
+            return new Response(JSON.stringify({ orders, _cache: 'MISS' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
         }
 
         // ─────────────────────────────────────────────
-        // ACTION: getLocations
+        // ACTION: getLocations  — cached 1 hour
         // ─────────────────────────────────────────────
         if (action === 'getLocations') {
+            const cacheKey = `shopify:locations:${storeKey}`;
+
+            if (!forceRefresh) {
+                const cached = await redis.get<any[]>(cacheKey);
+                if (cached) {
+                    console.log('Cache HIT: getLocations');
+                    return new Response(JSON.stringify({ locations: cached, _cache: 'HIT' }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        status: 200,
+                    });
+                }
+            }
+
             const locationsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/locations.json`;
 
             const response = await fetch(locationsUrl, {
@@ -257,19 +280,26 @@ serve(async (req) => {
             }
 
             const data = await response.json();
-            return new Response(JSON.stringify({ locations: data.locations || [] }), {
+            const locations = data.locations || [];
+
+            await redis.set(cacheKey, locations, TTL_LOCATIONS);
+            console.log(`Cache MISS: getLocations — cached ${locations.length} locations for ${TTL_LOCATIONS}s`);
+
+            return new Response(JSON.stringify({ locations, _cache: 'MISS' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
         }
 
         // ─────────────────────────────────────────────
-        // ACTION: syncProducts (Updated Strategy: Group by Product)
+        // ACTION: syncProducts
+        // Shopify API calls are cached to avoid hammering the API on repeat syncs.
+        // The DB upsert still always runs so the catalog stays up to date.
+        // Pass forceRefresh: true to bypass the Shopify cache.
         // ─────────────────────────────────────────────
         if (action === 'syncProducts') {
-            console.log('Starting Shopify product catalogue sync (Grouped Strategy)...');
+            console.log('Starting Shopify product catalogue sync...');
 
-            // Create a Supabase client with the service-role key to bypass RLS
             const supabaseUrl = Deno.env.get('SUPABASE_URL');
             const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY');
 
@@ -282,23 +312,60 @@ serve(async (req) => {
 
             const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-            // 1. Fetch all products from Shopify
-            const products = await fetchAllShopifyProducts(cleanStoreUrl, shopifyAccessToken);
-            console.log(`Fetched ${products.length} products from Shopify`);
+            const productsCacheKey = `shopify:products:${storeKey}`;
+            const locationsCacheKey = `shopify:locations:${storeKey}`;
 
-            // 1b. Fetch inventory map for primary location
-            const primaryLocationId = await getPrimaryLocationId(cleanStoreUrl, shopifyAccessToken);
-            let inventoryMap = null;
-            if (primaryLocationId) {
-                console.log(`Fetching inventory levels for primary location: ${primaryLocationId}`);
-                inventoryMap = await fetchInventoryMapForLocation(cleanStoreUrl, shopifyAccessToken, primaryLocationId);
-                console.log(`Fetched ${inventoryMap.size} inventory levels`);
-            } else {
-                console.warn('Could not find primary location ID, falling back to global inventory quantity');
+            // --- 1. Fetch products (cache-aware) ---
+            let products: any[] | null = null;
+            if (!forceRefresh) {
+                products = await redis.get<any[]>(productsCacheKey);
+                if (products) {
+                    console.log(`Cache HIT: Shopify products (${products.length} items)`);
+                }
+            }
+            if (!products) {
+                products = await fetchAllShopifyProducts(cleanStoreUrl, shopifyAccessToken);
+                console.log(`Cache MISS: Fetched ${products.length} products from Shopify`);
+                await redis.set(productsCacheKey, products, TTL_PRODUCTS);
             }
 
-            // 2. Map each Shopify product to a product_catalog row
-            //    (Variants are grouped within the row)
+            // --- 2. Fetch primary location (cache-aware) ---
+            let primaryLocationId: number | null = null;
+            const cachedLocations = forceRefresh ? null : await redis.get<any[]>(locationsCacheKey);
+            if (cachedLocations) {
+                const onlineStore = cachedLocations.find((l: any) => l.name.toLowerCase().includes('online store'));
+                const primary = onlineStore || cachedLocations.find((l: any) => l.legacy_primary === true) || cachedLocations[0];
+                primaryLocationId = primary ? primary.id : null;
+                console.log(`Cache HIT: locations, using location ${primaryLocationId}`);
+            } else {
+                primaryLocationId = await getPrimaryLocationId(cleanStoreUrl, shopifyAccessToken);
+            }
+
+            // --- 3. Fetch inventory (cache-aware, keyed by location) ---
+            let inventoryMap: Map<number, number> | null = null;
+            if (primaryLocationId) {
+                const inventoryCacheKey = `shopify:inventory:${storeKey}:${primaryLocationId}`;
+                const cachedInventory = forceRefresh ? null : await redis.get<Record<string, number>>(inventoryCacheKey);
+                if (cachedInventory) {
+                    // Reconstruct Map from plain object (JSON keys are strings)
+                    inventoryMap = new Map(
+                        Object.entries(cachedInventory).map(([k, v]) => [Number(k), v])
+                    );
+                    console.log(`Cache HIT: inventory (${inventoryMap.size} levels)`);
+                } else {
+                    console.log(`Fetching inventory levels for location: ${primaryLocationId}`);
+                    inventoryMap = await fetchInventoryMapForLocation(cleanStoreUrl, shopifyAccessToken, primaryLocationId);
+                    console.log(`Cache MISS: fetched ${inventoryMap.size} inventory levels`);
+                    // Store as plain object for JSON serialization
+                    const inventoryObj: Record<string, number> = {};
+                    inventoryMap.forEach((qty, id) => { inventoryObj[String(id)] = qty; });
+                    await redis.set(inventoryCacheKey, inventoryObj, TTL_INVENTORY);
+                }
+            } else {
+                console.warn('Could not resolve primary location ID, falling back to global inventory');
+            }
+
+            // --- 4. Map Shopify products → product_catalog rows and upsert ---
             const now = new Date().toISOString();
             const syncedSkus: string[] = [];
             let synced = 0;
@@ -308,24 +375,21 @@ serve(async (req) => {
                 const variants = product.variants || [];
                 if (variants.length === 0) continue;
 
-                // Group Strategy: Use the product handle as the SKU for the catalog row
                 const sku = product.handle;
                 const productName = product.title || 'Untitled Product';
 
-                // Align titles and SKUs by index
                 const sizes = variants.map(v => v.title === 'Default Title' ? 'Standard' : v.title);
                 const allVariantSkus = variants.map(v => v.sku || '');
-                
-                // Build maps of variant SKU -> price & inventory
+
                 const variantPrices: Record<string, number> = {};
                 const variantInventory: Record<string, number> = {};
                 variants.forEach(v => {
                     if (v.sku) {
                         variantPrices[v.sku] = parseFloat(v.price) || 0;
-                        
-                        // Use location-specific inventory if available, otherwise fallback to global quantity
                         const locationStock = inventoryMap ? inventoryMap.get(v.inventory_item_id) : null;
-                        variantInventory[v.sku] = locationStock !== null ? (locationStock || 0) : (parseInt(v.inventory_quantity) || 0);
+                        variantInventory[v.sku] = locationStock !== null && locationStock !== undefined
+                            ? locationStock
+                            : (parseInt(v.inventory_quantity) || 0);
                     }
                 });
 
@@ -334,7 +398,7 @@ serve(async (req) => {
                     product_name: productName,
                     product_description: stripHtml(product.body_html),
                     category: product.product_type || null,
-                    variants: sizes, // CRITICAL: Send as JS array for JSONB column
+                    variants: sizes,
                     variant_skus: allVariantSkus,
                     variant_prices: variantPrices,
                     variant_inventory: variantInventory,
@@ -344,11 +408,10 @@ serve(async (req) => {
                     price: parseFloat(variants[0].price) || 0,
                     active: product.status === 'active',
                     shopify_product_id: product.id,
-                    shopify_variant_id: null, // No longer specific to one variant-row
+                    shopify_variant_id: null,
                     last_synced_at: now,
                 };
 
-                // Upsert by SKU (handle)
                 if (synced === 0) {
                     console.log(`Sample data for SKU ${sku}: ` + JSON.stringify({
                         product_name: productName,
@@ -370,12 +433,9 @@ serve(async (req) => {
                 }
             }
 
-            // 3. Deactivate products that were not in the Shopify response
-            //    (only deactivate those that were previously synced from Shopify)
+            // --- 5. Deactivate products removed from Shopify ---
             let deactivated = 0;
             if (syncedSkus.length > 0) {
-                // We're deactivating rows that are marked active but weren't in this sync batch
-                // AND have a Shopify Product ID (ensuring we don't deactivate manually added items)
                 const { data: staleProducts, error: staleError } = await supabaseAdmin
                     .from('product_catalog')
                     .update({ active: false, last_synced_at: now })
@@ -391,7 +451,7 @@ serve(async (req) => {
                 }
             }
 
-            console.log(`Sync complete: ${synced} products synced, ${deactivated} deactivated, ${errors} errors`);
+            console.log(`Sync complete: ${synced} synced, ${deactivated} deactivated, ${errors} errors`);
 
             return new Response(JSON.stringify({
                 success: true,
