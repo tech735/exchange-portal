@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,7 +7,7 @@
 @layer base {
   :root {
     /* Clean professional SaaS palette — stored as R G B channels for Tailwind opacity modifier support */
-    --background: 249 250 251;
+    --background: 255 255 255;
     --foreground: 16 25 45;
 
     --card: 255 255 255;
@@ -16,8 +16,8 @@
     --popover: 255 255 255;
     --popover-foreground: 15 23 41;
 
-    /* Calm blue primary */
-    --primary: 33 73 131;
+    /* Deep indigo primary */
+    --primary: 0 27 148;
     --primary-foreground: 248 250 252;
 
     /* Soft gray secondary */
@@ -67,14 +67,14 @@
     --stage-completed: 22 162 73;
     --stage-denied: 239 67 67;
 
-    --sidebar-background: 33 73 131;
-    --sidebar-foreground: 248 250 252;
-    --sidebar-primary: 33 73 131;
+    --sidebar-background: 245 246 251;
+    --sidebar-foreground: 30 37 58;
+    --sidebar-primary: 0 27 148;
     --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 37 95 177;
-    --sidebar-accent-foreground: 248 250 252;
-    --sidebar-border: 224 229 235;
-    --sidebar-ring: 33 73 131;
+    --sidebar-accent: 235 237 247;
+    --sidebar-accent-foreground: 0 27 148;
+    --sidebar-border: 229 231 240;
+    --sidebar-ring: 0 27 148;
 
     /* Card styling */
     --card-shadow: 0 12px 30px -24px rgba(31, 48, 71, 0.6);
@@ -126,7 +126,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-heading font-semibold tracking-tight;
   }
 }
 
@@ -171,11 +171,11 @@
   }
 
   .sidebar-nav-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150;
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150;
   }
 
   .sidebar-nav-item-active {
-    @apply bg-white text-sidebar-primary font-medium shadow-sm;
+    @apply bg-sidebar-accent text-sidebar-primary font-semibold shadow-none;
   }
 
   .app-shell {
@@ -183,16 +183,15 @@
   }
 
   .app-sidebar {
-    @apply bg-sidebar text-sidebar-foreground rounded-3xl border border-sidebar-border;
-    box-shadow: var(--card-shadow-soft);
+    @apply bg-sidebar text-sidebar-foreground border-r border-sidebar-border;
   }
 
   .app-header {
-    @apply flex items-center justify-between gap-6 px-6 py-4 lg:px-10;
+    @apply flex items-center justify-between gap-6 px-6 py-4 lg:px-10 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20;
   }
 
   .app-content {
-    @apply flex-1 px-6 pb-8 lg:px-10;
+    @apply flex-1 px-6 pb-8 pt-6 lg:px-10;
   }
 
   .page-shell {

@@ -26,3 +26,6 @@ knip_report.json
 secrets.txt
 build_error_cmd.txt
 build*.log
+
+#Exclude env files
+.env
