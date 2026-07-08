@@ -30,6 +30,9 @@ export interface Database {
           exchange_awb: string | null;
           sla_breached: boolean;
           sla_breached_at: string | null;
+          sla_2day_warning_sent_at: string | null;
+          sla_warehouse_breach_sent_at: string | null;
+          sla_tech_breach_sent_at: string | null;
           assigned_team: string;
           created_by_user_id: string | null;
           created_at: string;
