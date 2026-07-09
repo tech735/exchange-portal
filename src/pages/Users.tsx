@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Key, Eye, EyeOff } from 'lucide-react';
+import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -288,22 +288,25 @@ export default function Users() {
       render: (value: string, row: User) => (
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-muted-foreground" />
-          <Select
-            value={value}
-            onValueChange={(newRole) => handleUpdateUser(row.id, { role: newRole as UserRole })}
-            disabled={row.id === currentUser?.id}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={row.id === currentUser?.id}>
+              <Button type="button" variant="outline" className="w-32 justify-between font-normal">
+                <span>{roles.find((r) => r.value === value)?.label ?? value}</span>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
               {roles.map((role) => (
-                <SelectItem key={role.value} value={role.value}>
+                <DropdownMenuItem
+                  key={role.value}
+                  onSelect={() => handleUpdateUser(row.id, { role: role.value as UserRole })}
+                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                >
                   {role.label}
-                </SelectItem>
+                </DropdownMenuItem>
               ))}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )
     },
@@ -352,7 +355,7 @@ export default function Users() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground mt-2 text-gradient">User Management</h1>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">User Management</h1>
             <p className="text-muted-foreground mt-2">Manage system users, passwords, and access roles</p>
           </div>
 
@@ -428,21 +431,25 @@ export default function Users() {
 
                   <div className="space-y-2">
                     <Label htmlFor="role">System Role</Label>
-                    <Select
-                      value={formData.role}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as UserRole }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                          <span>{roles.find((r) => r.value === formData.role)?.label ?? 'Select role'}</span>
+                          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
                         {roles.map((role) => (
-                          <SelectItem key={role.value} value={role.value}>
+                          <DropdownMenuItem
+                            key={role.value}
+                            onSelect={() => setFormData(prev => ({ ...prev, role: role.value as UserRole }))}
+                            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                          >
                             {role.label}
-                          </SelectItem>
+                          </DropdownMenuItem>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-6 sm:flex sm:justify-end sm:gap-2">

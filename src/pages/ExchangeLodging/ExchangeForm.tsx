@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { REASON_LABELS, type ReasonCode, type TicketItem, type ProductCatalog } from '@/types/database';
 import { useCreateTicket } from '@/hooks/useTickets';
 import { ImprovedItemSelector } from './ImprovedItemSelector';
@@ -127,26 +127,50 @@ export function ExchangeForm({ onSuccess }: ExchangeFormProps) {
       </div>
       <div className="space-y-2">
         <Label>School *</Label>
-        <Select value={formData.school_name} onValueChange={(v) => setFormData({ ...formData, school_name: v })}>
-          <SelectTrigger><SelectValue placeholder="Select school" /></SelectTrigger>
-          <SelectContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" className="w-full justify-between font-normal">
+              <span>{formData.school_name || 'Select school'}</span>
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
             {MOCK_SCHOOLS.map((school) => (
-              <SelectItem key={school.id} value={school.name}>
+              <DropdownMenuItem
+                key={school.id}
+                onSelect={() => setFormData({ ...formData, school_name: school.name })}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+              >
                 {school.name}
                 {school.type === 'knowledge' && (
                   <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Knowledge</span>
                 )}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="space-y-2">
         <Label>Reason for Exchange *</Label>
-        <Select value={formData.reason_code} onValueChange={(v) => setFormData({ ...formData, reason_code: v as ReasonCode })}>
-          <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-          <SelectContent>{Object.entries(REASON_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" className="w-full justify-between font-normal">
+              <span>{formData.reason_code ? REASON_LABELS[formData.reason_code] : 'Select reason'}</span>
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
+            {Object.entries(REASON_LABELS).map(([k, v]) => (
+              <DropdownMenuItem
+                key={k}
+                onSelect={() => setFormData({ ...formData, reason_code: k as ReasonCode })}
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+              >
+                {v}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="space-y-2"><Label>Reason Notes</Label><Textarea value={formData.reason_notes} onChange={(e) => setFormData({ ...formData, reason_notes: e.target.value })} /></div>
 

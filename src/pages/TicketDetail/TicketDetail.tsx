@@ -2,7 +2,7 @@ import { useParams, Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useTicket, useTicketEvents } from '@/hooks/useTickets';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { STAGE_LABELS, STATUS_LABELS } from '@/types/database';
 import { ExchangeDetails } from './ExchangeDetails';
 import { ItemsDisplay } from './ItemsDisplay';
@@ -37,11 +37,6 @@ export default function TicketDetail() {
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold flex flex-wrap items-center gap-2">
               Order {ticket.order_id}
-              {ticket.sla_breached && (
-                <span className="sla-breach-badge">
-                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" /> SLA Breach
-                </span>
-              )}
             </h1>
             <p className="text-sm text-muted-foreground mt-1 break-words">
               {ticket.customer_name}

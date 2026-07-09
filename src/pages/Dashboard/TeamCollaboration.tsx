@@ -72,10 +72,10 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
 
   if (isLoading) {
     return (
-      <div className="card-base">
+      <div className={`card-base flex flex-col ${className}`}>
         <p className="text-sm text-muted-foreground">Queue Overview</p>
         <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
-        <div className="mt-6 flex justify-center py-6">
+        <div className="flex-1 flex items-center justify-center">
           <div className="loader" />
         </div>
       </div>
@@ -83,10 +83,10 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
   }
 
   return (
-    <div className={`card-base ${className}`}>
+    <div className={`card-base flex flex-col ${className}`}>
       <p className="text-sm text-muted-foreground">Queue Overview</p>
       <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 flex-1 flex flex-col justify-center gap-4">
         {queueStats?.map((queue) => {
           const Icon = getIcon(queue.name);
           const statusBadge = getStatusBadge(queue.status, queue.count);

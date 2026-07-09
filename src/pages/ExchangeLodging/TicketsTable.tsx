@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { AlertTriangle, Calculator, ChevronRight, Trash2 } from 'lucide-react';
+import { DataTable, MobilePagination, Pagination } from '@/components/ui/DataTable';
+import { Calculator, ChevronRight, Trash2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { REASON_LABELS, STAGE_LABELS, type Ticket } from '@/types/database';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
@@ -107,11 +107,6 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
             <span>{row.customer_phone}</span>
             {row.customer_email && <span>{row.customer_email}</span>}
           </div>
-          {row.sla_breached && (
-            <span className="sla-breach-badge ml-2 mt-1">
-              <AlertTriangle className="h-3 w-3" />
-            </span>
-          )}
         </div>
       )
     },
@@ -285,17 +280,7 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
                 })}
               </div>
             ))}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                </Button>
-              </div>
-            </div>
+            <MobilePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </>
         )}
       </div>
@@ -312,30 +297,13 @@ export function TicketsTable({ tickets, isLoading, onTicketSelect, onMarkCollect
             console.log('Selected exchange tickets:', selectedRows);
           }}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Items per page:</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="w-20 px-2 py-1 border rounded text-sm"
-              >
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              </Button>
-              <span className="text-sm text-muted-foreground px-2">Page {currentPage} of {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </DataTable>
       </div>
     </>

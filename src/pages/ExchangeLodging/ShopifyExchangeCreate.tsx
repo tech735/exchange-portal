@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { shopifyService, ShopifyOrder, ShopifyOrderLineItem } from '@/services/shopify';
-import { Search, Package, AlertCircle, X, Plus, Minus } from 'lucide-react';
+import { Search, Package, AlertCircle, X, Plus, Minus, ChevronDown } from 'lucide-react';
 import { REASON_LABELS, type ReasonCode, type TicketItem, type ProductCatalog } from '@/types/database';
 import { ImprovedItemSelector } from './ImprovedItemSelector';
 import { useCreateTicket } from '@/hooks/useTickets';
@@ -282,16 +282,23 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
                                                 {isSelected && (
                                                     <div className="mt-4" onClick={e => e.stopPropagation()}>
                                                         <p className="text-xs text-muted-foreground mb-1.5">Return reason</p>
-                                                        <Select value={selectedData?.reason} onValueChange={(v) => updateReturnItemReason(item.id, v as ReasonCode)}>
-                                                            <SelectTrigger className="h-9">
-                                                                <SelectValue placeholder="Select reason" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button type="button" variant="outline" className="h-9 w-full justify-between font-normal">
+                                                                    <span>{selectedData?.reason ? REASON_LABELS[selectedData.reason] : 'Select reason'}</span>
+                                                                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
                                                                 {Object.entries(REASON_LABELS).map(([k, v]) => (
-                                                                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                                                                    <DropdownMenuItem
+                                                                        key={k}
+                                                                        onSelect={() => updateReturnItemReason(item.id, k as ReasonCode)}
+                                                                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                                                                    >{v}</DropdownMenuItem>
                                                                 ))}
-                                                            </SelectContent>
-                                                        </Select>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
                                                 )}
                                             </div>

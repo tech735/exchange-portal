@@ -9,6 +9,7 @@ import { ExternalLink, RefreshCw, Package, Search, ChevronRight } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/DataTable';
 import { ShopifyExchangeCreate } from '../ExchangeLodging/ShopifyExchangeCreate';
 
 export default function Orders() {
@@ -323,49 +324,17 @@ export default function Orders() {
 
                     {/* Pagination Footer */}
                     {orders.length > 0 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-b border-l border-r rounded-b-md bg-muted/10 gap-4 mt-[-1px]">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">Items per page:</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    className="w-16 px-2 py-1 border rounded text-sm bg-background"
-                                >
-                                    <option value="10">10</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className="h-8 px-2 lg:px-3"
-                                >
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </Button>
-                                <span className="text-sm text-muted-foreground min-w-[5rem] text-center">
-                                    Page {currentPage} of {totalPages}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="h-8 px-2 lg:px-3"
-                                >
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </Button>
-                            </div>
+                        <div className="border-t border-b border-l border-r rounded-b-md bg-muted/10 mt-[-1px]">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                itemsPerPage={itemsPerPage}
+                                onItemsPerPageChange={(count) => {
+                                    setItemsPerPage(count);
+                                    setCurrentPage(1);
+                                }}
+                            />
                         </div>
                     )}
                 </div>

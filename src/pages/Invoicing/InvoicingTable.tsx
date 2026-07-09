@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableProps, Pagination } from '@/components/ui/DataTable';
-import { AlertTriangle, CheckCircle, ChevronRight, Clock, IndianRupee } from 'lucide-react';
+import { DataTable, MobilePagination, Pagination } from '@/components/ui/DataTable';
+import { CheckCircle, ChevronRight, Clock, IndianRupee } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
@@ -101,14 +101,9 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     {
       key: 'customer_name',
       label: 'Customer',
-      render: (value: string, row: Ticket) => (
+      render: (value: string) => (
         <div>
           <div>{value}</div>
-          {row.sla_breached && (
-            <span className="sla-breach-badge ml-2">
-              <AlertTriangle className="h-3 w-3" />
-            </span>
-          )}
         </div>
       )
     },
@@ -311,17 +306,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
                 })}
               </div>
             ))}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                </Button>
-              </div>
-            </div>
+            <MobilePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </>
         )}
       </div>

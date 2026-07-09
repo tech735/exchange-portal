@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus, Search, Tag } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Trash2, Plus, Search, ChevronDown } from 'lucide-react';
 import { type TicketItem, type ProductCatalog } from '@/types/database';
 import { useProducts } from '@/hooks/useProducts';
 
@@ -199,16 +199,14 @@ export function ImprovedItemSelector({
           {/* Product Selection */}
           <div className="space-y-2">
             <Label className="text-sm">Product</Label>
-            <Select 
-              value={selectedProduct?.sku || ''} 
-              onValueChange={handleProductSelect}
-              open={isOpen}
-              onOpenChange={setIsOpen}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Select a product" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
+            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal">
+                  <span className="truncate">{selectedProduct ? selectedProduct.product_name : 'Select a product'}</span>
+                  <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-80 p-0" align="start">
                 <div className="sticky top-0 z-10 p-3 border-b bg-background">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -223,43 +221,28 @@ export function ImprovedItemSelector({
                   </div>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-60 overflow-y-auto p-1">
                   {filteredProducts.length === 0 ? (
                     <div className="p-4 text-center text-sm text-muted-foreground">
                       {searchTerm ? 'No products found' : 'No products available'}
                     </div>
                   ) : (
                     filteredProducts.map((product) => (
-                      <SelectItem key={product.sku} value={product.sku}>
-                        <div className="flex flex-col items-start space-y-1 py-1">
-                          <div className="w-full">
-                            <span className="font-medium text-sm truncate">{product.product_name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">
-                              {product.sku}
-                            </span>
-                            {product.school_tags && product.school_tags.length > 0 && (
-                              <div className="flex gap-1 flex-wrap">
-                                {product.school_tags.slice(0, 2).map((tag, idx) => (
-                                  <span key={idx} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                    <Tag className="h-2.5 w-2.5" />
-                                    {tag}
-                                  </span>
-                                ))}
-                                {product.school_tags.length > 2 && (
-                                  <span className="text-xs text-gray-500">+{product.school_tags.length - 2}</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                      <DropdownMenuItem
+                        key={product.sku}
+                        onSelect={() => handleProductSelect(product.sku)}
+                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <div className="flex flex-col items-start gap-1 py-1 w-full">
+                          <span className="font-medium text-sm truncate">{product.product_name}</span>
+                          <span className="text-xs text-muted-foreground">{product.sku}</span>
                         </div>
-                      </SelectItem>
+                      </DropdownMenuItem>
                     ))
                   )}
                 </div>
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Size Selection */}
@@ -271,18 +254,25 @@ export function ImprovedItemSelector({
                   No sizes available in stock.
                 </div>
               ) : (
-                <Select value={selectedSize} onValueChange={setSelectedSize}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Select size" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal">
+                      <span>{selectedSize || 'Select size'}</span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]" align="start">
                     {availableSizes.map((size) => (
-                      <SelectItem key={size} value={size}>
+                      <DropdownMenuItem
+                        key={size}
+                        onSelect={() => setSelectedSize(size)}
+                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                      >
                         {size}
-                      </SelectItem>
+                      </DropdownMenuItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           )}

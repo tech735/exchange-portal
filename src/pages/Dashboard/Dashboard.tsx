@@ -1,23 +1,19 @@
 import Layout from '@/components/Layout';
-import { useTicketStats, useTickets } from '@/hooks/useTickets';
-import { AlertTriangle, CheckCircle, Clock, Package, Receipt, XCircle } from 'lucide-react';
+import { useTicketStats } from '@/hooks/useTickets';
+import { useUser } from '@/contexts/UserContext';
+import { AlertTriangle, CheckCircle, ChevronRight, Clock, Package, Receipt, XCircle } from 'lucide-react';
 import { KPICard } from './KPICard';
-import { RecentTicketsTable } from './RecentTicketsTable';
+import { SlaBreachedTable } from './SlaBreachedTable';
 import { OperationalOverview } from './OperationalOverview';
 import { TeamCollaboration } from './TeamCollaboration';
 import { WeeklyProgress } from './WeeklyProgress';
-import { TimeTracker } from './TimeTracker';
 import { ProductSyncButton } from '@/components/ProductSyncButton';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PendingItemsDialog } from './PendingItemsDialog';
 import { useState } from 'react';
 
 export default function Dashboard() {
-  const [searchParams] = useSearchParams();
-  const search = searchParams.get('search') || undefined;
   const { data: stats } = useTicketStats();
-  const { data: recentTickets } = useTickets({ search });
-  const navigate = useNavigate();
+  const { user } = useUser();
   const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
 
   const kpiCards = [
@@ -34,12 +30,27 @@ export default function Dashboard() {
       <div className="page-shell animate-fade-in">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">Dashboard</h1>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+              <span>Home</span>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-foreground/70">Dashboard</span>
+            </div>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground">
+              Welcome back{user?.name ? `, ${user.name}` : ''}
+            </h1>
             <p className="text-muted-foreground mt-2">Overview of exchange ticket status</p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-success" />
-            Live operational view
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-success" />
+              Live operational view
+            </div>
+            <button
+              onClick={() => setIsPendingDialogOpen(true)}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
+            >
+              Review Pending Items
+            </button>
           </div>
         </div>
 
@@ -64,18 +75,8 @@ export default function Dashboard() {
             </div>
             <OperationalOverview />
           </div>
-          <div className="xl:col-span-4 card-base flex flex-col justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Reminder</p>
-              <h3 className="text-2xl font-semibold mt-3">Follow up on pending exchanges</h3>
-              <p className="text-sm text-muted-foreground mt-2">Keep tickets moving to maintain SLA confidence.</p>
-            </div>
-            <button
-              onClick={() => setIsPendingDialogOpen(true)}
-              className="mt-6 w-full rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
-            >
-              Review Pending Items
-            </button>
+          <div className="xl:col-span-4">
+            <TeamCollaboration className="h-full" />
           </div>
         </div>
 
@@ -86,13 +87,11 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-7">
-            <RecentTicketsTable tickets={recentTickets} />
+            <SlaBreachedTable />
           </div>
           <div className="xl:col-span-5 grid gap-6">
             <ProductSyncButton />
-            <TeamCollaboration />
             <WeeklyProgress />
-            <TimeTracker />
           </div>
         </div>
       </div>
