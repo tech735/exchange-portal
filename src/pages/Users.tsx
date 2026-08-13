@@ -288,7 +288,7 @@ export default function Users() {
       render: (value: string, row: User) => (
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-muted-foreground" />
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild disabled={row.id === currentUser?.id}>
               <Button type="button" variant="outline" className="w-32 justify-between font-normal">
                 <span>{roles.find((r) => r.value === value)?.label ?? value}</span>
@@ -431,7 +431,7 @@ export default function Users() {
 
                   <div className="space-y-2">
                     <Label htmlFor="role">System Role</Label>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button type="button" variant="outline" className="w-full justify-between font-normal">
                           <span>{roles.find((r) => r.value === formData.role)?.label ?? 'Select role'}</span>

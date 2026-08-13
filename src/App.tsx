@@ -1,20 +1,24 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import Dashboard from '@/pages/Dashboard';
 import ExchangeLodging from '@/pages/ExchangeLodging';
 import Warehouse from '@/pages/Warehouse';
-import Invoicing from '@/pages/Invoicing';
+// Invoicing page is disabled for now — re-enable with its route below and the
+// sidebar nav entry in components/Layout.tsx.
+// import Invoicing from '@/pages/Invoicing';
 import TicketDetail from '@/pages/TicketDetail';
 import AuthScreens from '@/pages/auth_screens/AuthScreens';
 import Users from '@/pages/Users';
 import Orders from '@/pages/Orders/Orders';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { useBodyPointerEventsGuard } from '@/hooks/useBodyPointerEventsGuard';
 import { PageLoader } from '@/components/ui/Loader';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
 
@@ -76,6 +80,23 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+// Radix modal layers lock `pointer-events: none` onto <body> while open. If a
+// layer is unmounted instead of closed, or two layers overlap (a menu item that
+// opens a sheet), the lock can outlive every overlay and freeze the whole page.
+// The guard watches <body> and releases a lock that no open overlay backs; the
+// route effect covers navigations that unmount a layer mid-flight.
+function BodyPointerEventsFix() {
+  const location = useLocation();
+
+  useBodyPointerEventsGuard();
+
+  useEffect(() => {
+    document.body.style.removeProperty('pointer-events');
+  }, [location.pathname]);
+
+  return null;
+}
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
 
@@ -95,6 +116,7 @@ function AppContent() {
         <BrowserRouter>
           <AuthProvider>
             <TooltipProvider>
+              <BodyPointerEventsFix />
               <Toaster />
               <Sonner />
               <Routes>
@@ -136,6 +158,7 @@ function AppContent() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Invoicing page disabled for now.
                 <Route
                   path="/invoicing"
                   element={
@@ -144,6 +167,7 @@ function AppContent() {
                     </ProtectedRoute>
                   }
                 />
+                */}
                 <Route
                   path="/users"
                   element={

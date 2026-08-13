@@ -273,7 +273,7 @@ export function DataTable<T extends { id: string | number }>({
             <h2 className="text-lg font-semibold">{title}</h2>
           </div>
         )}
-        <CardContent className="p-4">
+        <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <span className="text-sm text-muted-foreground">
               Selected {selectedRows.length}/{data.length}

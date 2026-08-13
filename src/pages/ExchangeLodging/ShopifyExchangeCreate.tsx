@@ -222,8 +222,7 @@ export function ShopifyExchangeCreate({ onSuccess, initialOrder }: ShopifyExchan
                     <div className="flex-1 space-y-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-semibold flex items-center gap-2">
-                                    <Package className="h-5 w-5" />
+                                <h2 className="text-lg font-semibold">
                                     {order.name} - Return and exchange
                                 </h2>
                                 <p className="text-sm text-muted-foreground">

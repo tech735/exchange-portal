@@ -2,11 +2,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, MobilePagination, Pagination } from '@/components/ui/DataTable';
 import { CheckCircle, ChevronRight, Clock, IndianRupee } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { STAGE_LABELS, type Ticket, type TicketItem } from '@/types/database';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import { useState, useMemo } from 'react';
 import { useProductPrices } from '@/hooks/useProductPrices';
+import { TicketDetailsDrawer } from '../ExchangeLodging/TicketDetailsDrawer';
 
 interface InvoicingTableProps {
   tickets?: Ticket[];
@@ -45,8 +45,17 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
     await onInvoiceDone(id);
   };
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  // The drawer stays mounted and is driven by `drawerOpen` so Radix runs its own
+  // close sequence — unmounting it instead strands the body pointer-events lock.
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openTicket = (id: string) => {
+    const idx = (tickets || []).findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    setViewingIndex(idx);
+    setDrawerOpen(true);
+  };
 
   const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -93,9 +102,13 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
       key: 'order_id',
       label: 'Order ID',
       render: (value: string, row: Ticket) => (
-        <Link to={`/ticket/${row.id}`} className="text-primary hover:underline font-medium">
+        <button
+          type="button"
+          onClick={() => openTicket(row.id)}
+          className="text-primary hover:underline font-medium text-left"
+        >
           {value}
-        </Link>
+        </button>
       )
     },
     {
@@ -255,7 +268,7 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
                     <div
                       key={ticket.id}
                       className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
-                      onClick={() => navigate(`/ticket/${ticket.id}`, { state: { from: location.pathname } })}
+                      onClick={() => openTicket(ticket.id)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -332,6 +345,14 @@ export function InvoicingTable({ tickets, isLoading, onInvoiceDone, onClose, onS
           />
         </DataTable>
       </div>
+
+      <TicketDetailsDrawer
+        tickets={tickets || []}
+        currentIndex={viewingIndex ?? -1}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onNavigate={(index) => setViewingIndex(index)}
+      />
     </>
   );
 }

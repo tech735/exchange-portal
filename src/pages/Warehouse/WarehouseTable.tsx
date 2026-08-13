@@ -1,11 +1,23 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DataTable, MobilePagination, Pagination } from '@/components/ui/DataTable';
-import { Check, ChevronRight, Package, X } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { BulkActionToolbar, BulkAction } from '@/components/ui/bulk-action-toolbar';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { MobilePagination } from '@/components/ui/DataTable';
+import { ChevronRight } from 'lucide-react';
 import { STAGE_LABELS, type Ticket } from '@/types/database';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { exportTicketsToCSV } from '@/utils/exportUtils';
+import { TicketDetailsDrawer } from '../ExchangeLodging/TicketDetailsDrawer';
 
 interface WarehouseTableProps {
   tickets?: Ticket[];
@@ -26,13 +38,65 @@ export function WarehouseTable({
 }: WarehouseTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // The drawer stays mounted and is driven by `drawerOpen` so Radix runs its own
+  // close sequence — unmounting it instead strands the body pointer-events lock.
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil((tickets?.length || 0) / itemsPerPage));
+  const list = tickets || [];
+
+  const openTicket = (id: string) => {
+    const idx = list.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    setViewingIndex(idx);
+    setDrawerOpen(true);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(list.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedTickets = tickets?.slice(startIndex, endIndex) || [];
+  const paginatedTickets = list.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [list.length]);
+
+  const selectAllOnPage = paginatedTickets.length > 0 && paginatedTickets.every((t) => selectedIds.has(t.id));
+
+  const handleSelectAllOnPage = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      paginatedTickets.forEach((t) => (checked ? next.add(t.id) : next.delete(t.id)));
+      return next;
+    });
+  };
+
+  const handleSelectTicket = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllMatching = () => {
+    setSelectedIds(new Set(list.map((t) => t.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkPrimaryActions: BulkAction[] = [
+    {
+      label: 'Export Selected',
+      onClick: () => {
+        const selected = list.filter((t) => selectedIds.has(t.id));
+        exportTicketsToCSV(selected);
+      },
+    },
+  ];
 
   const groupedTickets = useMemo(() => {
     const groups: { label: string; key: string; tickets: Ticket[] }[] = [];
@@ -51,134 +115,84 @@ export function WarehouseTable({
     return groups;
   }, [paginatedTickets]);
 
-  const columns = [
-    {
-      key: 'order_id',
-      label: 'Order ID',
-      render: (value: string, row: Ticket) => (
-        <Link to={`/ticket/${row.id}`} state={{ from: location.pathname }} className="text-primary hover:underline font-medium">
-          {value}
-        </Link>
-      )
-    },
-    {
-      key: 'customer_name',
-      label: 'Customer',
-      render: (value: string, row: Ticket) => (
-        <div>
-          <div>{value}</div>
-          <div className="text-xs text-muted-foreground flex flex-col">
-            <span>{row.customer_phone}</span>
-            {row.customer_email && <span>{row.customer_email}</span>}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'return_items',
-      label: 'Items',
-      render: (_: unknown, row: Ticket) => {
-        const showExchange = row.stage === 'WAREHOUSE_APPROVED' || row.stage === 'EXCHANGE_BOOKED';
-        const items = showExchange ? row.exchange_items : row.return_items;
-        return (
-          <div className="max-w-xs">
-            <div className="text-xs text-muted-foreground mb-1">
-              {showExchange ? 'Exchange Items' : 'Return Items'}
-            </div>
-            {items.map((item, idx) => (
-              <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1">
-                <Package className="h-3 w-3 inline mr-1" />
-                {item.product_name}
-                {showExchange && item.size ? ` ${item.size}` : ''}
-                ({item.qty})
-              </div>
-            ))}
-          </div>
-        );
-      }
-    },
-    {
-      key: 'awb_info',
-      label: 'AWB Info',
-      render: (_: unknown, row: Ticket) => (
-        <div className="text-xs space-y-1">
-          {row.return_awb && (
-            <div>Return: <span className="font-mono">{row.return_awb}</span></div>
-          )}
-          {row.exchange_awb && (
-            <div>Exchange: <span className="font-mono">{row.exchange_awb}</span></div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'stage',
-      label: 'Stage',
-      render: (value: string) => (
-        <Badge variant="outline">{STAGE_LABELS[value]}</Badge>
-      )
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (_: unknown, row: Ticket) => (
-        <div className="flex gap-2">
-          {/* TAB 1: NEW (WAREHOUSE) -> Book Return */}
-          {row.stage === 'LODGED' && (
-            <Button size="sm" onClick={() => onBookReturn(row)}>
-              <Package className="h-4 w-4 mr-1" />
-              Book Return
-            </Button>
-          )}
+  const renderActions = (row: Ticket, compact = false) => {
+    const textClass = compact ? 'text-xs' : 'text-sm';
 
-          {/* TAB 2: RETURN PENDING -> Mark Received */}
-          {row.stage === 'RETURN_PENDING' && (
-            <Button size="sm" onClick={() => onReceive(row.id)}>
-              <Check className="h-4 w-4 mr-1" />
-              Mark Received
-            </Button>
-          )}
-
-          {/* TAB 3: RETURN RECEIVED -> QC Approve/Deny */}
-          {row.stage === 'RETURN_RECEIVED' && (
-            <>
-              <Button size="sm" onClick={() => onQCAction(row, 'APPROVE')}>
-                <Check className="h-4 w-4 mr-1" />
-                Approve
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => onQCAction(row, 'DENY')}>
-                <X className="h-4 w-4 mr-1" />
-                Deny
-              </Button>
-            </>
-          )}
-
-          {/* TAB 4: APPROVED -> Book Exchange */}
-          {row.stage === 'WAREHOUSE_APPROVED' && (
-            <Button size="sm" onClick={() => onBookExchange(row)}>
-              <Package className="h-4 w-4 mr-1" />
-              Book Exchange
-            </Button>
-          )}
-
-          {/* TAB 6: EXCHANGE BOOKED -> View/Complete (Optional) */}
-          {row.stage === 'EXCHANGE_BOOKED' && (
-            <div className="text-xs text-muted-foreground italic">
-              Exchange Booked
-            </div>
-          )}
-        </div>
-      )
+    if (row.stage === 'LODGED') {
+      return (
+        <button
+          type="button"
+          onClick={() => onBookReturn(row)}
+          className={`${textClass} font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block`}
+        >
+          Book Return
+        </button>
+      );
     }
-  ];
+    if (row.stage === 'RETURN_PENDING') {
+      return (
+        <button
+          type="button"
+          onClick={() => onReceive(row.id)}
+          className={`${textClass} font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block`}
+        >
+          Mark Received
+        </button>
+      );
+    }
+    if (row.stage === 'RETURN_RECEIVED') {
+      return (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => onQCAction(row, 'APPROVE')}
+            className={`${textClass} font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block`}
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => onQCAction(row, 'DENY')}
+            className={`${textClass} font-medium text-destructive transition-all duration-150 hover:text-destructive/70 hover:scale-105 inline-block`}
+          >
+            Deny
+          </button>
+        </div>
+      );
+    }
+    if (row.stage === 'WAREHOUSE_APPROVED') {
+      return (
+        <button
+          type="button"
+          onClick={() => onBookExchange(row)}
+          className={`${textClass} font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block`}
+        >
+          Book Exchange
+        </button>
+      );
+    }
+    if (row.stage === 'EXCHANGE_BOOKED') {
+      return <span className="text-xs text-muted-foreground italic">Exchange Booked</span>;
+    }
+    return null;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading tickets...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Mobile list (< lg) */}
       <div className="block lg:hidden rounded-2xl overflow-hidden border border-border bg-card">
-        {isLoading ? (
-          <div className="flex justify-center py-16"><div className="loader" /></div>
-        ) : paginatedTickets.length === 0 ? (
+        {paginatedTickets.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No tickets found</p>
         ) : (
           <>
@@ -196,7 +210,7 @@ export function WarehouseTable({
                     <div
                       key={ticket.id}
                       className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
-                      onClick={() => navigate(`/ticket/${ticket.id}`, { state: { from: location.pathname } })}
+                      onClick={() => openTicket(ticket.id)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -211,34 +225,7 @@ export function WarehouseTable({
                           {` · ${time}`}
                         </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                          {ticket.stage === 'LODGED' && (
-                            <Button size="sm" className="h-7 text-xs px-3" onClick={() => onBookReturn(ticket)}>
-                              <Package className="h-3 w-3 mr-1" />Book Return
-                            </Button>
-                          )}
-                          {ticket.stage === 'RETURN_PENDING' && (
-                            <Button size="sm" className="h-7 text-xs px-3" onClick={() => onReceive(ticket.id)}>
-                              <Check className="h-3 w-3 mr-1" />Mark Received
-                            </Button>
-                          )}
-                          {ticket.stage === 'RETURN_RECEIVED' && (
-                            <>
-                              <Button size="sm" className="h-7 text-xs px-3" onClick={() => onQCAction(ticket, 'APPROVE')}>
-                                <Check className="h-3 w-3 mr-1" />Approve
-                              </Button>
-                              <Button size="sm" variant="destructive" className="h-7 text-xs px-3" onClick={() => onQCAction(ticket, 'DENY')}>
-                                <X className="h-3 w-3 mr-1" />Deny
-                              </Button>
-                            </>
-                          )}
-                          {ticket.stage === 'WAREHOUSE_APPROVED' && (
-                            <Button size="sm" className="h-7 text-xs px-3" onClick={() => onBookExchange(ticket)}>
-                              <Package className="h-3 w-3 mr-1" />Book Exchange
-                            </Button>
-                          )}
-                          {ticket.stage === 'EXCHANGE_BOOKED' && (
-                            <span className="text-xs text-muted-foreground italic">Exchange Booked</span>
-                          )}
+                          {renderActions(ticket, true)}
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
@@ -254,25 +241,149 @@ export function WarehouseTable({
 
       {/* Desktop table (≥ lg) */}
       <div className="hidden lg:block">
-        <DataTable
-          title="Warehouse Tickets"
-          data={paginatedTickets}
-          columns={columns}
-          isLoading={isLoading}
-          emptyMessage="No tickets found"
-          onSelectionChange={(selectedRows) => {
-            console.log('Selected warehouse tickets:', selectedRows);
-          }}
-        >
-          <Pagination
+        <Card className="border shadow-card overflow-hidden">
+          <Table className="table-fixed">
+            <colgroup>
+              <col className="w-[4%]" />
+              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[20%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[20%]" />
+            </colgroup>
+            <TableHeader>
+              {selectedIds.size > 0 ? (
+                <TableRow>
+                  <TableHead colSpan={7} className="p-2">
+                    <BulkActionToolbar
+                      selectedCount={selectedIds.size}
+                      totalMatching={list.length}
+                      onSelectAllMatching={handleSelectAllMatching}
+                      onClearSelection={clearSelection}
+                      primaryActions={bulkPrimaryActions}
+                      itemLabel="selected"
+                    />
+                  </TableHead>
+                </TableRow>
+              ) : (
+                <TableRow>
+                  <TableHead>
+                    <Checkbox
+                      id="select-all-warehouse-tickets"
+                      name="select-all-warehouse-tickets"
+                      checked={selectAllOnPage}
+                      onCheckedChange={(checked) => handleSelectAllOnPage(checked === true)}
+                      aria-label="Select all tickets on this page"
+                    />
+                  </TableHead>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>AWB Info</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              )}
+            </TableHeader>
+            <TableBody>
+              {paginatedTickets.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    No tickets found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTickets.map((ticket) => {
+                  const showExchange = ticket.stage === 'WAREHOUSE_APPROVED' || ticket.stage === 'EXCHANGE_BOOKED';
+                  const items = showExchange ? ticket.exchange_items : ticket.return_items;
+
+                  return (
+                    <TableRow
+                      key={ticket.id}
+                      className="transition-colors"
+                      data-state={selectedIds.has(ticket.id) ? 'selected' : undefined}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          id={`select-warehouse-ticket-${ticket.id}`}
+                          name={`select-warehouse-ticket-${ticket.id}`}
+                          checked={selectedIds.has(ticket.id)}
+                          onCheckedChange={(checked) => handleSelectTicket(ticket.id, checked === true)}
+                          aria-label={`Select ticket ${ticket.order_id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => openTicket(ticket.id)}
+                          className="text-primary hover:underline font-medium text-left"
+                        >
+                          {ticket.order_id}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate text-sm">{ticket.customer_name}</p>
+                          <p className="text-sm text-muted-foreground truncate">{ticket.customer_phone}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-muted-foreground mb-1">
+                          {showExchange ? 'Exchange Items' : 'Return Items'}
+                        </div>
+                        {items.map((item, idx) => (
+                          <div key={idx} className="text-xs bg-muted px-2 py-1 rounded mb-1 truncate">
+                            {item.product_name}
+                            {showExchange && item.size ? ` ${item.size}` : ''}
+                            {` (${item.qty})`}
+                          </div>
+                        ))}
+                      </TableCell>
+                      <TableCell className="text-xs space-y-1">
+                        {ticket.return_awb && (
+                          <div>Return: <span className="font-mono">{ticket.return_awb}</span></div>
+                        )}
+                        {ticket.exchange_awb && (
+                          <div>Exchange: <span className="font-mono">{ticket.exchange_awb}</span></div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{STAGE_LABELS[ticket.stage]}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {renderActions(ticket)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+
+        {/* Desktop Footer Stats and Pagination */}
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {paginatedTickets.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, list.length)} of {list.length} tickets
+          </div>
+          <DataTablePagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
-            itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            pageSize={itemsPerPage}
+            setPageSize={setItemsPerPage}
           />
-        </DataTable>
+        </div>
       </div>
+
+      <TicketDetailsDrawer
+        tickets={list}
+        currentIndex={viewingIndex ?? -1}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onNavigate={(index) => setViewingIndex(index)}
+      />
     </>
   );
 }

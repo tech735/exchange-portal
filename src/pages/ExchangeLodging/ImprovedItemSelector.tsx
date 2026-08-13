@@ -3,7 +3,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Trash2, Plus, Search, ChevronDown } from 'lucide-react';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import { type TicketItem, type ProductCatalog } from '@/types/database';
 import { useProducts } from '@/hooks/useProducts';
 
@@ -199,50 +207,62 @@ export function ImprovedItemSelector({
           {/* Product Selection */}
           <div className="space-y-2">
             <Label className="text-sm">Product</Label>
-            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal">
-                  <span className="truncate">{selectedProduct ? selectedProduct.product_name : 'Select a product'}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-80 p-0" align="start">
-                <div className="sticky top-0 z-10 p-3 border-b bg-background">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by SKU, product name, or tags..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 h-9"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                </div>
+            {/* Rendered in flow rather than in a Popover/DropdownMenu. Both of
+                those portal their content to <body>, which the enclosing dialog
+                has set to `pointer-events: none` — the panel shows but nothing
+                inside it can be clicked or typed into. Staying in the dialog's
+                own DOM avoids that entirely. */}
+            <Button
+              type="button"
+              variant="outline"
+              role="combobox"
+              aria-expanded={isOpen}
+              onClick={() => setIsOpen((o) => !o)}
+              className="h-10 w-full justify-between font-normal"
+            >
+              <span className="truncate">{selectedProduct ? selectedProduct.product_name : 'Select a product'}</span>
+              <ChevronDown className={`h-4 w-4 opacity-50 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </Button>
 
-                <div className="max-h-60 overflow-y-auto p-1">
-                  {filteredProducts.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
+            {isOpen && (
+              <div
+                className="rounded-md border bg-popover text-popover-foreground shadow-md"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                  }
+                }}
+              >
+                {/* shouldFilter={false}: filteredProducts already matches on SKU,
+                    name and school tags, which cmdk's own scorer can't see. */}
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    autoFocus
+                    placeholder="Search by SKU, product name, or tags..."
+                    value={searchTerm}
+                    onValueChange={setSearchTerm}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
                       {searchTerm ? 'No products found' : 'No products available'}
-                    </div>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <DropdownMenuItem
-                        key={product.sku}
-                        onSelect={() => handleProductSelect(product.sku)}
-                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                      >
-                        <div className="flex flex-col items-start gap-1 py-1 w-full">
-                          <span className="font-medium text-sm truncate">{product.product_name}</span>
-                          <span className="text-xs text-muted-foreground">{product.sku}</span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {filteredProducts.map((product) => (
+                        <CommandItem
+                          key={product.sku}
+                          value={product.sku}
+                          onSelect={() => handleProductSelect(product.sku)}
+                          className="cursor-pointer"
+                        >
+                          <span className="text-sm truncate w-full">{product.product_name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </div>
+            )}
           </div>
 
           {/* Size Selection */}

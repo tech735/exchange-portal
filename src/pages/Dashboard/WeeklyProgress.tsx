@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Progress } from '@/components/ui/progress';
-import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
+import { startOfWeek, endOfWeek } from 'date-fns';
+import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface WeeklyProgressProps {
   className?: string;
@@ -68,67 +69,78 @@ export function WeeklyProgress({ className }: WeeklyProgressProps) {
 
   if (isLoading) {
     return (
-      <div className={`card-base flex items-center justify-between ${className}`}>
-        <div>
-          <p className="text-sm text-muted-foreground">Progress</p>
-          <div className="h-8 w-16 bg-muted rounded mt-2 mb-1"></div>
-          <div className="h-3 w-24 bg-muted rounded mt-1"></div>
-        </div>
-        <div className="h-24 w-24 rounded-full border-8 border-muted animate-pulse"></div>
-      </div>
+      <Card className={cn('flex items-center justify-between', className)}>
+        <CardContent className="p-6 flex items-center justify-between w-full">
+          <div>
+            <p className="text-sm text-muted-foreground">Progress</p>
+            <div className="h-8 w-16 bg-muted rounded mt-2 mb-1"></div>
+            <div className="h-3 w-24 bg-muted rounded mt-1"></div>
+          </div>
+          <div className="h-24 w-24 rounded-full border-8 border-muted animate-pulse"></div>
+        </CardContent>
+      </Card>
     );
   }
 
   const completionRate = progressData?.completionRate || 0;
   const avgProcessingTime = progressData?.avgProcessingTime || 0;
+  const breakdown = [
+    { label: 'Completed', count: progressData?.completedTickets ?? 0, dot: 'bg-success' },
+    { label: 'In Progress', count: progressData?.inProgressTickets ?? 0, dot: 'bg-info' },
+    { label: 'Denied', count: progressData?.deniedTickets ?? 0, dot: 'bg-destructive' },
+  ];
 
   return (
-    <div className={`card-base flex items-center justify-between ${className}`}>
-      <div>
-        <p className="text-sm text-muted-foreground">Progress</p>
-        <h3 className="text-3xl font-semibold mt-2">{completionRate}%</h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          Weekly completion • Avg: {avgProcessingTime}h
-        </p>
-        <div className="mt-3 space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Completion Rate</span>
-            <span>{completionRate}%</span>
-          </div>
-          <Progress value={completionRate} className="h-2" />
-        </div>
-      </div>
-      <div className="relative">
-        <div className="h-24 w-24 rounded-full border-8 border-primary/20 flex items-center justify-center">
-          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary">{completionRate}%</span>
+    <Card className={cn('flex items-center justify-between', className)}>
+      <CardContent className="p-6 flex items-center justify-between w-full">
+        <div>
+          <p className="text-sm text-muted-foreground">Progress</p>
+          <h3 className="text-3xl font-semibold mt-2 tabular-nums">{completionRate}%</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Weekly completion • Avg: {avgProcessingTime}h
+          </p>
+          <div className="mt-3 flex flex-col gap-1.5">
+            {breakdown.map(({ label, count, dot }) => (
+              <div key={label} className="flex items-center gap-2 text-xs">
+                <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} aria-hidden />
+                <span className="text-muted-foreground">{label}</span>
+                <span className="ml-auto font-medium tabular-nums">{count}</span>
+              </div>
+            ))}
           </div>
         </div>
-        {/* Progress ring */}
-        <svg className="absolute inset-0 h-24 w-24 -rotate-90">
-          <circle
-            cx="48"
-            cy="48"
-            r="36"
-            stroke="currentColor"
-            strokeWidth="8"
-            fill="none"
-            className="text-primary/20"
-          />
-          <circle
-            cx="48"
-            cy="48"
-            r="36"
-            stroke="currentColor"
-            strokeWidth="8"
-            fill="none"
-            strokeDasharray={`${2 * Math.PI * 36}`}
-            strokeDashoffset={`${2 * Math.PI * 36 * (1 - completionRate / 100)}`}
-            className="text-primary transition-all duration-500 ease-out"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-    </div>
+        <div className="relative">
+          <div className="h-24 w-24 rounded-full border-8 border-primary/20 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-sm font-semibold text-primary">{completionRate}%</span>
+            </div>
+          </div>
+          {/* Progress ring */}
+          <svg className="absolute inset-0 h-24 w-24 -rotate-90">
+            <circle
+              cx="48"
+              cy="48"
+              r="36"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              className="text-primary/20"
+            />
+            <circle
+              cx="48"
+              cy="48"
+              r="36"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 36}`}
+              strokeDashoffset={`${2 * Math.PI * 36 * (1 - completionRate / 100)}`}
+              className="text-primary transition-all duration-500 ease-out"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

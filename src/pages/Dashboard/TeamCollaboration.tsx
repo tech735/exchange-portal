@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Users, Clock, CheckCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface QueueStats {
   name: string;
@@ -70,53 +72,63 @@ export function TeamCollaboration({ className }: TeamCollaborationProps) {
     return CheckCircle;
   };
 
+  const getToneClasses = (name: string) => {
+    if (name.includes('Support')) return 'bg-stage-lodged/10 text-stage-lodged';
+    if (name.includes('Warehouse')) return 'bg-stage-warehouse/10 text-stage-warehouse';
+    return 'bg-stage-invoicing/10 text-stage-invoicing';
+  };
+
   if (isLoading) {
     return (
-      <div className={`card-base flex flex-col ${className}`}>
-        <p className="text-sm text-muted-foreground">Queue Overview</p>
-        <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="loader" />
-        </div>
-      </div>
+      <Card className={cn('flex flex-col', className)}>
+        <CardContent className="p-6 flex flex-col flex-1">
+          <p className="text-sm text-muted-foreground">Queue Overview</p>
+          <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="loader" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className={`card-base flex flex-col ${className}`}>
-      <p className="text-sm text-muted-foreground">Queue Overview</p>
-      <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
-      <div className="mt-4 flex-1 flex flex-col justify-center gap-4">
-        {queueStats?.map((queue) => {
-          const Icon = getIcon(queue.name);
-          const statusBadge = getStatusBadge(queue.status, queue.count);
+    <Card className={cn('flex flex-col', className)}>
+      <CardContent className="p-6 flex flex-col flex-1">
+        <p className="text-sm text-muted-foreground">Queue Overview</p>
+        <h3 className="text-xl font-semibold mt-2">Active Queues</h3>
+        <div className="mt-4 flex-1 flex flex-col justify-center gap-4">
+          {queueStats?.map((queue) => {
+            const Icon = getIcon(queue.name);
+            const statusBadge = getStatusBadge(queue.status, queue.count);
 
-          return (
-            <div key={queue.name} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                  <Icon className="h-4 w-4" />
+            return (
+              <div key={queue.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-full flex items-center justify-center ${getToneClasses(queue.name)}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{queue.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {queue.count} {queue.count === 1 ? 'item' : 'items'} pending
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{queue.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {queue.count} {queue.count === 1 ? 'item' : 'items'} pending
-                  </p>
-                </div>
+                <Badge variant={statusBadge.variant} className="text-xs">
+                  {statusBadge.text}
+                </Badge>
               </div>
-              <Badge variant={statusBadge.variant} className="text-xs">
-                {statusBadge.text}
-              </Badge>
-            </div>
-          );
-        })}
+            );
+          })}
 
-        {queueStats?.length === 0 && (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">All queues are clear</p>
-          </div>
-        )}
-      </div>
-    </div>
+          {queueStats?.length === 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground">All queues are clear</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

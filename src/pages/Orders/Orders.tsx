@@ -5,12 +5,24 @@ import { useToast } from '@/hooks/use-toast';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, RefreshCw, Package, Search, ChevronRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
+import { BulkActionToolbar, BulkAction } from '@/components/ui/bulk-action-toolbar';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { RefreshCw, Package, Search, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { Pagination } from '@/components/ui/DataTable';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { ShopifyExchangeCreate } from '../ExchangeLodging/ShopifyExchangeCreate';
+import { exportOrdersToCSV } from '@/utils/exportUtils';
 
 export default function Orders() {
     const [orders, setOrders] = useState<ShopifyOrder[]>([]);
@@ -24,8 +36,11 @@ export default function Orders() {
     const [selectedOrderDetails, setSelectedOrderDetails] = useState<ShopifyOrder | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [paymentFilter, setPaymentFilter] = useState('all');
+    const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(50);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
     const fetchOrders = async () => {
         setIsLoading(true);
@@ -48,14 +63,22 @@ export default function Orders() {
         fetchOrders();
     }, []);
 
-    const filteredOrders = orders.filter(
-        (o) =>
+    const filteredOrders = orders.filter((o) => {
+        const matchesSearch =
             o.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             o.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             o.customer?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             o.customer?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.phone?.includes(searchQuery)
-    );
+            o.phone?.includes(searchQuery);
+
+        const matchesPayment = paymentFilter === 'all' || o.financial_status?.toLowerCase() === paymentFilter;
+
+        const matchesFulfillment =
+            fulfillmentFilter === 'all' ||
+            (fulfillmentFilter === 'unfulfilled' ? !o.fulfillment_status : o.fulfillment_status?.toLowerCase() === fulfillmentFilter);
+
+        return matchesSearch && matchesPayment && matchesFulfillment;
+    });
 
     const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -63,7 +86,43 @@ export default function Orders() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery]);
+        setSelectedIds(new Set());
+    }, [searchQuery, paymentFilter, fulfillmentFilter]);
+
+    const selectAllOnPage = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedIds.has(o.id));
+
+    const handleSelectAllOnPage = (checked: boolean) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            paginatedOrders.forEach((o) => (checked ? next.add(o.id) : next.delete(o.id)));
+            return next;
+        });
+    };
+
+    const handleSelectOrder = (id: number, checked: boolean) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (checked) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    };
+
+    const handleSelectAllMatching = () => {
+        setSelectedIds(new Set(filteredOrders.map((o) => o.id)));
+    };
+
+    const clearSelection = () => setSelectedIds(new Set());
+
+    const bulkPrimaryActions: BulkAction[] = [
+        {
+            label: 'Export Selected',
+            onClick: () => {
+                const selected = filteredOrders.filter((o) => selectedIds.has(o.id));
+                exportOrdersToCSV(selected);
+            },
+        },
+    ];
 
     // Group paginated orders by date for the mobile list view
     const groupedOrders = useMemo(() => {
@@ -93,34 +152,62 @@ export default function Orders() {
     return (
         <Layout>
             <div className="page-shell animate-fade-in">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">
-                            {/* <ShoppingCart className="h-8 w-8 text-primary" /> */}
-                            Shopify Orders
-                        </h1>
-                        <p className="text-muted-foreground mt-2">Latest 50 orders synced from Shopify</p>
+                        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Shopify Orders</h1>
                     </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm w-full lg:w-auto">
-                        <div className="relative w-full sm:w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search orders, customers..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 h-10 bg-background"
-                            />
-                        </div>
+                    <div className="flex items-center gap-3">
                         <Button
                             variant="outline"
+                            className="gap-2"
                             onClick={fetchOrders}
                             disabled={isLoading}
-                            className="flex items-center gap-2 whitespace-nowrap h-10"
                         >
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh Sync
+                            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Refresh Sync</span>
                         </Button>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+                    <div className="relative w-full sm:w-64 shrink-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Search orders, customers..."
+                            className="pl-10 w-full rounded-full bg-card border-border/60 shadow-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                            <SelectTrigger className="w-[150px] rounded-full bg-card border-border/60 shadow-sm">
+                                <SelectValue placeholder="All Payment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Payment</SelectItem>
+                                <SelectItem value="paid">Paid</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="partially_paid">Partially Paid</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
+                                <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
+                                <SelectItem value="voided">Voided</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={fulfillmentFilter} onValueChange={setFulfillmentFilter}>
+                            <SelectTrigger className="w-[160px] rounded-full bg-card border-border/60 shadow-sm">
+                                <SelectValue placeholder="All Fulfillment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Fulfillment</SelectItem>
+                                <SelectItem value="fulfilled">Fulfilled</SelectItem>
+                                <SelectItem value="partial">Partial</SelectItem>
+                                <SelectItem value="unfulfilled">Unfulfilled</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
 
@@ -178,19 +265,17 @@ export default function Orders() {
                                                                 {order.fulfillment_status}
                                                             </span>
                                                         )}
-                                                        <Button
-                                                            size="sm"
-                                                            variant="secondary"
-                                                            className="h-6 text-[11px] px-2.5 rounded-full"
+                                                        <button
+                                                            type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setSelectedOrderForExchange(order);
                                                                 setExchangeOpen(true);
                                                             }}
+                                                            className="text-[11px] font-medium text-primary transition-all duration-150 hover:text-primary/70 inline-block"
                                                         >
-                                                            <Package className="h-3 w-3 mr-1" />
                                                             Exchange
-                                                        </Button>
+                                                        </button>
                                                     </div>
                                                 </div>
                                                 <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
@@ -219,25 +304,60 @@ export default function Orders() {
                 </div>
 
                 {/* ── Desktop table (≥ lg) ───────────────────────────── */}
-                <div className="hidden lg:block card-base mt-8">
-                    <div className="rounded-md border overflow-hidden">
-                        <Table>
+                <div className="hidden lg:block">
+                    <Card className="border shadow-card overflow-hidden">
+                        <Table className="table-fixed">
+                            <colgroup>
+                                <col className="w-[4%]" />
+                                <col className="w-[13%]" />
+                                <col className="w-[11%]" />
+                                <col className="w-[18%]" />
+                                <col className="w-[11%]" />
+                                <col className="w-[11%]" />
+                                <col className="w-[11%]" />
+                                <col className="w-[8%]" />
+                                <col className="w-[13%]" />
+                            </colgroup>
                             <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                    <TableHead className="w-[150px] whitespace-nowrap">Order</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="w-[200px]">Customer</TableHead>
-                                    <TableHead className="w-[150px] whitespace-nowrap">Total</TableHead>
-                                    <TableHead>Payment</TableHead>
-                                    <TableHead>Fulfillment</TableHead>
-                                    <TableHead className="text-right">Items</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
+                                {selectedIds.size > 0 ? (
+                                    <TableRow>
+                                        <TableHead colSpan={9} className="p-2">
+                                            <BulkActionToolbar
+                                                selectedCount={selectedIds.size}
+                                                totalMatching={filteredOrders.length}
+                                                onSelectAllMatching={handleSelectAllMatching}
+                                                onClearSelection={clearSelection}
+                                                primaryActions={bulkPrimaryActions}
+                                                itemLabel="selected"
+                                            />
+                                        </TableHead>
+                                    </TableRow>
+                                ) : (
+                                    <TableRow className="bg-muted/50">
+                                        <TableHead>
+                                            <Checkbox
+                                                id="select-all-orders"
+                                                name="select-all-orders"
+                                                checked={selectAllOnPage}
+                                                onCheckedChange={(checked) => handleSelectAllOnPage(checked === true)}
+                                                aria-label="Select all orders on this page"
+                                            />
+                                        </TableHead>
+                                        <TableHead className="whitespace-nowrap">Order</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead className="whitespace-nowrap">Total</TableHead>
+                                        <TableHead>Payment</TableHead>
+                                        <TableHead>Fulfillment</TableHead>
+                                        <TableHead className="text-right">Items</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                )}
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-48 text-center">
+                                        <TableCell colSpan={9} className="h-48 text-center">
                                             <div className="flex justify-center">
                                                 <div className="loader" />
                                             </div>
@@ -245,13 +365,13 @@ export default function Orders() {
                                     </TableRow>
                                 ) :orders.length === 0 && !searchQuery ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                                        <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                                             No orders found in Shopify.
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredOrders.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                                        <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                                             No orders found matching "{searchQuery}".
                                         </TableCell>
                                     </TableRow>
@@ -260,16 +380,23 @@ export default function Orders() {
                                         <TableRow
                                             key={order.id}
                                             className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                            data-state={selectedIds.has(order.id) ? 'selected' : undefined}
                                             onClick={() => {
                                                 setSelectedOrderDetails(order);
                                                 setDetailsOpen(true);
                                             }}
                                         >
+                                            <TableCell onClick={(e) => e.stopPropagation()}>
+                                                <Checkbox
+                                                    id={`select-order-${order.id}`}
+                                                    name={`select-order-${order.id}`}
+                                                    checked={selectedIds.has(order.id)}
+                                                    onCheckedChange={(checked) => handleSelectOrder(order.id, checked === true)}
+                                                    aria-label={`Select order ${order.name}`}
+                                                />
+                                            </TableCell>
                                             <TableCell className="font-medium whitespace-nowrap">
-                                                <div className="flex items-center gap-1.5 text-primary hover:underline">
-                                                    {order.name}
-                                                    <ExternalLink className="h-3 w-3" />
-                                                </div>
+                                                <span className="text-primary">{order.name}</span>
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {format(new Date(order.created_at), 'MMM d, h:mm a')}
@@ -302,38 +429,37 @@ export default function Orders() {
                                                 {order.line_items.reduce((sum, item) => sum + item.quantity, 0)}
                                             </TableCell>
                                             <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    className="flex items-center gap-1.5"
+                                                {/* Text action, matching the warehouse tickets table */}
+                                                <button
+                                                    type="button"
                                                     onClick={() => {
                                                         setSelectedOrderForExchange(order);
                                                         setExchangeOpen(true);
                                                     }}
+                                                    className="text-sm font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block"
                                                 >
-                                                    <Package className="h-3.5 w-3.5" />
                                                     Exchange
-                                                </Button>
+                                                </button>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 )}
                             </TableBody>
                         </Table>
-                    </div>
+                    </Card>
 
-                    {/* Pagination Footer */}
+                    {/* Desktop Footer Stats and Pagination */}
                     {orders.length > 0 && (
-                        <div className="border-t border-b border-l border-r rounded-b-md bg-muted/10 mt-[-1px]">
-                            <Pagination
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="text-sm text-muted-foreground">
+                                Showing {paginatedOrders.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+                            </div>
+                            <DataTablePagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}
                                 onPageChange={setCurrentPage}
-                                itemsPerPage={itemsPerPage}
-                                onItemsPerPageChange={(count) => {
-                                    setItemsPerPage(count);
-                                    setCurrentPage(1);
-                                }}
+                                pageSize={itemsPerPage}
+                                setPageSize={setItemsPerPage}
                             />
                         </div>
                     )}
@@ -353,16 +479,16 @@ export default function Orders() {
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                    <DialogContent className="sm:max-w-5xl sm:max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>Order Details: {selectedOrderDetails?.name}</DialogTitle>
-                        </DialogHeader>
+                <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+                    <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+                        <SheetHeader className="text-left">
+                            <SheetTitle>Order Details: {selectedOrderDetails?.name}</SheetTitle>
+                        </SheetHeader>
                         {selectedOrderDetails && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="space-y-6 mt-4">
+                                <div className="grid grid-cols-1 gap-6">
                                     {/* Main Content: Line Items & Fulfillments */}
-                                    <div className="lg:col-span-2 space-y-6">
+                                    <div className="space-y-6">
                                         {/* Fulfillment Cards */}
                                         {selectedOrderDetails.fulfillments && selectedOrderDetails.fulfillments.length > 0 ? (
                                             selectedOrderDetails.fulfillments.map((fulfillment, idx) => {
@@ -503,7 +629,7 @@ export default function Orders() {
                                     </div>
 
                                     {/* Sidebar: Notes, Customer, Details */}
-                                    <div className="space-y-6">
+                                    <div className="space-y-6 pt-2 border-t">
                                         {/* Customer Header Info */}
                                         <div className="bg-card border rounded-lg p-5 shadow-sm">
                                             <h3 className="font-medium text-sm text-muted-foreground flex justify-between items-center mb-3">
@@ -572,8 +698,8 @@ export default function Orders() {
                                 </div>
                             </div>
                         )}
-                    </DialogContent>
-                </Dialog>
+                    </SheetContent>
+                </Sheet>
             </div>
         </Layout>
     );

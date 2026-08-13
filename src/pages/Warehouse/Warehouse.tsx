@@ -1,15 +1,29 @@
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useTickets, useUpdateTicket } from '@/hooks/useTickets';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { type TicketStage, type Ticket } from '@/types/database';
 import { WarehouseTable } from './WarehouseTable';
 import { AggregatorSelector } from '@/components/AggregatorSelector';
 import { QCActionDialog } from '@/components/QCActionDialog';
+
+const stageTabs = [
+  { key: 'new_warehouse', label: 'New Requests' },
+  { key: 'return_pending', label: 'Return Pending' },
+  { key: 'return_received', label: 'QC Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'denied', label: 'Denied' },
+  { key: 'exchange_booked', label: 'Exchange Booked' },
+];
 
 export default function Warehouse() {
   const [tab, setTab] = useState('new_warehouse');
@@ -77,6 +91,10 @@ export default function Warehouse() {
         await updateTicket.mutateAsync({
           id: selectedTicket.id,
           stage: 'EXCHANGE_BOOKED',
+          // Booking the exchange is the end of the support workflow, so the
+          // ticket's status settles at COMPLETED even though later stages
+          // (invoicing, closure) still move the stage forward.
+          status: 'COMPLETED',
           exchange_aggregator: aggregator,
           exchange_awb: awb,
           exchange_booked_at: new Date().toISOString(),
@@ -162,40 +180,44 @@ export default function Warehouse() {
   return (
     <Layout>
       <div className="page-shell animate-fade-in">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mt-2">Warehouse Processing</h1>
-            <p className="text-muted-foreground mt-1">Process returns and exchanges</p>
+            <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Warehouse Processing</h1>
           </div>
         </div>
 
-        <div className="card-base">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search warehouse tickets..."
+              className="pl-10 w-full rounded-full bg-card border-border/60 shadow-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
-          <Tabs value={tab} onValueChange={setTab} className="mt-6">
-            <TabsList className="flex h-auto w-full items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto scrollbar-hide">
-              <TabsTrigger value="new_warehouse" className="rounded-md px-3 py-1.5">New Requests</TabsTrigger>
-              <TabsTrigger value="return_pending" className="rounded-md px-3 py-1.5">Return Pending</TabsTrigger>
-              <TabsTrigger value="return_received" className="rounded-md px-3 py-1.5">QC Pending</TabsTrigger>
-              <TabsTrigger value="approved" className="rounded-md px-3 py-1.5">Approved</TabsTrigger>
-              <TabsTrigger value="denied" className="rounded-md px-3 py-1.5">Denied</TabsTrigger>
-              <TabsTrigger value="exchange_booked" className="rounded-md px-3 py-1.5">Exchange Booked</TabsTrigger>
-            </TabsList>
-            <TabsContent value={tab} className="mt-6">
-              <WarehouseTable
-                tickets={tickets}
-                isLoading={isLoading}
-                onBookReturn={handleBookReturn}
-                onReceive={handleReceive}
-                onQCAction={handleQCAction}
-                onBookExchange={handleBookExchange}
-              />
-            </TabsContent>
-          </Tabs>
+          <Select value={tab} onValueChange={setTab}>
+            <SelectTrigger className="w-full sm:w-[180px] rounded-full bg-card border-border/60 shadow-sm">
+              <SelectValue placeholder="Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              {stageTabs.map(({ key, label }) => (
+                <SelectItem key={key} value={key}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
+        <WarehouseTable
+          tickets={tickets}
+          isLoading={isLoading}
+          onBookReturn={handleBookReturn}
+          onReceive={handleReceive}
+          onQCAction={handleQCAction}
+          onBookExchange={handleBookExchange}
+        />
 
         <AggregatorSelector
           open={aggregatorDialogOpen}

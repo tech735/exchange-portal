@@ -1,4 +1,5 @@
 import { type Ticket } from '@/types/database';
+import { type ShopifyOrder } from '@/services/shopify';
 
 interface ExportData {
   'Ticket ID': string;
@@ -172,6 +173,47 @@ export function exportTicketsToExcel(tickets: Ticket[]): void {
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
   link.setAttribute('download', `tickets-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function exportOrdersToCSV(orders: ShopifyOrder[]): void {
+  if (orders.length === 0) {
+    alert('No orders to export');
+    return;
+  }
+
+  const exportData = orders.map(order => ({
+    'Order': order.name,
+    'Date': order.created_at ? new Date(order.created_at).toLocaleString() : '',
+    'Customer': [order.customer?.first_name, order.customer?.last_name].filter(Boolean).join(' '),
+    'Email': order.email || '',
+    'Phone': order.phone || '',
+    'Total': `${order.currency} ${order.total_price}`,
+    'Payment Status': order.financial_status || '',
+    'Fulfillment Status': order.fulfillment_status || 'unfulfilled',
+    'Items': order.line_items.reduce((sum, item) => sum + item.quantity, 0),
+  }));
+
+  const headers = Object.keys(exportData[0]) as (keyof typeof exportData[number])[];
+  const csvContent = [
+    headers.join(','),
+    ...exportData.map(row =>
+      headers.map(header => {
+        const escapedValue = String(row[header]).replace(/"/g, '""');
+        return `"${escapedValue}"`;
+      }).join(',')
+    )
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `orders-export-${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
