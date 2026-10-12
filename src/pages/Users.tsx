@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DataTable, type DataTableProps } from '@/components/ui/DataTable';
-import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Key, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Shield, Trash2, Users as UsersIcon, Plus, Edit, User, Key, Eye, EyeOff, ChevronDown, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,36 +80,59 @@ export default function Users() {
   }, []);
 
   const { user: currentUser } = useAuth();
+  const { user: contextUser } = useUser();
+  // The fallback admin login has no Supabase auth user, so fall back to the context id
+  // to keep the "you cannot delete/demote yourself" guard working.
+  const selfId = currentUser?.id ?? contextUser?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Fetch users
-  const { data: users = [], isLoading, error: fetchError, refetch } = useQuery({
+  // Fetch users.
+  //
+  // The list has to come from the `manage-users` Edge Function (service role), not from a
+  // direct `profiles` select: RLS on public.profiles only exposes rows to an admin with a
+  // real Supabase session (policy `profiles_admin_manage`). The fallback admin login
+  // (admin@kotu.com) never creates a session, so a direct select comes back as an empty
+  // array with HTTP 200 — the page looked "empty" instead of "blocked".
+  // The direct select is kept as a fallback for deployments where the function is not up yet.
+  const { data: users = [], isLoading, error: fetchError, refetch, isRefetching } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: async () => {
-      console.log('Fetching users from profiles...');
-      
-      // Create a timeout promise to prevent infinite hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database request timed out after 10 seconds. This usually means there is a security loop in the database.')), 10000)
-      );
+      const { data, error } = await supabase.functions.invoke('manage-users', {
+        body: { action: 'list-users' }
+      });
 
-      const fetchPromise = (async () => {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
+      if (!error && Array.isArray(data?.users)) {
+        return data.users as User[];
+      }
 
-        if (error) {
-          console.error('Fetch Users Error:', error);
-          throw error;
-        }
-        return data;
-      })();
+      if (error) {
+        console.warn('list-users Edge Function unavailable, falling back to direct query:', error);
+      } else if (data?.error) {
+        console.warn('list-users Edge Function returned an error, falling back:', data.error);
+      }
 
-      const data = await Promise.race([fetchPromise, timeoutPromise]) as User[];
-      console.log('Fetched users:', data);
-      return data;
+      // Fallback: direct table read (works only for an admin with a real session).
+      const { data: rows, error: selectError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (selectError) {
+        console.error('Fetch Users Error:', selectError);
+        throw selectError;
+      }
+
+      if (!rows || rows.length === 0) {
+        throw new Error(
+          'Could not load users. The user list is served by the "manage-users" Edge Function — ' +
+          'deploy it with `supabase functions deploy manage-users`. ' +
+          '(A direct read of profiles returned nothing because row level security hides every ' +
+          'row from sessions that are not a signed-in admin.)'
+        );
+      }
+
+      return rows as User[];
     },
     retry: 1
   });
@@ -179,9 +202,21 @@ export default function Users() {
     }
   });
 
-  // Update user mutation (Role only)
+  // Update user mutation (Role only) — routed through the Edge Function for the same
+  // reason as the list: a direct update is filtered out by RLS unless the caller is an
+  // admin with a real Supabase session.
   const updateUserMutation = useMutation<any, Error, { id: string; updates: Partial<User> }>({
     mutationFn: async ({ id, updates }) => {
+      if (updates.role) {
+        const { data, error } = await supabase.functions.invoke('manage-users', {
+          body: { action: 'update-role', userId: id, role: updates.role }
+        });
+
+        if (!error && data?.success) return data.user;
+        if (data?.error) throw new Error(data.error);
+        if (error) console.warn('update-role Edge Function unavailable, falling back:', error);
+      }
+
       const { data, error } = await (supabase.from('profiles') as any)
         .update(updates)
         .eq('id', id)
@@ -289,7 +324,7 @@ export default function Users() {
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-muted-foreground" />
           <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild disabled={row.id === currentUser?.id}>
+            <DropdownMenuTrigger asChild disabled={row.id === selfId}>
               <Button type="button" variant="outline" className="w-32 justify-between font-normal">
                 <span>{roles.find((r) => r.value === value)?.label ?? value}</span>
                 <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
@@ -341,7 +376,7 @@ export default function Users() {
             variant="destructive"
             className="h-8 w-8 p-0"
             onClick={() => handleDeleteUser(row.id)}
-            disabled={row.id === currentUser?.id}
+            disabled={row.id === selfId}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -525,16 +560,42 @@ export default function Users() {
         </Dialog>
 
         <Card className="card-base mt-12 overflow-hidden border-none shadow-premium bg-white/50 backdrop-blur-sm">
-          <CardHeader className="border-b bg-muted/30 px-6 py-4">
-            <CardTitle className="text-lg font-medium">Active System Users</CardTitle>
+          <CardHeader className="border-b bg-muted/30 px-6 py-4 flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-lg font-medium">
+              Active System Users
+              {!isLoading && !fetchError && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({users.length})</span>
+              )}
+            </CardTitle>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => refetch()}
+              disabled={isLoading || isRefetching}
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${isRefetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
-            <DataTable
-              data={users}
-              columns={columns}
-              isLoading={isLoading}
-              emptyMessage="No users found"
-            />
+            {fetchError ? (
+              <div className="p-6">
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {fetchError instanceof Error ? fetchError.message : 'Failed to load users.'}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : (
+              <DataTable
+                data={users}
+                columns={columns}
+                isLoading={isLoading}
+                emptyMessage="No users found"
+              />
+            )}
           </CardContent>
         </Card>
       </div>

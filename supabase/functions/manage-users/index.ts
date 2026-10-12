@@ -172,6 +172,61 @@ serve(async (req: Request) => {
             });
         }
 
+        if (action === 'update-role') {
+            const { userId, role } = params;
+
+            if (!userId || !role) {
+                return new Response(JSON.stringify({ error: 'Missing userId or role' }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 400,
+                });
+            }
+
+            const { data, error } = await supabaseAdmin
+                .from('profiles')
+                .update({ role })
+                .eq('id', userId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Update Role Error:', error);
+                return new Response(JSON.stringify({ error: error.message }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 500,
+                });
+            }
+
+            return new Response(JSON.stringify({ success: true, user: data }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        if (action === 'list-users') {
+            // Listing runs through the service role on purpose: the browser client is
+            // subject to RLS on public.profiles, which hides every row from any session
+            // that is not itself an admin (including the fallback admin, which has no
+            // Supabase session at all). Create/reset/delete already go through here.
+            const { data, error } = await supabaseAdmin
+                .from('profiles')
+                .select('id, email, full_name, role, created_at, updated_at')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('List Users Error:', error);
+                return new Response(JSON.stringify({ error: error.message }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 500,
+                });
+            }
+
+            return new Response(JSON.stringify({ users: data ?? [] }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
         if (action === 'diagnostic') {
             console.log('Diagnostic Action Started');
             const { data, count, error } = await supabaseAdmin.from('profiles').select('*', { count: 'exact' });

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { functionErrorMessage } from '@/lib/utils';
 
 export interface ShopifyOrderLineItem {
     id: number;
@@ -82,6 +83,15 @@ export interface SyncResult {
     totalShopifyProducts: number;
 }
 
+export interface ShipmentSyncResult {
+    success: boolean;
+    ordersScanned: number;
+    created: number;
+    updated: number;
+    cancelled: number;
+    syncedAt: string;
+}
+
 export const shopifyService = {
     /**
      * Fetch a Shopify order by its name/ID (e.g., KO-1256)
@@ -142,5 +152,26 @@ export const shopifyService = {
         }
 
         return data as SyncResult;
+    },
+
+    /**
+     * Pull orders and fulfillments from the last `lookbackDays` days into the
+     * shipments table (the delivery tracker).
+     */
+    async syncShipments(lookbackDays?: number): Promise<ShipmentSyncResult> {
+        const { data, error } = await supabase.functions.invoke('shopify', {
+            body: { action: 'syncShipments', lookbackDays },
+        });
+
+        if (error) {
+            console.error('Error invoking shipment sync:', error);
+            throw new Error(await functionErrorMessage(error, 'Failed to sync shipments'));
+        }
+
+        if (data?.error) {
+            throw new Error(data.error);
+        }
+
+        return data as ShipmentSyncResult;
     },
 };

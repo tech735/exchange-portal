@@ -16,6 +16,7 @@ import TicketDetail from '@/pages/TicketDetail';
 import AuthScreens from '@/pages/auth_screens/AuthScreens';
 import Users from '@/pages/Users';
 import Orders from '@/pages/Orders/Orders';
+import Shipments from '@/pages/Shipments';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useBodyPointerEventsGuard } from '@/hooks/useBodyPointerEventsGuard';
@@ -26,9 +27,9 @@ const queryClient = new QueryClient();
 
 // Define role-based access to pages
 const roleAccess: Record<DatabaseUserRole, string[]> = {
-  ADMIN: ['/', '/dashboard', '/orders', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
-  SUPPORT: ['/', '/dashboard', '/orders', '/exchange-lodging', '/ticket'],
-  WAREHOUSE: ['/', '/dashboard', '/warehouse'],
+  ADMIN: ['/', '/dashboard', '/orders', '/shipments', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
+  SUPPORT: ['/', '/dashboard', '/orders', '/shipments', '/exchange-lodging', '/ticket'],
+  WAREHOUSE: ['/', '/dashboard', '/shipments', '/warehouse'],
   INVOICING: ['/', '/dashboard', '/invoicing'],
 };
 
@@ -147,6 +148,14 @@ function AppContent() {
                   element={
                     <ProtectedRoute requiredPaths={['/orders']}>
                       <Orders />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/shipments"
+                  element={
+                    <ProtectedRoute requiredPaths={['/shipments']}>
+                      <Shipments />
                     </ProtectedRoute>
                   }
                 />

@@ -136,6 +136,115 @@ export interface ProductCatalog {
   updated_at: string;
 }
 
+export type ShipmentStatus =
+  | 'AWAITING_PICKUP'
+  | 'PICKED_UP'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'RTO'
+  | 'CANCELLED';
+
+export type DeliveryZone = 'DELHI_NCR' | 'OUTSIDE_NCR';
+
+export type NotificationChannel = 'EMAIL' | 'WHATSAPP' | 'SMS' | 'CALL';
+
+export type ShipmentAggregator = 'ITHINK' | 'SHIPDELIGHT';
+
+export interface Shipment {
+  id: string;
+  shipment_key: string;
+  source: 'SHOPIFY' | 'MANUAL';
+  shopify_order_id: number | null;
+  shopify_fulfillment_id: number | null;
+  order_name: string;
+  shipment_ref: string;
+  order_date: string; // yyyy-MM-dd
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  delivery_zone: DeliveryZone;
+  courier: string | null;
+  awb_number: string | null;
+  tracking_url: string | null;
+  status: ShipmentStatus;
+  courier_status: string | null;
+  pickup_date: string | null;
+  expected_delivery_date: string | null; // courier override; null = derived from SLA
+  delivered_date: string | null;
+  customer_notified: boolean;
+  notified_on: string | null;
+  notified_via: NotificationChannel | null;
+  notes: string | null;
+  resolution: string | null;
+  resolved_on: string | null;
+  pickup_alert_sent_at: string | null;
+  delay_alert_sent_at: string | null;
+  escalation_alert_sent_at: string | null;
+  manual_overrides: string[];
+  aggregator: ShipmentAggregator | null;
+  tracking_error: string | null;
+  tracking_error_at: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SpecialCaseType = 'EXCHANGE' | 'RETURN' | 'RTO' | 'OTHER';
+export type SpecialCaseStatus = 'OPEN' | 'RESOLVED';
+
+export interface SpecialCase {
+  id: string;
+  order_name: string;
+  case_type: SpecialCaseType;
+  issue: string;
+  action_taken: string | null;
+  awb_number: string | null;
+  latest_update: string | null;
+  status: SpecialCaseStatus;
+  resolved_on: string | null; // yyyy-MM-dd
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const SPECIAL_CASE_TYPE_LABELS: Record<SpecialCaseType, string> = {
+  EXCHANGE: 'Exchange',
+  RETURN: 'Return',
+  RTO: 'RTO',
+  OTHER: 'Other',
+};
+
+export const AGGREGATOR_LABELS: Record<ShipmentAggregator, string> = {
+  ITHINK: 'iThink',
+  SHIPDELIGHT: 'ShipDelight',
+};
+
+export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
+  AWAITING_PICKUP: 'Awaiting Pickup',
+  PICKED_UP: 'Picked Up',
+  IN_TRANSIT: 'In Transit',
+  OUT_FOR_DELIVERY: 'Out for Delivery',
+  DELIVERED: 'Delivered',
+  RTO: 'RTO',
+  CANCELLED: 'Cancelled',
+};
+
+export const DELIVERY_ZONE_LABELS: Record<DeliveryZone, string> = {
+  DELHI_NCR: 'Delhi NCR',
+  OUTSIDE_NCR: 'Outside NCR',
+};
+
+export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  EMAIL: 'Email',
+  WHATSAPP: 'WhatsApp',
+  SMS: 'SMS',
+  CALL: 'Phone call',
+};
+
 export const REASON_LABELS: Record<ReasonCode, string> = {
   WRONG_SIZE: 'Wrong Size',
   DEFECTIVE: 'Defective Product',

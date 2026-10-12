@@ -3,6 +3,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import * as redis from '../_shared/redis.ts';
+import { syncShipments } from './shipments.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -127,7 +128,7 @@ serve(async (req) => {
 
     try {
         const body = await req.json();
-        const { action, orderId, forceRefresh = false } = body;
+        const { action, orderId, forceRefresh = false, lookbackDays } = body;
 
         if (!action) {
             return new Response(JSON.stringify({ error: 'Action is required' }), {
@@ -460,6 +461,34 @@ serve(async (req) => {
                 errors,
                 totalShopifyProducts: products.length,
             }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        // ─────────────────────────────────────────────
+        // ACTION: syncShipments  (not cached — writes public.order_shipments)
+        // Runs hourly from pg_cron and on demand from the Shipments page.
+        // ─────────────────────────────────────────────
+        if (action === 'syncShipments') {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL');
+            const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY');
+
+            if (!supabaseUrl || !supabaseServiceKey) {
+                return new Response(JSON.stringify({ error: 'Supabase service credentials not configured' }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 500,
+                });
+            }
+
+            const result = await syncShipments({
+                supabaseAdmin: createClient(supabaseUrl, supabaseServiceKey),
+                storeUrl: cleanStoreUrl,
+                accessToken: shopifyAccessToken,
+                lookbackDays,
+            });
+
+            return new Response(JSON.stringify(result), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });

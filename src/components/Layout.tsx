@@ -15,6 +15,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Truck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 const navigationGeneral: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SUPPORT', 'WAREHOUSE', 'INVOICING'] },
   { to: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['ADMIN', 'SUPPORT'] },
+  { to: '/shipments', label: 'Shipments', icon: Truck, roles: ['ADMIN', 'SUPPORT', 'WAREHOUSE'] },
   { to: '/exchange-lodging', label: 'Exchange Tickets', icon: Package, roles: ['ADMIN', 'SUPPORT'] },
   { to: '/warehouse', label: 'Warehouse', icon: Warehouse, roles: ['ADMIN', 'WAREHOUSE'] },
   // Invoicing page is disabled for now — re-enable alongside the route in App.tsx.
