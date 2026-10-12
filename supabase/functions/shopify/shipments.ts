@@ -10,7 +10,9 @@
 // set here; the team marks it in the tracker.
 //
 // A new fulfillment starts as Awaiting Pickup; from there the track-shipments
-// function follows the parcel at iThink / ShipDelight every 10 minutes.
+// function follows the parcel at iThink / ShipDelight every 10 minutes and is
+// the only thing that changes its status (Shopify's own carrier status runs
+// ahead of the courier).
 //
 // Fulfilled shipments are named the way Shopify numbers fulfillments:
 // <order>-F1, <order>-F2 ... (a cancelled fulfillment still uses up its number).
@@ -64,9 +66,9 @@ export function istDate(timestamp: string | null | undefined): string | null {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(timestamp));
 }
 
-// Shopify's fulfillment.shipment_status → our status. A fulfillment with no
-// carrier status is packed but not yet collected; the aggregator's tracking
-// (track-shipments) moves it on once the courier scans it.
+// Shopify's fulfillment.shipment_status → our status, used only for parcels
+// the courier tracking can't follow (see the fulfillment loop). A
+// fulfillment with no carrier status is packed but not yet collected.
 function mapShipmentStatus(shipmentStatus: string | null): string {
     switch (shipmentStatus) {
         case 'delivered':
@@ -329,7 +331,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
             const number = fulfillmentNumber(f, order.fulfillments);
             const shipmentRef = `${order.name}-F${number}`;
             const isExchange = number >= 2;
-            const status = mapShipmentStatus(f.shipment_status);
+            const awbNumber = f.tracking_number || (f.tracking_numbers || [])[0] || null;
 
             // Promote the placeholder (or an imported row) so notes and
             // notified flags carry over.
@@ -340,6 +342,14 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
             }
             if (!row) row = adopt(order, shipmentRef);
             if (!row && placedBeforeWindow && !isExchange) continue;
+
+            // The courier's tracking (track-shipments, every 10 minutes) owns
+            // the status of any parcel it can follow: Shopify marks a
+            // fulfillment in transit as soon as it is booked, while the
+            // courier still has it pending pickup. Shopify's carrier status
+            // only fills in when there is no AWB, or no aggregator knows it.
+            const courierUntrackable = !awbNumber || (!!row && !row.aggregator && !!row.tracking_error);
+            const status = courierUntrackable ? mapShipmentStatus(f.shipment_status) : null;
 
             let deliveredDate = null;
             if (status === 'DELIVERED' && !row?.delivered_date) {
@@ -354,11 +364,11 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
                 raised_date: isExchange ? istDate(f.created_at) : null,
                 shopify_fulfillment_id: f.id,
                 courier: f.tracking_company || null,
-                awb_number: f.tracking_number || (f.tracking_numbers || [])[0] || null,
+                awb_number: awbNumber,
                 tracking_url: f.tracking_url || (f.tracking_urls || [])[0] || null,
                 courier_status: f.shipment_status || null,
                 status,
-                pickup_date: istDate(f.created_at),
+                pickup_date: status ? istDate(f.created_at) : null,
                 delivered_date: deliveredDate,
             };
 
