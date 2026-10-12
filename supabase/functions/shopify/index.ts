@@ -4,6 +4,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import * as redis from '../_shared/redis.ts';
 import { syncShipments } from './shipments.ts';
+import { syncReturns } from './returns.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -481,14 +482,25 @@ serve(async (req) => {
                 });
             }
 
-            const result = await syncShipments({
+            const syncArgs = {
                 supabaseAdmin: createClient(supabaseUrl, supabaseServiceKey),
                 storeUrl: cleanStoreUrl,
                 accessToken: shopifyAccessToken,
                 lookbackDays,
-            });
+            };
+            const result = await syncShipments(syncArgs);
 
-            return new Response(JSON.stringify(result), {
+            // Returns come from the GraphQL API; a failure there (e.g. the
+            // token lacks read_returns) is reported without failing the sync.
+            let returns;
+            try {
+                returns = await syncReturns(syncArgs);
+            } catch (error) {
+                console.error('Return sync failed:', error.message);
+                returns = { error: error.message };
+            }
+
+            return new Response(JSON.stringify({ ...result, returns }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });

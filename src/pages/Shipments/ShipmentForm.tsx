@@ -6,13 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatDay, toDateInput, trackShipment, type ShipmentSettings } from '@/lib/shipmentTracking';
+import { formatDay, statusOptions, toDateInput, trackShipment, type ShipmentSettings } from '@/lib/shipmentTracking';
 import type { ShipmentPatch } from '@/hooks/useShipments';
 import {
   AGGREGATOR_LABELS,
   DELIVERY_ZONE_LABELS,
   NOTIFICATION_CHANNEL_LABELS,
-  SHIPMENT_STATUS_LABELS,
   type DeliveryZone,
   type NotificationChannel,
   type Shipment,
@@ -152,11 +151,16 @@ export function ShipmentForm({
   const zoneLocked = shipment?.manual_overrides.includes('delivery_zone');
   const isSpecialCase = values.status === 'RTO' || !!values.resolution || !!values.resolved_on;
 
+  // A new shipment's ref is the order no. typed in (e.g. K-2627-3232-R1).
+  const shipmentRef = shipment?.shipment_ref ?? values.order_name;
+
   // Preview the deadline the tracker will use when no courier date is set.
   const ruleDate = values.order_date
     ? trackShipment(
         {
+          shipment_ref: shipmentRef,
           order_date: values.order_date,
+          raised_date: shipment?.raised_date ?? null,
           pickup_date: orNull(values.pickup_date),
           expected_delivery_date: null,
           delivered_date: null,
@@ -192,7 +196,7 @@ export function ShipmentForm({
             <Select value={values.status} onValueChange={(v) => handleStatusChange(v as ShipmentStatus)}>
               <SelectTrigger id="shipment-status"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Object.entries(SHIPMENT_STATUS_LABELS).map(([value, label]) => (
+                {statusOptions(shipmentRef).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>

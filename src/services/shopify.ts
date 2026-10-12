@@ -90,6 +90,7 @@ export interface ShipmentSyncResult {
     updated: number;
     cancelled: number;
     syncedAt: string;
+    returns?: { ordersWithReturns: number; returns: number; created: number; updated: number } | { error: string };
 }
 
 export const shopifyService = {

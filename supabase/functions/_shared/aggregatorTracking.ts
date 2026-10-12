@@ -11,6 +11,11 @@
 //
 // Secrets: ITHINK_API_BASE_URL, ITHINK_ACCESS_TOKEN, ITHINK_SECRET_KEY and/or
 // SHIPDELIGHT_API_KEY (SHIPDELIGHT_API_BASE_URL optional).
+//
+// iThink AWBs the API doesn't know (booked under another iThink account, or
+// the API pointed at staging) fall back to iThink's public tracking — the
+// data behind the tracking link (ithinklogistics.co.in/postship/tracking/…),
+// which needs no login. See trackIThinkPublic.
 
 export type Aggregator = 'ITHINK' | 'SHIPDELIGHT';
 
@@ -143,6 +148,50 @@ export async function trackIThink(awbs: string[]): Promise<Map<string, CourierTr
     });
   }
   return found;
+}
+
+// iThink's public tracking: what the tracking page loads in the browser. No
+// login, any iThink AWB; null when iThink doesn't know it. activity_details
+// lists the courier's stages oldest first ("Rev manifest", "Rev picked up",
+// "In transit" …), each with timed scans whose dates carry no year.
+const ITHINK_PUBLIC_TRACKING_URL = 'https://my-app-v4.ithinklogistics.com/external/v1/domestic/order/get/tracking-history';
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+// "Oct 9, 4:26 pm" → yyyy-MM-dd: this year, or last year if that would be
+// in the future (a December scan read in January).
+function publicScanDay(value: unknown, today: string): string | null {
+  const m = String(value ?? '').match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})/);
+  const month = m ? MONTHS.indexOf(m[1].toLowerCase()) + 1 : 0;
+  if (!month) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const year = Number(today.slice(0, 4));
+  const day = `${year}-${pad(month)}-${pad(Number(m[2]))}`;
+  return day > today ? `${year - 1}-${pad(month)}-${pad(Number(m[2]))}` : day;
+}
+
+export async function trackIThinkPublic(awb: string): Promise<CourierTracking | null> {
+  const response = await fetch(ITHINK_PUBLIC_TRACKING_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ awb_no: awb }),
+  });
+  if (response.status === 429 || response.status >= 500) {
+    throw new Error(`iThink public tracking failed (HTTP ${response.status})`);
+  }
+  const json = await response.json().catch(() => null);
+  const activities = Array.isArray(json?.activity_details) ? json.activity_details : [];
+  if (json?.status !== 'success' || activities.length === 0) return null;
+
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const scans = activities.flatMap((activity: any) =>
+    (Array.isArray(activity.sub_activity) ? activity.sub_activity : []).map((scan: any) => ({
+      status: trackerStatus(activity.activity_title),
+      at: publicScanDay(scan.status_date_time, today),
+    }))
+  );
+  const latest = String(activities[activities.length - 1].activity_title ?? '').trim();
+  const courierStatus = latest.charAt(0).toUpperCase() + latest.slice(1);
+  return { aggregator: 'ITHINK', courierStatus, status: trackerStatus(courierStatus), ...scanDates(scans) };
 }
 
 // ShipDelight's bearer token lasts 24h; cached per warm isolate.

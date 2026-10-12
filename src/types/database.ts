@@ -160,6 +160,7 @@ export interface Shipment {
   order_name: string;
   shipment_ref: string;
   order_date: string; // yyyy-MM-dd
+  raised_date: string | null; // exchanges / returns: day raised; deadlines count from it
   customer_name: string | null;
   customer_phone: string | null;
   customer_email: string | null;

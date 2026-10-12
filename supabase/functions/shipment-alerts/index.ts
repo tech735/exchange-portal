@@ -27,7 +27,14 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { escapeHtml, listTable, paragraph, sendResendEmail, wrapEmail } from '../_shared/email.ts';
-import { DEFAULT_SHIPMENT_SETTINGS, DELIVERY_CHECK_LABELS, istNow, trackShipment } from '../_shared/shipmentRules.ts';
+import {
+  DEFAULT_SHIPMENT_SETTINGS,
+  DELIVERY_CHECK_LABELS,
+  SHIPMENT_KIND_LABELS,
+  istNow,
+  shipmentKind,
+  trackShipment,
+} from '../_shared/shipmentRules.ts';
 
 const ZONE_LABELS = { DELHI_NCR: 'Delhi NCR', OUTSIDE_NCR: 'Outside NCR' };
 const CUSTOMER_MESSAGE_HOURS = { from: 9, to: 21 }; // IST, [from, to)
@@ -141,6 +148,7 @@ serve(async (req: Request) => {
     const delayRows = (list: any[]) =>
       list.map((s) => [
         s.shipment_ref,
+        SHIPMENT_KIND_LABELS[shipmentKind(s.shipment_ref)],
         ZONE_LABELS[s.delivery_zone],
         [s.courier, s.awb_number].filter(Boolean).join(' · ') || '—',
         displayDate(s.pickup_date),
@@ -148,7 +156,7 @@ serve(async (req: Request) => {
         String(s.daysDelayed ?? ''),
         `${s.customer_name || '—'} (${s.customer_notified ? 'notified' : 'not notified'})`,
       ]);
-    const delayHeaders = ['Order', 'Zone', 'Courier · AWB', 'Picked up', 'Due', 'Days late', 'Customer'];
+    const delayHeaders = ['Order', 'Type', 'Zone', 'Courier · AWB', 'Picked up', 'Due', 'Days late', 'Customer'];
 
     if ((latePickups.length || delayed.length || escalated.length) && teamEmails.length) {
       const sections: string[] = [];
@@ -160,10 +168,17 @@ serve(async (req: Request) => {
       }
       if (latePickups.length) {
         sections.push(
-          paragraph(`Not picked up by the deadline (${settings.pickup_deadline_hour}:00, ${settings.pickup_deadline_days} day after order):`),
+          paragraph(`Not picked up by the deadline (${settings.pickup_deadline_hour}:00, ${settings.pickup_deadline_days} day after the order, exchange or return was raised):`),
           listTable(
-            ['Order', 'Ordered', 'Pickup due', 'Customer', 'City'],
-            latePickups.map((s) => [s.shipment_ref, displayDate(s.order_date), displayDate(s.pickupDue), s.customer_name || '—', s.city || '—'])
+            ['Order', 'Type', 'Raised', 'Pickup due', 'Customer', 'City'],
+            latePickups.map((s) => [
+              s.shipment_ref,
+              SHIPMENT_KIND_LABELS[shipmentKind(s.shipment_ref)],
+              displayDate(s.raised_date ?? s.order_date),
+              displayDate(s.pickupDue),
+              s.customer_name || '—',
+              s.city || '—',
+            ])
           )
         );
       }
@@ -211,8 +226,13 @@ serve(async (req: Request) => {
     const inHours = now.hour >= CUSTOMER_MESSAGE_HOURS.from && now.hour < CUSTOMER_MESSAGE_HOURS.to;
 
     if ((settings.notify_customers_by_email || smsReady) && inHours) {
+      // The apology is about a late delivery to the customer, so returns
+      // (coming back from them) are left to the team.
       const toNotify = tracked.filter(
-        (s) => !s.customer_notified && (s.check === 'DELAYED_NOTIFY' || s.check === 'ESCALATED')
+        (s) =>
+          !s.customer_notified &&
+          (s.check === 'DELAYED_NOTIFY' || s.check === 'ESCALATED') &&
+          shipmentKind(s.shipment_ref) !== 'RETURN'
       );
 
       for (const s of toNotify) {

@@ -15,8 +15,9 @@ export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
       pickedUpLate: t.pickedUpLate + r.pickedUpLate,
       delivered: t.delivered + r.delivered,
       deliveredLate: t.deliveredLate + r.deliveredLate,
+      returns: t.returns + r.returns,
     }),
-    { placed: 0, pickedUp: 0, pickedUpLate: 0, delivered: 0, deliveredLate: 0 }
+    { placed: 0, pickedUp: 0, pickedUpLate: 0, delivered: 0, deliveredLate: 0, returns: 0 }
   );
 
   const late = (n: number) => (n ? <span className="text-destructive"> ({n} late)</span> : null);
@@ -31,6 +32,7 @@ export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
             <TableHead className="text-right">Picked up</TableHead>
             <TableHead className="text-right">Delivered</TableHead>
             <TableHead className="text-right hidden sm:table-cell">On-time</TableHead>
+            <TableHead className="text-right">Returns</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -43,6 +45,7 @@ export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
               <TableCell className={cn('text-right hidden sm:table-cell', r.deliveredLate && 'text-warning')}>
                 {r.delivered ? `${Math.round((r.deliveredOnTime / r.delivered) * 100)}%` : '—'}
               </TableCell>
+              <TableCell className="text-right">{r.returns}</TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-muted/30 font-semibold">
@@ -53,6 +56,7 @@ export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
             <TableCell className="text-right hidden sm:table-cell">
               {totals.delivered ? `${Math.round(((totals.delivered - totals.deliveredLate) / totals.delivered) * 100)}%` : '—'}
             </TableCell>
+            <TableCell className="text-right">{totals.returns}</TableCell>
           </TableRow>
         </TableBody>
       </Table>

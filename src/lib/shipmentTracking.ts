@@ -4,22 +4,36 @@
 // numbers and reports on top.
 import { format, parseISO } from 'date-fns';
 import {
+  shipmentKind,
   trackShipment,
   type IstNow,
   type ShipmentSettings,
   type ShipmentTracking,
 } from '../../supabase/functions/_shared/shipmentRules';
-import type { DeliveryZone, Shipment } from '@/types/database';
+import { SHIPMENT_STATUS_LABELS, type DeliveryZone, type Shipment, type ShipmentStatus } from '@/types/database';
 
 export {
   DEFAULT_SHIPMENT_SETTINGS,
   DELIVERY_CHECK_LABELS,
+  SHIPMENT_KIND_LABELS,
   istNow,
+  shipmentKind,
   trackShipment,
   type DeliveryCheck,
   type IstNow,
+  type ShipmentKind,
   type ShipmentSettings,
 } from '../../supabase/functions/_shared/shipmentRules';
+
+// The day an exchange / return was raised; the order date for everything else.
+export const raisedOn = (s: Shipment) => s.raised_date ?? s.order_date;
+
+// Statuses a shipment can be set to; a return has no RTO.
+export function statusOptions(shipmentRef: string | undefined): [ShipmentStatus, string][] {
+  return (Object.entries(SHIPMENT_STATUS_LABELS) as [ShipmentStatus, string][]).filter(
+    ([status]) => status !== 'RTO' || shipmentKind(shipmentRef) !== 'RETURN'
+  );
+}
 
 export type TrackedShipment = Shipment & ShipmentTracking;
 
@@ -64,7 +78,7 @@ export function summarizeShipments(shipments: TrackedShipment[], today: string):
 
   return {
     total: shipments.filter((s) => s.check !== 'CANCELLED').length,
-    todaysOrders: shipments.filter((s) => s.order_date === today).length,
+    todaysOrders: shipments.filter((s) => raisedOn(s) === today).length,
     awaitingPickup: count('AWAITING_PICKUP'),
     pickupDelayed: count('PICKUP_DELAYED'),
     onTrack: count('ON_TRACK'),
@@ -115,21 +129,27 @@ export interface DailyReportRow {
   delivered: number;
   deliveredOnTime: number;
   deliveredLate: number;
+  returns: number;
 }
 
-// Orders placed, picked up and delivered on each day, newest first.
+// Orders placed, picked up and delivered on each day, newest first. Returns
+// are only counted as raised (the returns column), not as orders.
 export function dailyReport(shipments: TrackedShipment[], sinceDate: string | null): DailyReportRow[] {
   const rows = new Map<string, DailyReportRow>();
   const row = (date: string) => {
     if (!rows.has(date)) {
-      rows.set(date, { date, placed: 0, pickedUp: 0, pickedUpLate: 0, delivered: 0, deliveredOnTime: 0, deliveredLate: 0 });
+      rows.set(date, { date, placed: 0, pickedUp: 0, pickedUpLate: 0, delivered: 0, deliveredOnTime: 0, deliveredLate: 0, returns: 0 });
     }
     return rows.get(date)!;
   };
 
   for (const s of shipments) {
     if (s.check === 'CANCELLED') continue;
-    row(s.order_date).placed++;
+    if (shipmentKind(s.shipment_ref) === 'RETURN') {
+      row(raisedOn(s)).returns++;
+      continue;
+    }
+    row(raisedOn(s)).placed++;
     if (s.pickup_date) {
       const r = row(s.pickup_date);
       r.pickedUp++;

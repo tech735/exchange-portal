@@ -32,7 +32,8 @@ const STATUS_RANK: Record<ShipmentStatus, number> = {
 export type ShipmentPatch = Partial<Omit<Shipment, 'id' | 'created_at' | 'updated_at' | 'manual_overrides'>>;
 
 /**
- * Shipments ordered in the last `lookbackDays` days, plus every shipment that
+ * Shipments ordered (or, for exchanges / returns, raised) in the last
+ * `lookbackDays` days, plus every shipment that
  * is still open (or an unresolved RTO) regardless of age, so an old parcel
  * never drops off the tracker. Refetches whenever a row changes (the courier
  * tracking job, the Shopify sync or a teammate's edit), so statuses update live.
@@ -65,7 +66,7 @@ export function useShipments(lookbackDays: number | null) {
       if (lookbackDays !== null) {
         const since = toDateInput(subDays(new Date(), lookbackDays));
         query = query.or(
-          `order_date.gte.${since},status.not.in.(DELIVERED,CANCELLED,RTO),and(status.eq.RTO,resolved_on.is.null)`
+          `order_date.gte.${since},raised_date.gte.${since},status.not.in.(DELIVERED,CANCELLED,RTO),and(status.eq.RTO,resolved_on.is.null)`
         );
       }
 

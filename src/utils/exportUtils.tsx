@@ -307,6 +307,7 @@ export async function exportShipmentsToExcel({
       { header: 'Delivered', key: 'delivered', width: 11 },
       { header: 'Delivered On Time', key: 'onTime', width: 17 },
       { header: 'Delivered Late', key: 'late', width: 14 },
+      { header: 'Returns', key: 'returns', width: 10 },
     ],
     daily.map((r) => ({
       date: day(r.date),
@@ -316,6 +317,7 @@ export async function exportShipmentsToExcel({
       delivered: r.delivered,
       onTime: r.deliveredOnTime,
       late: r.deliveredLate,
+      returns: r.returns,
     }))
   );
 

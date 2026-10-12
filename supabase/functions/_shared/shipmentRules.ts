@@ -12,6 +12,11 @@
 //   - Undelivered `rto_escalation_days` (3) days past the delivery deadline,
 //     a shipment is escalated for an RTO decision; RTO itself is set by hand or
 //     by the courier tracking (track-shipments).
+//
+// Exchanges and returns follow the same rules, counted from the day they were
+// raised (raised_date) rather than the original order date. A return is
+// already on its way back, so it has no RTO and is never escalated; it stays
+// Delayed until it arrives.
 
 export interface ShipmentSettings {
   ncr_delivery_days: number;
@@ -53,6 +58,24 @@ export type DeliveryCheck =
   | 'RTO'
   | 'CANCELLED';
 
+// What a shipment is, from its ref: Shopify numbers an order's fulfillments
+// <order>-F1, -F2 … and its returns <order>-R1, -R2 …. The first fulfillment
+// is the order itself; any later one is an exchange being sent out.
+export type ShipmentKind = 'FORWARD' | 'EXCHANGE' | 'RETURN';
+
+export const SHIPMENT_KIND_LABELS: Record<ShipmentKind, string> = {
+  FORWARD: 'Forward',
+  EXCHANGE: 'Exchange',
+  RETURN: 'Return',
+};
+
+export function shipmentKind(shipmentRef: string | null | undefined): ShipmentKind {
+  const ref = String(shipmentRef ?? '').trim().toUpperCase();
+  if (/-R\d+$/.test(ref)) return 'RETURN';
+  const fulfillment = ref.match(/-F(\d+)$/);
+  return fulfillment && Number(fulfillment[1]) >= 2 ? 'EXCHANGE' : 'FORWARD';
+}
+
 export const DELIVERY_CHECK_LABELS: Record<DeliveryCheck, string> = {
   AWAITING_PICKUP: 'Awaiting Pickup',
   PICKUP_DELAYED: 'Pickup Delayed',
@@ -68,7 +91,9 @@ export const DELIVERY_CHECK_LABELS: Record<DeliveryCheck, string> = {
 
 // The fields the rules read; Shipment rows from either side satisfy it.
 export interface ShipmentDates {
+  shipment_ref?: string;
   order_date: string;
+  raised_date?: string | null;
   pickup_date: string | null;
   expected_delivery_date: string | null;
   delivered_date: string | null;
@@ -130,10 +155,12 @@ export function trackShipment(
   settings: ShipmentSettings,
   now: IstNow = istNow()
 ): ShipmentTracking {
-  const pickupDue = addDeadlineDays(shipment.order_date, settings.pickup_deadline_days, settings.skip_sundays);
-  // Status says it left but nobody recorded when: count from the order date,
-  // which can only flag a delay early, never hide one.
-  const pickedUp = shipment.pickup_date ?? (shipment.status !== 'AWAITING_PICKUP' ? shipment.order_date : null);
+  const isReturn = shipmentKind(shipment.shipment_ref) === 'RETURN';
+  const raised = shipment.raised_date ?? shipment.order_date;
+  const pickupDue = addDeadlineDays(raised, settings.pickup_deadline_days, settings.skip_sundays);
+  // Status says it left but nobody recorded when: count from the day it was
+  // raised, which can only flag a delay early, never hide one.
+  const pickedUp = shipment.pickup_date ?? (shipment.status !== 'AWAITING_PICKUP' ? raised : null);
   const delivered = shipment.status === 'DELIVERED' ? shipment.delivered_date ?? now.date : null;
 
   const zoneDays =
@@ -163,7 +190,7 @@ export function trackShipment(
   } else if (expectedDelivery && now.date > expectedDelivery) {
     daysDelayed = diffDays(now.date, expectedDelivery);
     check =
-      daysDelayed >= settings.rto_escalation_days
+      daysDelayed >= settings.rto_escalation_days && !isReturn
         ? 'ESCALATED'
         : shipment.customer_notified
           ? 'DELAYED_NOTIFIED'

@@ -28,10 +28,11 @@ import {
   guessAggregator,
   isConfigured,
   trackIThink,
+  trackIThinkPublic,
   trackShipDelight,
   type CourierTracking,
 } from '../_shared/aggregatorTracking.ts';
-import { istNow } from '../_shared/shipmentRules.ts';
+import { istNow, shipmentKind } from '../_shared/shipmentRules.ts';
 
 const IN_FLIGHT = ['AWAITING_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'];
 const CLOSED_CHECK_DAYS = 60;
@@ -41,9 +42,10 @@ const SHIPDELIGHT_CONCURRENCY = 5;
 // RTO and Cancelled may have been set by the team or by Shopify, so the
 // courier only moves them on with something more definite: an RTO parcel
 // that is delivered or cancelled after all, and a cancelled one the courier
-// picks up anyway.
-function nextStatus(current: string, courier: string | null): string {
-  if (!courier) return current;
+// picks up anyway. A return has no RTO in the tracker, so a courier RTO on
+// one leaves its status alone (courier_status still shows it).
+function nextStatus(current: string, courier: string | null, isReturn: boolean): string {
+  if (!courier || (isReturn && courier === 'RTO')) return current;
   if (current === 'RTO') return courier === 'DELIVERED' || courier === 'CANCELLED' ? courier : current;
   if (current === 'CANCELLED') return courier === 'AWAITING_PICKUP' ? current : courier;
   return courier;
@@ -69,19 +71,17 @@ serve(async (_req: Request) => {
       console.error('track-shipments: missing Supabase service credentials');
       return json({ error: 'Not configured' }, 500);
     }
-    const ithinkReady = isConfigured('ITHINK');
+    // iThink always works through its public tracking; its API and
+    // ShipDelight need their secrets.
+    const ithinkApiReady = isConfigured('ITHINK');
     const shipDelightReady = isConfigured('SHIPDELIGHT');
-    if (!ithinkReady && !shipDelightReady) {
-      console.error('track-shipments: no iThink or ShipDelight credentials set');
-      return json({ error: 'No aggregator configured' }, 500);
-    }
 
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
     const closedSince = new Date(Date.now() - CLOSED_CHECK_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data, error } = await supabase
       .from('order_shipments')
-      .select('id, status, awb_number, tracking_url, courier, aggregator, courier_status, pickup_date, delivered_date, tracking_error, tracking_error_at')
+      .select('id, shipment_ref, status, awb_number, tracking_url, courier, aggregator, courier_status, pickup_date, delivered_date, tracking_error, tracking_error_at')
       .not('awb_number', 'is', null)
       .neq('status', 'DELIVERED')
       .or(`status.in.(${IN_FLIGHT.join(',')}),and(resolved_on.is.null,order_date.gte.${closedSince})`);
@@ -97,18 +97,30 @@ serve(async (_req: Request) => {
 
     const found = new Map<string, CourierTracking>();
     const failures = new Map<string, string>();
+    const notFound = (list: any[]) => list.filter((s) => !found.has(s.id));
 
+    // The API first (batches of 10), then the public tracking for whatever
+    // it didn't return.
     const askIThink = async (list: any[]) => {
-      if (!ithinkReady) return;
-      for (let i = 0; i < list.length; i += ITHINK_BATCH_SIZE) {
-        const batch = list.slice(i, i + ITHINK_BATCH_SIZE);
-        try {
-          const result = await trackIThink(batch.map((s) => s.awb_number));
-          batch.forEach((s) => result.has(s.awb_number) && found.set(s.id, result.get(s.awb_number)));
-        } catch (err) {
-          batch.forEach((s) => failures.set(s.id, err.message));
+      if (ithinkApiReady) {
+        for (let i = 0; i < list.length; i += ITHINK_BATCH_SIZE) {
+          const batch = list.slice(i, i + ITHINK_BATCH_SIZE);
+          try {
+            const result = await trackIThink(batch.map((s) => s.awb_number));
+            batch.forEach((s) => result.has(s.awb_number) && found.set(s.id, result.get(s.awb_number)));
+          } catch (err) {
+            batch.forEach((s) => failures.set(s.id, err.message));
+          }
         }
       }
+      await eachLimit(notFound(list), SHIPDELIGHT_CONCURRENCY, async (s) => {
+        try {
+          const result = await trackIThinkPublic(s.awb_number);
+          if (result) found.set(s.id, result);
+        } catch (err) {
+          failures.set(s.id, err.message);
+        }
+      });
     };
     const askShipDelight = async (list: any[]) => {
       if (!shipDelightReady) return;
@@ -126,7 +138,6 @@ serve(async (_req: Request) => {
     // other one if that one doesn't know the AWB.
     const shipDelightFirst = shipments.filter((s) => (s.aggregator ?? guessAggregator(s)) === 'SHIPDELIGHT');
     const iThinkFirst = shipments.filter((s) => !shipDelightFirst.includes(s));
-    const notFound = (list: any[]) => list.filter((s) => !found.has(s.id));
 
     await Promise.all([askIThink(iThinkFirst), askShipDelight(shipDelightFirst)]);
     await Promise.all([askShipDelight(notFound(iThinkFirst)), askIThink(notFound(shipDelightFirst))]);
@@ -151,7 +162,7 @@ serve(async (_req: Request) => {
           ...(message ? {} : { aggregator: null }),
         };
       } else {
-        const status = nextStatus(s.status, tracking.status);
+        const status = nextStatus(s.status, tracking.status, shipmentKind(s.shipment_ref) === 'RETURN');
         const next = {
           aggregator: tracking.aggregator,
           courier_status: tracking.courierStatus,

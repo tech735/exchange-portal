@@ -14,18 +14,25 @@
 //
 // Fulfilled shipments are named the way Shopify numbers fulfillments:
 // <order>-F1, <order>-F2 ... (a cancelled fulfillment still uses up its number).
+// F2 onwards are exchanges; their deadlines count from the day the
+// fulfillment was created (raised_date). Returns come from returns.ts.
+//
+// Orders are picked up by when they were last updated, so an exchange sent
+// on an older order still comes through. For orders placed before the
+// lookback window only exchanges are added; their first shipment is only
+// refreshed if it is already in the tracker.
 //
 // Rows imported from the old Google Sheet (source MANUAL, no Shopify id) are
 // adopted by order name the first time their order comes through, so an
 // import followed by a sync never produces duplicates.
 
 const API_VERSION = '2024-01';
-const DEFAULT_LOOKBACK_DAYS = 30;
+export const DEFAULT_LOOKBACK_DAYS = 30;
 // Delivered dates come from one events call per fulfillment; during a long
 // backfill, older orders fall back to the fulfillment's updated_at instead so
 // the run stays inside the Edge Function time limit.
 const DELIVERY_EVENT_LOOKUP_DAYS = 30;
-const CHUNK = 200;
+export const CHUNK = 200;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ORDER_FIELDS = [
@@ -47,11 +54,11 @@ const STATUS_RANK: Record<string, number> = {
 
 // Fields Shopify refreshes on every sync unless the team overrode them.
 const SHOPIFY_OWNED_FIELDS = [
-    'order_name', 'shipment_ref', 'order_date', 'customer_name', 'customer_phone',
+    'order_name', 'shipment_ref', 'order_date', 'raised_date', 'customer_name', 'customer_phone',
     'customer_email', 'city', 'state', 'pincode', 'courier', 'awb_number', 'tracking_url',
 ];
 
-function istDate(timestamp: string | null | undefined): string | null {
+export function istDate(timestamp: string | null | undefined): string | null {
     if (!timestamp) return null;
     // en-CA formats as YYYY-MM-DD.
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(timestamp));
@@ -99,11 +106,11 @@ async function shopifyGet(url: string, accessToken: string) {
     return { data: await response.json(), next };
 }
 
-async function fetchOrdersSince(storeUrl: string, accessToken: string, sinceIso: string): Promise<any[]> {
+async function fetchOrdersUpdatedSince(storeUrl: string, accessToken: string, sinceIso: string): Promise<any[]> {
     const orders: any[] = [];
     let url: string | null =
         `https://${storeUrl}/admin/api/${API_VERSION}/orders.json?status=any&limit=250` +
-        `&created_at_min=${encodeURIComponent(sinceIso)}&fields=${ORDER_FIELDS}`;
+        `&updated_at_min=${encodeURIComponent(sinceIso)}&fields=${ORDER_FIELDS}`;
 
     while (url) {
         const { data, next } = await shopifyGet(url, accessToken);
@@ -151,7 +158,7 @@ function orderFields(order: any) {
 }
 
 // Every column, so all rows in one upsert batch carry the same keys.
-function newRow(key: string, order: any, now: string) {
+export function newRow(key: string, order: any, now: string) {
     return {
         id: crypto.randomUUID(),
         shipment_key: key,
@@ -161,6 +168,7 @@ function newRow(key: string, order: any, now: string) {
         order_name: order.name,
         shipment_ref: order.name,
         order_date: istDate(order.created_at),
+        raised_date: null,
         customer_name: null,
         customer_phone: null,
         customer_email: null,
@@ -196,7 +204,7 @@ function newRow(key: string, order: any, now: string) {
 }
 
 // Apply Shopify's view of a shipment onto a row without clobbering edits.
-function merge(row: any, incoming: Record<string, any>, now: string) {
+export function merge(row: any, incoming: Record<string, any>, now: string) {
     const locked = new Set(row.manual_overrides || []);
     const next = { ...row, last_synced_at: now };
 
@@ -230,7 +238,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
     const now = new Date().toISOString();
 
     // Store pickups, digital items etc. have no shipping address — nothing to track.
-    const orders = (await fetchOrdersSince(storeUrl, accessToken, since)).filter((o) => o.shipping_address);
+    const orders = (await fetchOrdersUpdatedSince(storeUrl, accessToken, since)).filter((o) => o.shipping_address);
 
     // Every existing row for these orders, keyed by shipment_key …
     const existing = new Map<string, any>();
@@ -281,6 +289,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
     for (const order of orders) {
         const base = orderFields(order);
         const pendingKey = `${order.id}:pending`;
+        const placedBeforeWindow = new Date(order.created_at).getTime() < Date.parse(since);
 
         if (order.cancelled_at) {
             for (const row of existing.values()) {
@@ -305,6 +314,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
 
         if (fulfillments.length === 0) {
             const row = existing.get(pendingKey) || adopt(order, order.name);
+            if (!row && placedBeforeWindow) continue;
             const incoming = { ...base, shipment_ref: order.name };
             if (row) updated++;
             else created++;
@@ -316,7 +326,9 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
 
         for (const f of fulfillments) {
             const key = `${order.id}:${f.id}`;
-            const shipmentRef = `${order.name}-F${fulfillmentNumber(f, order.fulfillments)}`;
+            const number = fulfillmentNumber(f, order.fulfillments);
+            const shipmentRef = `${order.name}-F${number}`;
+            const isExchange = number >= 2;
             const status = mapShipmentStatus(f.shipment_status);
 
             // Promote the placeholder (or an imported row) so notes and
@@ -327,6 +339,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
                 placeholder = null;
             }
             if (!row) row = adopt(order, shipmentRef);
+            if (!row && placedBeforeWindow && !isExchange) continue;
 
             let deliveredDate = null;
             if (status === 'DELIVERED' && !row?.delivered_date) {
@@ -338,6 +351,7 @@ export async function syncShipments({ supabaseAdmin, storeUrl, accessToken, look
             const incoming = {
                 ...base,
                 shipment_ref: shipmentRef,
+                raised_date: isExchange ? istDate(f.created_at) : null,
                 shopify_fulfillment_id: f.id,
                 courier: f.tracking_company || null,
                 awb_number: f.tracking_number || (f.tracking_numbers || [])[0] || null,

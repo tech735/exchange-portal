@@ -108,6 +108,7 @@ export interface Database {
           order_name: string;
           shipment_ref: string;
           order_date: string;
+          raised_date: string | null;
           customer_name: string | null;
           customer_phone: string | null;
           customer_email: string | null;
