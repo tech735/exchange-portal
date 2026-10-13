@@ -2,11 +2,21 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatDay, statusOptions, toDateInput, trackShipment, type ShipmentSettings } from '@/lib/shipmentTracking';
+import {
+  SHIPMENT_KIND_LABELS,
+  formatDay,
+  shipmentKind,
+  statusOptions,
+  toDateInput,
+  trackShipment,
+  type ShipmentKind,
+  type ShipmentSettings,
+} from '@/lib/shipmentTracking';
 import type { ShipmentPatch } from '@/hooks/useShipments';
 import {
   AGGREGATOR_LABELS,
@@ -19,6 +29,7 @@ import {
 } from '@/types/database';
 
 type FormValues = {
+  kind: ShipmentKind; // new shipments only; sets the ref's suffix
   order_name: string;
   order_date: string;
   customer_name: string;
@@ -47,6 +58,7 @@ const today = () => toDateInput(new Date());
 
 function initialValues(shipment?: Shipment): FormValues {
   return {
+    kind: 'FORWARD',
     order_name: shipment?.order_name ?? '',
     order_date: shipment?.order_date ?? today(),
     customer_name: shipment?.customer_name ?? '',
@@ -86,9 +98,25 @@ function courierHint(shipment?: Shipment): string | undefined {
 
 const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
 
+// A new shipment's ref: the order no. with the suffix its type needs
+// (-F2 exchange, -R1 return), unless the right one was typed already.
+function newShipmentRef(orderNo: string, kind: ShipmentKind): string {
+  const typed = orderNo.trim();
+  if (shipmentKind(typed) === kind) return typed;
+  const base = typed.replace(/-[FR]\d+$/i, '');
+  return kind === 'EXCHANGE' ? `${base}-F2` : kind === 'RETURN' ? `${base}-R1` : base;
+}
+
 function toPatch(values: FormValues, shipment?: Shipment): ShipmentPatch {
+  // Adding: the type decides the ref, and an exchange / return counts its
+  // deadlines from today, when it was raised.
+  const newRef = shipment ? null : newShipmentRef(values.order_name, values.kind);
   const patch: ShipmentPatch = {
-    order_name: values.order_name.trim(),
+    ...(newRef && {
+      shipment_ref: newRef,
+      raised_date: values.kind === 'FORWARD' ? null : today(),
+    }),
+    order_name: newRef ? newRef.replace(/-[FR]\d+$/i, '') : values.order_name.trim(),
     order_date: values.order_date,
     customer_name: orNull(values.customer_name),
     customer_phone: orNull(values.customer_phone),
@@ -151,8 +179,7 @@ export function ShipmentForm({
   const zoneLocked = shipment?.manual_overrides.includes('delivery_zone');
   const isSpecialCase = values.status === 'RTO' || !!values.resolution || !!values.resolved_on;
 
-  // A new shipment's ref is the order no. typed in (e.g. K-2627-3232-R1).
-  const shipmentRef = shipment?.shipment_ref ?? values.order_name;
+  const shipmentRef = shipment?.shipment_ref ?? newShipmentRef(values.order_name, values.kind);
 
   // Preview the deadline the tracker will use when no courier date is set.
   const ruleDate = values.order_date
@@ -160,7 +187,7 @@ export function ShipmentForm({
         {
           shipment_ref: shipmentRef,
           order_date: values.order_date,
-          raised_date: shipment?.raised_date ?? null,
+          raised_date: shipment ? shipment.raised_date : values.kind === 'FORWARD' ? null : today(),
           pickup_date: orNull(values.pickup_date),
           expected_delivery_date: null,
           delivered_date: null,
@@ -212,7 +239,7 @@ export function ShipmentForm({
             <Input id="shipment-tracking-url" type="url" value={values.tracking_url} onChange={(e) => set('tracking_url', e.target.value)} placeholder="https://" />
           </Field>
           <Field label="Pickup date" htmlFor="shipment-pickup">
-            <Input id="shipment-pickup" type="date" value={values.pickup_date} onChange={(e) => set('pickup_date', e.target.value)} />
+            <DatePicker id="shipment-pickup" value={values.pickup_date} onChange={(v) => set('pickup_date', v)} />
           </Field>
           <Field
             label="Expected delivery"
@@ -225,11 +252,11 @@ export function ShipmentForm({
                   : 'Blank = deadline rule, once picked up'
             }
           >
-            <Input id="shipment-expected" type="date" value={values.expected_delivery_date} onChange={(e) => set('expected_delivery_date', e.target.value)} />
+            <DatePicker id="shipment-expected" value={values.expected_delivery_date} onChange={(v) => set('expected_delivery_date', v)} />
           </Field>
           {values.status === 'DELIVERED' && (
             <Field label="Delivered date" htmlFor="shipment-delivered">
-              <Input id="shipment-delivered" type="date" required value={values.delivered_date} onChange={(e) => set('delivered_date', e.target.value)} />
+              <DatePicker id="shipment-delivered" required value={values.delivered_date} onChange={(v) => set('delivered_date', v)} />
             </Field>
           )}
         </div>
@@ -251,7 +278,7 @@ export function ShipmentForm({
         {values.customer_notified && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Notified on" htmlFor="shipment-notified-on">
-              <Input id="shipment-notified-on" type="date" value={values.notified_on} onChange={(e) => set('notified_on', e.target.value)} />
+              <DatePicker id="shipment-notified-on" value={values.notified_on} onChange={(v) => set('notified_on', v)} />
             </Field>
             <Field label="Notified via" htmlFor="shipment-notified-via">
               <Select value={values.notified_via} onValueChange={(v) => set('notified_via', v as FormValues['notified_via'])}>
@@ -280,7 +307,7 @@ export function ShipmentForm({
               <Input id="shipment-resolution" value={values.resolution} onChange={(e) => set('resolution', e.target.value)} placeholder="e.g. Re-shipped, refunded" />
             </Field>
             <Field label="Resolved on" htmlFor="shipment-resolved-on">
-              <Input id="shipment-resolved-on" type="date" value={values.resolved_on} onChange={(e) => set('resolved_on', e.target.value)} />
+              <DatePicker id="shipment-resolved-on" value={values.resolved_on} onChange={(v) => set('resolved_on', v)} />
             </Field>
           </div>
         </section>
@@ -294,11 +321,27 @@ export function ShipmentForm({
           </p>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Order No." htmlFor="shipment-order">
+          {!shipment && (
+            <Field label="Type" htmlFor="shipment-kind">
+              <Select value={values.kind} onValueChange={(v) => set('kind', v as ShipmentKind)}>
+                <SelectTrigger id="shipment-kind"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SHIPMENT_KIND_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+          <Field
+            label="Order No."
+            htmlFor="shipment-order"
+            hint={!shipment && values.kind !== 'FORWARD' && values.order_name.trim() ? `Saved as ${shipmentRef}` : undefined}
+          >
             <Input id="shipment-order" required value={values.order_name} onChange={(e) => set('order_name', e.target.value)} placeholder="K-2627-3254" />
           </Field>
           <Field label="Order date" htmlFor="shipment-order-date">
-            <Input id="shipment-order-date" type="date" required value={values.order_date} onChange={(e) => set('order_date', e.target.value)} />
+            <DatePicker id="shipment-order-date" required value={values.order_date} onChange={(v) => set('order_date', v)} />
           </Field>
           <Field label="Customer name" htmlFor="shipment-customer">
             <Input id="shipment-customer" value={values.customer_name} onChange={(e) => set('customer_name', e.target.value)} />

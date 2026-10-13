@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -146,7 +147,7 @@ function SpecialCaseForm({ specialCase, onDone }: { specialCase: SpecialCase | n
         </Field>
         {values.status === 'RESOLVED' && (
           <Field label="Resolved on" htmlFor="case-resolved">
-            <Input id="case-resolved" type="date" value={values.resolved_on} onChange={(e) => set('resolved_on', e.target.value)} />
+            <DatePicker id="case-resolved" value={values.resolved_on} onChange={(v) => set('resolved_on', v)} />
           </Field>
         )}
       </div>

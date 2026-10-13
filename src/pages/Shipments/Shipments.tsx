@@ -4,8 +4,7 @@ import { Plus, RefreshCw, Settings, Upload } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
@@ -313,30 +312,35 @@ export default function Shipments() {
         </Sheet>
 
         {/* Add (orders shipped outside Shopify) */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add shipment</DialogTitle>
-            </DialogHeader>
-            <ShipmentForm
-              settings={settings}
-              submitting={createShipment.isPending}
-              submitLabel="Add shipment"
-              onSubmit={(patch) =>
-                createShipment.mutate(
-                  { ...patch, order_name: patch.order_name!, order_date: patch.order_date! },
-                  {
-                    onSuccess: () => {
-                      toast({ title: 'Shipment added', description: patch.order_name });
-                      setAddOpen(false);
-                    },
-                    onError: (error: Error) => toast({ title: 'Could not add shipment', description: error.message, variant: 'destructive' }),
+        <Sheet open={addOpen} onOpenChange={setAddOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader className="text-left">
+              <SheetTitle>Add shipment</SheetTitle>
+              <SheetDescription>For orders, exchanges or returns that don't come in from Shopify.</SheetDescription>
+            </SheetHeader>
+            <div className="mt-6">
+              {addOpen && (
+                <ShipmentForm
+                  settings={settings}
+                  submitting={createShipment.isPending}
+                  submitLabel="Add shipment"
+                  onSubmit={(patch) =>
+                    createShipment.mutate(
+                      { ...patch, order_name: patch.order_name!, order_date: patch.order_date! },
+                      {
+                        onSuccess: () => {
+                          toast({ title: 'Shipment added', description: patch.order_name });
+                          setAddOpen(false);
+                        },
+                        onError: (error: Error) => toast({ title: 'Could not add shipment', description: error.message, variant: 'destructive' }),
+                      }
+                    )
                   }
-                )
-              }
-            />
-          </DialogContent>
-        </Dialog>
+                />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {isAdmin && <ShipmentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} />}
         <ImportTrackerDialog open={importOpen} onOpenChange={setImportOpen} />
