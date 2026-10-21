@@ -33,6 +33,7 @@ import {
   type CourierTracking,
 } from '../_shared/aggregatorTracking.ts';
 import { istNow, shipmentKind } from '../_shared/shipmentRules.ts';
+import { requireCaller } from '../_shared/auth.ts';
 
 const IN_FLIGHT = ['AWAITING_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'];
 const CLOSED_CHECK_DAYS = 60;
@@ -63,7 +64,11 @@ async function eachLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<
   );
 }
 
-serve(async (_req: Request) => {
+serve(async (req: Request) => {
+  // Only pg_cron / DB triggers call this; they send the service role key.
+  const denied = await requireCaller(req, 'service');
+  if (denied) return denied;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');

@@ -3,6 +3,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import * as redis from '../_shared/redis.ts';
+import { requireCaller } from '../_shared/auth.ts';
 import { syncShipments } from './shipments.ts';
 import { syncReturns } from './returns.ts';
 
@@ -126,6 +127,10 @@ serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
+
+    // Staff from the app, or the hourly syncShipments cron (service role key).
+    const denied = await requireCaller(req, 'staff', corsHeaders);
+    if (denied) return denied;
 
     try {
         const body = await req.json();

@@ -27,6 +27,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { escapeHtml, listTable, paragraph, sendResendEmail, wrapEmail } from '../_shared/email.ts';
+import { requireCaller } from '../_shared/auth.ts';
 import {
   DEFAULT_SHIPMENT_SETTINGS,
   DELIVERY_CHECK_LABELS,
@@ -104,6 +105,10 @@ async function sendApologySms(authKey: string, templateId: string, mobile: strin
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // Only pg_cron / DB triggers call this; they send the service role key.
+  const denied = await requireCaller(req, 'service');
+  if (denied) return denied;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');

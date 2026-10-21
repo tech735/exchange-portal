@@ -31,20 +31,6 @@ export default function AuthScreens() {
     }
 
     try {
-      // Emergency Mock Check: allow admin@kotu.com login even if auth isn't seeded yet
-      if (email === 'admin@kotu.com' && password === 'test123') {
-        const adminUser = {
-          id: 'admin-fallback-id',
-          name: 'System Admin (Fallback)',
-          email: 'admin@kotu.com',
-          role: 'ADMIN' as DatabaseUserRole
-        };
-        setUser(adminUser);
-        setOriginalAdminUser(adminUser);
-        navigate('/dashboard');
-        return;
-      }
-
       // 1. Sign in with Supabase Auth
       await signIn(email, password);
 

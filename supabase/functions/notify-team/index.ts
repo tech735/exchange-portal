@@ -13,6 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { keyValueTable, paragraph, sendResendEmail, wrapEmail } from '../_shared/email.ts';
+import { requireCaller } from '../_shared/auth.ts';
 
 interface TicketChangePayload {
   type: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -132,6 +133,10 @@ function withFallback(list: string[], fallback: string[]): string[] {
 }
 
 serve(async (req: Request) => {
+  // Only pg_cron / DB triggers call this; they send the service role key.
+  const denied = await requireCaller(req, 'service');
+  if (denied) return denied;
+
   try {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL');

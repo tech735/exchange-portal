@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserRole } from '@/types/database';
+import { supabase } from '@/integrations/supabase/client';
 
 interface User {
   id: string;
@@ -38,10 +39,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check if we have a persisted user in localStorage
-    const checkPersistedUser = () => {
+    const checkPersistedUser = async () => {
+      // Read before the first await: the persist effects below clear these keys while
+      // user is still null on mount.
+      const persistedUser = localStorage.getItem('user');
+      const persistedOriginalAdmin = localStorage.getItem('originalAdminUser');
+
       try {
-        const persistedUser = localStorage.getItem('user');
-        const persistedOriginalAdmin = localStorage.getItem('originalAdminUser');
+        // Database access needs a real Supabase session (RLS). Drop a cached user that
+        // has none, e.g. an expired session or the removed fallback admin login.
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setIsLoading(false);
+          return;
+        }
 
         if (persistedUser) {
           const parsedUser = JSON.parse(persistedUser);

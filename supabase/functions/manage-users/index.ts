@@ -2,6 +2,7 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { requireCaller } from '../_shared/auth.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,10 @@ serve(async (req: Request) => {
                 persistSession: false
             }
         });
+
+        // Only a signed-in ADMIN may create users, reset passwords, etc.
+        const denied = await requireCaller(req, 'admin', corsHeaders);
+        if (denied) return denied;
 
         const { action, ...params } = await req.json();
 

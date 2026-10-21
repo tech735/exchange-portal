@@ -17,6 +17,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { listTable, sendResendEmail, wrapEmail } from '../_shared/email.ts';
+import { requireCaller } from '../_shared/auth.ts';
 
 const STAGE_LABELS: Record<string, string> = {
   LODGED: 'Lodged',
@@ -41,7 +42,11 @@ function ageDaysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
 }
 
-serve(async (_req: Request) => {
+serve(async (req: Request) => {
+  // Only pg_cron / DB triggers call this; they send the service role key.
+  const denied = await requireCaller(req, 'service');
+  if (denied) return denied;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');

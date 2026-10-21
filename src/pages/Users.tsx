@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,28 +34,9 @@ const roles = [
   { value: 'INVOICING', label: 'Accounts' }
 ];
 
-const PASSWORDS_KEY = 'exchange_flow_user_passwords';
-
-function loadStoredPasswords(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(PASSWORDS_KEY) || '{}'); } catch { return {}; }
-}
-function saveStoredPassword(email: string, password: string) {
-  const passwords = loadStoredPasswords();
-  passwords[email] = password;
-  localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
-}
-
-function PasswordCell({ password }: { password: string }) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="flex items-center gap-1">
-      <span className="font-mono text-xs text-foreground">{visible ? password : '••••••••'}</span>
-      <button type="button" onClick={() => setVisible(v => !v)} className="text-muted-foreground hover:text-foreground ml-1">
-        {visible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-      </button>
-    </div>
-  );
-}
+// Passwords used to be kept here in plain text. They are no longer recorded; wipe any
+// copy left in this browser.
+try { localStorage.removeItem('exchange_flow_user_passwords'); } catch { /* storage unavailable */ }
 
 export default function Users() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -72,17 +53,10 @@ export default function Users() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [storedPasswords, setStoredPasswords] = useState<Record<string, string>>(loadStoredPasswords);
-
-  const updateStoredPassword = useCallback((email: string, password: string) => {
-    saveStoredPassword(email, password);
-    setStoredPasswords(loadStoredPasswords());
-  }, []);
 
   const { user: currentUser } = useAuth();
   const { user: contextUser } = useUser();
-  // The fallback admin login has no Supabase auth user, so fall back to the context id
-  // to keep the "you cannot delete/demote yourself" guard working.
+  // Used by the "you cannot delete/demote yourself" guard.
   const selfId = currentUser?.id ?? contextUser?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -90,11 +64,8 @@ export default function Users() {
   // Fetch users.
   //
   // The list has to come from the `manage-users` Edge Function (service role), not from a
-  // direct `profiles` select: RLS on public.profiles only exposes rows to an admin with a
-  // real Supabase session (policy `profiles_admin_manage`). The fallback admin login
-  // (admin@kotu.com) never creates a session, so a direct select comes back as an empty
-  // array with HTTP 200 — the page looked "empty" instead of "blocked".
-  // The direct select is kept as a fallback for deployments where the function is not up yet.
+  // direct `profiles` select: RLS on public.profiles only exposes every row to an admin
+  // (policy `profiles_select`). The direct select is kept as a fallback for deployments where the function is not up yet.
   const { data: users = [], isLoading, error: fetchError, refetch, isRefetching } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: async () => {
@@ -154,10 +125,9 @@ export default function Users() {
       if (error) throw (error.message ? error : new Error('Failed to invoke function'));
       return data;
     },
-    onSuccess: (_, variables) => {
-      updateStoredPassword(variables.email, variables.password);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setSuccess('User created successfully! They can now log in with their email and password.');
+      setSuccess('User created successfully! Share the password with them now — it is not stored anywhere.');
       setError('');
       setFormData({ email: '', full_name: '', role: 'SUPPORT', password: '' });
       setShowCreateDialog(false);
@@ -183,8 +153,7 @@ export default function Users() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (_, variables) => {
-      if (resetTarget?.email) updateStoredPassword(resetTarget.email, variables.password);
+    onSuccess: () => {
       toast({
         title: "Success",
         description: `Password for ${resetTarget?.email} has been updated.`,
@@ -306,16 +275,6 @@ export default function Users() {
           <span>{value}</span>
         </div>
       )
-    },
-    {
-      key: 'password_display',
-      label: 'Password',
-      render: (_: unknown, row: User) => {
-        const password = storedPasswords[row.email];
-        return password
-          ? <PasswordCell password={password} />
-          : <span className="text-xs text-muted-foreground italic">Not on record</span>;
-      }
     },
     {
       key: 'role',
@@ -508,19 +467,7 @@ export default function Users() {
               <DialogTitle>Reset Password for {resetTarget?.full_name}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleResetPassword} className="space-y-4 pt-4">
-              {resetTarget && storedPasswords[resetTarget.email] && (
-                <div className="bg-muted/40 border rounded-lg px-4 py-3">
-                  <p className="text-xs text-muted-foreground mb-1">Current recorded password</p>
-                  <PasswordCell password={storedPasswords[resetTarget.email]} />
-                </div>
-              )}
-              {resetTarget?.id === 'admin-fallback-id' ? (
-                <div className="bg-amber-50 border border-amber-100 text-amber-700 px-4 py-3 rounded-xl text-sm font-medium">
-                  This user is a temporary "System Fallback" account. You cannot reset its password. 
-                  Please <strong>Create User</strong> to add a real administrative account instead.
-                </div>
-              ) : (
-                <div className="space-y-2">
+              <div className="space-y-2">
                   <Label htmlFor="new-password">New Password</Label>
                   <div className="relative">
                     <Input
@@ -542,14 +489,13 @@ export default function Users() {
                     </button>
                   </div>
                 </div>
-              )}
               <div className="flex justify-end gap-2 pt-6">
                 <Button type="button" variant="outline" onClick={() => setShowResetDialog(false)}>
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={resetPasswordMutation.isPending || resetTarget?.id === 'admin-fallback-id'}
+                  disabled={resetPasswordMutation.isPending}
                   className="bg-primary hover:bg-primary/90"
                 >
                   {resetPasswordMutation.isPending ? 'Updating...' : 'Update Password'}
