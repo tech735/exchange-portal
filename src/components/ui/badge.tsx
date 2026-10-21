@@ -3,40 +3,52 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+const tone = {
+  neutral: "bg-muted text-muted-foreground",
+  info: "bg-info/10 text-info",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  danger: "bg-destructive/10 text-destructive",
+  brand: "bg-accent text-accent-foreground",
+};
+
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium leading-5 transition-colors",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        destructive: "border-transparent bg-destructive text-destructive-foreground",
-        outline: "text-foreground border-border",
-        success: "border-transparent bg-success/15 text-success",
-        warning: "border-transparent bg-warning/15 text-warning",
-        info: "border-transparent bg-info/15 text-info",
-        // Exchange ticket status variants
-        new: "border-transparent bg-info/15 text-info",
-        in_process: "border-transparent bg-warning/15 text-warning",
-        completed: "border-transparent bg-success/15 text-success",
-        denied: "border-transparent bg-destructive/15 text-destructive",
-        escalated: "border-transparent bg-destructive/15 text-destructive",
-        // Payment status
-        paid: "border-transparent bg-success/15 text-success",
-        unpaid: "border-transparent bg-warning/15 text-warning",
-        refunded: "border-transparent bg-warning/15 text-warning",
-        // Stage variants
-        lodged: "border-transparent bg-info/15 text-info",
-        return_pending: "border-transparent bg-warning/15 text-warning",
-        return_received: "border-transparent bg-info/15 text-info",
-        warehouse_approved: "border-transparent bg-success/15 text-success",
-        warehouse_denied: "border-transparent bg-destructive/15 text-destructive",
-        exchange_booked: "border-transparent bg-info/15 text-info",
-        exchange_completed: "border-transparent bg-success/15 text-success",
-        invoicing_pending: "border-transparent bg-warning/15 text-warning",
-        invoiced: "border-transparent bg-success/15 text-success",
-        to_be_refunded: "border-transparent bg-warning/15 text-warning",
-        closed: "border-transparent bg-muted text-muted-foreground",
+        default: "bg-primary text-primary-foreground",
+        secondary: tone.neutral,
+        destructive: tone.danger,
+        outline: "border border-border text-foreground",
+        neutral: tone.neutral,
+        brand: tone.brand,
+        success: tone.success,
+        warning: tone.warning,
+        info: tone.info,
+        danger: tone.danger,
+        // Ticket status
+        new: tone.info,
+        in_process: tone.warning,
+        completed: tone.success,
+        denied: tone.danger,
+        escalated: tone.danger,
+        // Payment
+        paid: tone.success,
+        unpaid: tone.warning,
+        refunded: tone.warning,
+        // Stage
+        lodged: tone.info,
+        return_pending: tone.warning,
+        return_received: tone.info,
+        warehouse_approved: tone.success,
+        warehouse_denied: tone.danger,
+        exchange_booked: tone.info,
+        exchange_completed: tone.success,
+        invoicing_pending: tone.warning,
+        invoiced: tone.success,
+        to_be_refunded: tone.warning,
+        closed: tone.neutral,
       },
     },
     defaultVariants: {
@@ -45,10 +57,18 @@ const badgeVariants = cva(
   },
 );
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {
+  /** Show a leading status dot in the current text colour. */
+  dot?: boolean;
+}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+function Badge({ className, variant, dot, children, ...props }: BadgeProps) {
+  return (
+    <div className={cn(badgeVariants({ variant }), className)} {...props}>
+      {dot && <span aria-hidden className="size-1.5 rounded-full bg-current" />}
+      {children}
+    </div>
+  );
 }
 
 export { Badge, badgeVariants };

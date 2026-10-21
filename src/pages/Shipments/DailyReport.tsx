@@ -1,13 +1,28 @@
-import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertTriangle, CalendarDays } from 'lucide-react';
+import { EmptyState, RowSkeleton } from '@/components/app';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDay, type DailyReportRow } from '@/lib/shipmentTracking';
 import { cn } from '@/lib/utils';
 
-export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
-  if (rows.length === 0) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">No orders in this period.</p>;
-  }
+const onTime = (delivered: number, late: number) =>
+  delivered ? `${Math.round(((delivered - late) / delivered) * 100)}%` : '—';
 
+function Late({ n }: { n: number }) {
+  return n ? <span className="ml-1 text-xs font-medium text-destructive">({n} late)</span> : null;
+}
+
+export function DailyReport({
+  rows,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  rows: DailyReportRow[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
   const totals = rows.reduce(
     (t, r) => ({
       placed: t.placed + r.placed,
@@ -20,46 +35,116 @@ export function DailyReport({ rows }: { rows: DailyReportRow[] }) {
     { placed: 0, pickedUp: 0, pickedUpLate: 0, delivered: 0, deliveredLate: 0, returns: 0 }
   );
 
-  const late = (n: number) => (n ? <span className="text-destructive"> ({n} late)</span> : null);
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-border bg-card">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn't load the report"
+          description="Check your connection and try again."
+          action={<Button variant="secondary" size="sm" onClick={onRetry}>Try again</Button>}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <RowSkeleton rows={7} />
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card">
+        <EmptyState icon={CalendarDays} title="No orders in this period" description="Pick a longer period to see more days." />
+      </div>
+    );
+  }
 
   return (
-    <Card className="border shadow-card overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            <TableHead>Date</TableHead>
-            <TableHead className="text-right">Placed</TableHead>
-            <TableHead className="text-right">Picked up</TableHead>
-            <TableHead className="text-right">Delivered</TableHead>
-            <TableHead className="text-right hidden sm:table-cell">On-time</TableHead>
-            <TableHead className="text-right">Returns</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <>
+      {/* Phone: one card per day */}
+      <div className="md:hidden overflow-hidden rounded-xl border border-border bg-card">
+        <ul className="divide-y divide-border">
           {rows.map((r) => (
-            <TableRow key={r.date}>
-              <TableCell className="whitespace-nowrap font-medium">{formatDay(r.date, 'EEE, dd MMM')}</TableCell>
-              <TableCell className="text-right">{r.placed}</TableCell>
-              <TableCell className="text-right whitespace-nowrap">{r.pickedUp}{late(r.pickedUpLate)}</TableCell>
-              <TableCell className="text-right whitespace-nowrap">{r.delivered}{late(r.deliveredLate)}</TableCell>
-              <TableCell className={cn('text-right hidden sm:table-cell', r.deliveredLate && 'text-warning')}>
-                {r.delivered ? `${Math.round((r.deliveredOnTime / r.delivered) * 100)}%` : '—'}
-              </TableCell>
-              <TableCell className="text-right">{r.returns}</TableCell>
-            </TableRow>
+            <li key={r.date} className="px-4 py-3">
+              <p className="text-sm font-medium text-foreground">{formatDay(r.date, 'EEE, dd MMM')}</p>
+              <dl className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                <Stat label="Placed" value={r.placed} />
+                <Stat label="Picked up" value={r.pickedUp} late={r.pickedUpLate} />
+                <Stat label="Delivered" value={r.delivered} late={r.deliveredLate} />
+                <Stat label="Returns" value={r.returns} />
+              </dl>
+            </li>
           ))}
-          <TableRow className="bg-muted/30 font-semibold">
-            <TableCell>Total</TableCell>
-            <TableCell className="text-right">{totals.placed}</TableCell>
-            <TableCell className="text-right whitespace-nowrap">{totals.pickedUp}{late(totals.pickedUpLate)}</TableCell>
-            <TableCell className="text-right whitespace-nowrap">{totals.delivered}{late(totals.deliveredLate)}</TableCell>
-            <TableCell className="text-right hidden sm:table-cell">
-              {totals.delivered ? `${Math.round(((totals.delivered - totals.deliveredLate) / totals.delivered) * 100)}%` : '—'}
-            </TableCell>
-            <TableCell className="text-right">{totals.returns}</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </Card>
+        </ul>
+        <div className="border-t border-border bg-muted/50 px-4 py-3">
+          <p className="text-sm font-semibold text-foreground">
+            Total · {onTime(totals.delivered, totals.deliveredLate)} on time
+          </p>
+          <dl className="mt-2 grid grid-cols-4 gap-2 text-xs">
+            <Stat label="Placed" value={totals.placed} />
+            <Stat label="Picked up" value={totals.pickedUp} late={totals.pickedUpLate} />
+            <Stat label="Delivered" value={totals.delivered} late={totals.deliveredLate} />
+            <Stat label="Returns" value={totals.returns} />
+          </dl>
+        </div>
+      </div>
+
+      {/* md+: table */}
+      <div className="hidden md:block overflow-hidden rounded-xl border border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Placed</TableHead>
+              <TableHead className="text-right">Picked up</TableHead>
+              <TableHead className="text-right">Delivered</TableHead>
+              <TableHead className="text-right">On time</TableHead>
+              <TableHead className="text-right">Returns</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.date}>
+                <TableCell className="whitespace-nowrap font-medium text-foreground">{formatDay(r.date, 'EEE, dd MMM')}</TableCell>
+                <TableCell className="text-right tabular">{r.placed}</TableCell>
+                <TableCell className="whitespace-nowrap text-right tabular">{r.pickedUp}<Late n={r.pickedUpLate} /></TableCell>
+                <TableCell className="whitespace-nowrap text-right tabular">{r.delivered}<Late n={r.deliveredLate} /></TableCell>
+                <TableCell className={cn('text-right tabular', r.deliveredLate ? 'text-warning' : 'text-muted-foreground')}>
+                  {onTime(r.delivered, r.deliveredLate)}
+                </TableCell>
+                <TableCell className="text-right tabular">{r.returns}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow className="hover:bg-transparent">
+              <TableCell className="font-semibold">Total</TableCell>
+              <TableCell className="text-right font-semibold tabular">{totals.placed}</TableCell>
+              <TableCell className="whitespace-nowrap text-right font-semibold tabular">{totals.pickedUp}<Late n={totals.pickedUpLate} /></TableCell>
+              <TableCell className="whitespace-nowrap text-right font-semibold tabular">{totals.delivered}<Late n={totals.deliveredLate} /></TableCell>
+              <TableCell className="text-right font-semibold tabular">{onTime(totals.delivered, totals.deliveredLate)}</TableCell>
+              <TableCell className="text-right font-semibold tabular">{totals.returns}</TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+    </>
+  );
+}
+
+function Stat({ label, value, late }: { label: string; value: number; late?: number }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 font-medium text-foreground tabular">
+        {value}
+        {late ? <span className="ml-1 text-destructive">({late})</span> : null}
+      </dd>
+    </div>
   );
 }

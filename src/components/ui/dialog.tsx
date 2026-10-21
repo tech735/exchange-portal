@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-foreground/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -37,7 +37,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         // Base — all sizes
-        "fixed z-50 grid bg-background shadow-xl duration-300",
+        "fixed z-50 grid bg-card shadow-overlay duration-200",
         "gap-4 max-h-[78vh] overflow-y-auto",
         "rounded-t-3xl border-t px-6 pb-8 pt-8",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -46,7 +46,7 @@ const DialogContent = React.forwardRef<
         // Desktop modal (sm:) — before className so user's sm: classes can override
         "sm:w-auto sm:bottom-auto sm:right-auto sm:left-[50%] sm:top-[50%]",
         "sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%]",
-        "sm:rounded-2xl sm:border sm:p-6 sm:shadow-lg",
+        "sm:rounded-xl sm:border sm:p-6",
         "sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95",
         "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
         "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
@@ -60,7 +60,7 @@ const DialogContent = React.forwardRef<
       {/* Drag handle — mobile only */}
       <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-muted-foreground/25" />
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1.5 opacity-60 bg-muted transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -85,7 +85,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    className={cn("font-heading text-lg font-semibold leading-snug tracking-tight", className)}
     {...props}
   />
 ));

@@ -105,6 +105,15 @@ export interface Ticket {
   amount_collected: number;
   closed_at: string | null;
   updated_at: string;
+
+  // Revamp phase 1 (all optional in the DB)
+  request_source: 'EMAIL' | 'WHATSAPP' | 'CALL' | 'HELPDESK' | 'OTHER' | null;
+  request_ref: string | null;
+  request_received_at: string | null;
+  assigned_to: string | null;
+  delivery_charge: number | null;
+  qc_checklist: Record<string, boolean> | null;
+  qc_photos: string[];
 }
 
 export interface TicketEvent {
@@ -208,8 +217,42 @@ export interface SpecialCase {
   status: SpecialCaseStatus;
   resolved_on: string | null; // yyyy-MM-dd
   updated_by: string | null;
+  owner_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CaseUpdate {
+  id: string;
+  case_id: string;
+  body: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface ExchangePolicySettings {
+  window_days: number;
+  max_per_order: number;
+  block_final_sale: boolean;
+  final_sale_tag: string;
+  allow_different_product: boolean;
+}
+
+export interface FeeSettings {
+  delivery_charge: number;
+  free_reasons: ReasonCode[];
+  payment_provider: string;
+}
+
+export interface QcChecklistSettings {
+  items: string[];
+}
+
+export interface AppSettings {
+  exchange_policy: ExchangePolicySettings;
+  fees: FeeSettings;
+  qc_checklist: QcChecklistSettings;
 }
 
 export const SPECIAL_CASE_TYPE_LABELS: Record<SpecialCaseType, string> = {
@@ -247,11 +290,11 @@ export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = 
 };
 
 export const REASON_LABELS: Record<ReasonCode, string> = {
-  WRONG_SIZE: 'Wrong Size',
-  DEFECTIVE: 'Defective Product',
-  WRONG_ITEM: 'Wrong Item Received',
-  CHANGED_MIND: 'Changed Mind',
-  QUALITY_ISSUE: 'Quality Issue',
+  WRONG_SIZE: 'Wrong size',
+  DEFECTIVE: 'Defective',
+  WRONG_ITEM: 'Wrong item received',
+  CHANGED_MIND: 'Changed mind',
+  QUALITY_ISSUE: 'Quality issue',
   OTHER: 'Other',
 };
 

@@ -1,143 +1,117 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * KOTU brand tokens (Brand Guidelines v2.0, Jan 2025)
+ *   Indigo Blue #02019B (primary) · Azure #6EC5FF · Sky #C7E9FF
+ *   Light grey #E9E9E9 · Dark grey #2D2D2D
+ *   Type: Poppins (headings) · Inter (UI text and numbers)
+ * Values are HSL channels so Tailwind can apply opacity (bg-primary/10).
+ */
 @layer base {
   :root {
-    /* Clean professional SaaS palette — HSL format matching Asset Tracker */
-    --background: 210 20% 98%;
-    --foreground: 222 47% 12%;
+    --background: 240 23% 97%;          /* canvas #F7F7FA */
+    --foreground: 240 16% 14%;          /* ink #1F1F2B */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
+    --card-foreground: 240 16% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 16% 14%;
 
-    /* Calm blue primary */
-    --primary: 215 60% 32%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 240 97% 31%;             /* indigo #02019B */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 240 97% 25%;
 
-    /* Soft gray secondary */
-    --secondary: 214 32% 91%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 240 23% 95%;
+    --secondary-foreground: 240 16% 14%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 240 23% 95%;               /* #EFEFF5 */
+    --muted-foreground: 240 7% 40%;     /* #5F5F6E */
+    --faint-foreground: 240 6% 61%;     /* #9696A3 */
 
-    --accent: 214 80% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 240 67% 96%;              /* indigo tint #EDEDFB */
+    --accent-foreground: 240 97% 31%;
 
-    /* Status colors */
-    --destructive: 0 84% 60%;
+    --destructive: 0 66% 47%;           /* #C62828 */
     --destructive-foreground: 0 0% 100%;
-
-    --success: 142 76% 36%;
+    --success: 142 72% 29%;             /* #15803D */
     --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
+    --warning: 26 90% 37%;              /* #B45309 */
     --warning-foreground: 0 0% 100%;
-
-    --info: 199 89% 48%;
+    --info: 205 88% 37%;                /* #0B6BB0 */
     --info-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 222 47% 20%;
+    --brand-azure: 204 100% 72%;        /* #6EC5FF */
+    --brand-sky: 204 100% 89%;          /* #C7E9FF */
 
-    --radius: 0.75rem;
+    --border: 0 0% 91%;                 /* #E9E9E9 */
+    --input: 240 10% 84%;               /* #D3D3DC */
+    --ring: 240 97% 31%;
 
-    /* Chart series — primary/secondary driven */
-    --chart-1: 215 60% 32%;
-    --chart-2: 215 16% 72%;
-    --chart-3: 199 89% 48%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 142 76% 36%;
+    --radius: 0.625rem;
 
-    /* Spacing scale */
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-5: 1.5rem;
-    --space-6: 2rem;
-    --space-7: 2.5rem;
-    --space-8: 3rem;
+    --chart-1: 240 97% 31%;
+    --chart-2: 204 100% 72%;
+    --chart-3: 240 30% 70%;
+    --chart-4: 26 90% 45%;
+    --chart-5: 142 60% 38%;
 
-    /* Custom tokens */
-    --sla-breach: 0 84% 60%;
-    --stage-lodged: 199 89% 48%;
-    --stage-warehouse: 38 92% 50%;
-    --stage-invoicing: 263 70% 50%;
-    --stage-completed: 142 76% 36%;
-    --stage-denied: 0 84% 60%;
+    --sla-breach: 0 66% 47%;
+    --stage-lodged: 205 88% 37%;
+    --stage-warehouse: 26 90% 37%;
+    --stage-invoicing: 263 60% 45%;
+    --stage-completed: 142 72% 29%;
+    --stage-denied: 0 66% 47%;
 
-    /* Modern sidebar colors — white rail, matching Asset Tracker */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 15%;
-    --sidebar-primary: 215 60% 45%;
+    --sidebar-foreground: 240 16% 14%;
+    --sidebar-primary: 240 97% 31%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 96%;
-    --sidebar-accent-foreground: 222 47% 15%;
-    --sidebar-border: 214 20% 90%;
-    --sidebar-muted: 215 15% 45%;
-    --sidebar-ring: 215 60% 45%;
+    --sidebar-accent: 240 67% 96%;
+    --sidebar-accent-foreground: 240 97% 31%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-muted: 240 7% 40%;
+    --sidebar-ring: 240 97% 31%;
 
-    /* Card styling */
-    --card-shadow: 0 12px 30px -24px hsl(215 40% 20% / 0.6);
-    --card-shadow-soft: 0 8px 20px -16px hsl(215 40% 20% / 0.5);
+    --card-shadow: 0 1px 2px 0 hsl(240 30% 20% / 0.04);
+    --card-shadow-soft: 0 1px 2px 0 hsl(240 30% 20% / 0.04);
+    --overlay-shadow: 0 24px 48px -12px hsl(240 40% 12% / 0.22);
+
+    /* Motion: short and calm, "confident, not loud" */
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --dur-fast: 120ms;
+    --dur-base: 180ms;
   }
 
   .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
-
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 199 89% 60%;
-    --primary-foreground: 222 47% 11%;
-
-    --secondary: 222 47% 18%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 222 47% 18%;
-    --muted-foreground: 215 20% 65%;
-
-    --accent: 222 47% 18%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-
-    --success: 142 76% 30%;
-    --success-foreground: 0 0% 100%;
-
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
-    --ring: 199 89% 60%;
-
-    /* Chart series — primary/secondary driven */
-    --chart-1: 199 89% 60%;
-    --chart-2: 215 20% 45%;
-    --chart-3: 199 89% 48%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 142 76% 40%;
-
-    /* Dark mode sidebar colors */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 60%;
-    --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 222 47% 18%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 20%;
-    --sidebar-ring: 199 89% 60%;
+    --background: 240 20% 8%;
+    --foreground: 240 10% 96%;
+    --card: 240 18% 11%;
+    --card-foreground: 240 10% 96%;
+    --popover: 240 18% 11%;
+    --popover-foreground: 240 10% 96%;
+    --primary: 230 100% 72%;
+    --primary-foreground: 240 30% 10%;
+    --primary-hover: 230 100% 78%;
+    --secondary: 240 14% 17%;
+    --secondary-foreground: 240 10% 96%;
+    --muted: 240 14% 17%;
+    --muted-foreground: 240 8% 66%;
+    --faint-foreground: 240 6% 50%;
+    --accent: 240 30% 20%;
+    --accent-foreground: 230 100% 80%;
+    --destructive: 0 70% 58%;
+    --border: 240 12% 20%;
+    --input: 240 12% 26%;
+    --ring: 230 100% 72%;
+    --sidebar-background: 240 18% 11%;
+    --sidebar-foreground: 240 10% 96%;
+    --sidebar-accent: 240 30% 20%;
+    --sidebar-accent-foreground: 230 100% 80%;
+    --sidebar-border: 240 12% 20%;
   }
 }
 
@@ -146,100 +120,79 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'DM Sans', system-ui, sans-serif;
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-heading tracking-tight;
+  }
+
+  /* Numbers line up in tables and KPI tiles */
+  .tabular, td, th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .status-new {
-    @apply bg-blue-100 text-blue-800;
-  }
-
-  .status-in-process {
-    @apply bg-amber-100 text-amber-800;
-  }
-
-  .status-completed {
-    @apply bg-green-100 text-green-800;
-  }
-
-  .status-denied {
-    @apply bg-red-100 text-red-800;
-  }
-
-  .status-escalated {
-    @apply bg-red-100 text-red-800 ring-2 ring-red-300;
-  }
-
-  .sla-breach-badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-600 text-white animate-pulse;
-  }
-
-  .kpi-card {
-    @apply bg-card rounded-xl border border-transparent p-6 shadow-sm transition-all duration-200 hover:shadow-md;
-    box-shadow: var(--card-shadow-soft);
-  }
-
-  .kpi-card-primary {
-    @apply text-white border-transparent;
-    background: linear-gradient(135deg, hsl(215 60% 40%), hsl(210 80% 48%));
-    box-shadow: var(--card-shadow);
-  }
-
-  .sidebar-nav-item {
-    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150;
-  }
-
-  .sidebar-nav-item-active {
-    @apply bg-sidebar-accent text-sidebar-primary font-medium;
-  }
-
-  .sidebar-nav-item-collapsed {
-    @apply flex items-center justify-center w-11 h-11 mx-auto rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors duration-150;
-  }
-
-  .app-sidebar {
-    @apply bg-sidebar text-sidebar-foreground border-r border-sidebar-border;
-    box-shadow: 1px 0 8px -4px rgb(0 0 0 / 0.06);
-  }
-
-  .app-shell {
-    @apply h-screen bg-background flex overflow-hidden;
-  }
-
-  .app-header {
-    @apply flex items-center justify-between gap-6 px-6 py-3.5 lg:px-8 border-b border-border/70 bg-background/95 backdrop-blur-sm;
-  }
-
-  .app-content {
-    @apply flex-1 px-6 pt-4 pb-28 lg:px-10 lg:pt-8 lg:pb-8;
-  }
-
-  .page-shell {
-    @apply flex flex-col gap-8;
+  /* Surfaces */
+  .surface {
+    @apply bg-card rounded-xl border border-border;
   }
 
   .card-base {
-    @apply bg-card rounded-2xl p-6;
-    box-shadow: var(--card-shadow-soft);
+    @apply bg-card rounded-xl border border-border p-5;
+  }
+
+  .kpi-card {
+    @apply bg-card rounded-xl border border-border p-5 transition-colors duration-150 hover:border-input;
+  }
+
+  .kpi-card-primary {
+    @apply bg-primary text-primary-foreground border-transparent;
+  }
+
+  /* Legacy status classes (kept so older screens still render) */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .status-new { @apply bg-info/10 text-info; }
+  .status-in-process { @apply bg-warning/10 text-warning; }
+  .status-completed { @apply bg-success/10 text-success; }
+  .status-denied { @apply bg-destructive/10 text-destructive; }
+  .status-escalated { @apply bg-destructive/10 text-destructive; }
+
+  .sla-breach-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive;
+  }
+
+  .page-shell {
+    @apply flex flex-col gap-6;
   }
 
   .card-grid {
-    @apply grid gap-6;
+    @apply grid gap-4;
   }
 
   .data-table-row {
-    @apply border-b border-border hover:bg-muted/50 transition-colors cursor-pointer;
+    @apply border-b border-border hover:bg-muted/60 transition-colors cursor-pointer;
   }
 
   .stage-indicator {
@@ -253,6 +206,11 @@
   .timeline-line {
     @apply absolute left-0 top-3 w-0.5 h-full -translate-x-1/2;
   }
+
+  /* Keyboard hint chip, e.g. ⌘K */
+  .kbd {
+    @apply inline-flex items-center rounded border border-border bg-card px-1.5 text-[11px] font-medium text-muted-foreground leading-5;
+  }
 }
 
 @layer utilities {
@@ -260,44 +218,34 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-
   .scrollbar-thin {
     scrollbar-width: thin;
   }
-
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-
   .scrollbar-thin::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
-
   .scrollbar-thin::-webkit-scrollbar-thumb {
     @apply bg-border rounded-full;
   }
 
-  .gradient-border {
-    @apply relative;
+  .text-faint {
+    color: hsl(var(--faint-foreground));
   }
 
-  .gradient-border::before {
-    content: '';
-    @apply absolute inset-0 rounded-lg p-[1px];
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--info)));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+  /* Bottom padding so content clears the mobile tab bar + iOS home indicator */
+  .pb-safe-tabbar {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }
 
-/* Custom bar loader */
+/* Bar loader used by PageLoader */
 .loader {
   width: 120px;
   height: 22px;

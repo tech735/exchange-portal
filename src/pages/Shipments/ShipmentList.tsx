@@ -1,30 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  BellRing,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  Download,
-  PackageCheck,
-  PackageSearch,
-  PackageX,
-  RotateCcw,
-  Search,
-  Truck,
-} from 'lucide-react';
-import { KPICard } from '@/pages/Dashboard/KPICard';
+import { AlertTriangle, CheckCircle2, ChevronRight, Download, ExternalLink, Phone, Truck } from 'lucide-react';
+import { EmptyState, FilterChip, RowSkeleton, SearchField, ToneBadge } from '@/components/app';
+import type { Tone } from '@/lib/exchangeStatus';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import {
   DELIVERY_CHECK_LABELS,
+  SHIPMENT_KIND_LABELS,
   dailyReport,
-  dailySummary,
   formatDay,
   raisedOn,
   shipmentKind,
@@ -35,19 +22,27 @@ import {
   type TrackedShipment,
 } from '@/lib/shipmentTracking';
 import { exportShipmentsToExcel } from '@/utils/exportUtils';
-import {
-  DELIVERY_ZONE_LABELS,
-  NOTIFICATION_CHANNEL_LABELS,
-  type DeliveryZone,
-  type ShipmentStatus,
-} from '@/types/database';
+import { DELIVERY_ZONE_LABELS, type DeliveryZone, type ShipmentStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { DeliveryCheckBadge } from './DeliveryCheckBadge';
+import { LookbackSelect } from './LookbackSelect';
+import { CHECK_META, DEFAULT_LOOKBACK_DAYS, LOOKBACK_LABELS } from './constants';
 
 type CheckFilter = 'all' | 'needs_action' | 'open' | 'delivered' | DeliveryCheck;
 type KindFilter = 'all' | Exclude<ShipmentKind, 'FORWARD'>;
 
+const DEFAULT_CHECK: CheckFilter = 'open';
 const OPEN_CHECKS: DeliveryCheck[] = ['ESCALATED', 'DELAYED_NOTIFY', 'PICKUP_DELAYED', 'DELAYED_NOTIFIED', 'AWAITING_PICKUP', 'ON_TRACK'];
+
+const CHECK_FILTER_LABELS: Record<'all' | 'needs_action' | 'open' | 'delivered', string> = {
+  open: 'Open shipments',
+  needs_action: 'Needs action',
+  delivered: 'Delivered',
+  all: 'All shipments',
+};
+
+const checkFilterLabel = (f: CheckFilter) =>
+  f in CHECK_FILTER_LABELS ? CHECK_FILTER_LABELS[f as keyof typeof CHECK_FILTER_LABELS] : CHECK_META[f as DeliveryCheck].short;
 
 function matchesCheck(s: TrackedShipment, filter: CheckFilter) {
   if (filter === 'all') return true;
@@ -57,44 +52,47 @@ function matchesCheck(s: TrackedShipment, filter: CheckFilter) {
   return s.check === filter;
 }
 
+const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+
 function AwbLink({ shipment }: { shipment: TrackedShipment }) {
-  if (!shipment.awb_number) return <span className="text-muted-foreground">—</span>;
-  if (!shipment.tracking_url) return <span>{shipment.awb_number}</span>;
+  if (!shipment.awb_number) return <span className="text-faint">No AWB yet</span>;
+  if (!shipment.tracking_url) return <span className="tabular">{shipment.awb_number}</span>;
   return (
     <a
       href={shipment.tracking_url}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className="text-primary hover:underline"
+      className="inline-flex items-center gap-1 tabular text-primary hover:underline"
     >
       {shipment.awb_number}
+      <ExternalLink className="size-3" aria-hidden />
     </a>
   );
 }
 
-
-
 // Quick status change from the row itself, for when the courier's tracking
-// hasn't caught up. Clicks are stopped by the parent cell so the row doesn't
-// open the edit panel.
+// hasn't caught up. Clicks are stopped by the parent so the row doesn't open
+// the edit panel.
 function StatusSelect({
   shipment,
   onChange,
   disabled,
+  className,
 }: {
   shipment: TrackedShipment;
   onChange: (status: ShipmentStatus) => void;
   disabled: boolean;
+  className?: string;
 }) {
   return (
     <Select value={shipment.status} onValueChange={(v) => onChange(v as ShipmentStatus)} disabled={disabled}>
-      <SelectTrigger className="h-8 w-[150px] text-xs" aria-label={`Status of ${shipment.shipment_ref}`}>
+      <SelectTrigger className={cn('h-8 w-[148px] text-[13px]', className)} aria-label={`Status of ${shipment.shipment_ref}`}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {statusOptions(shipment.shipment_ref).map(([value, label]) => (
-          <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
+          <SelectItem key={value} value={value} className="text-[13px]">{label}</SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -102,36 +100,117 @@ function StatusSelect({
 }
 
 const delayLabel = (s: TrackedShipment) =>
-  s.daysDelayed === null ? '—' : s.daysDelayed === 0 ? 'today' : String(s.daysDelayed);
+  s.daysDelayed === null ? '—' : s.daysDelayed === 0 ? 'today' : `${s.daysDelayed}d`;
+
+function PickupCell({ s }: { s: TrackedShipment }) {
+  if (s.pickup_date) {
+    return <span className={cn(s.pickedUpLate && 'text-warning')}>{formatDay(s.pickup_date)}</span>;
+  }
+  return <span className="text-muted-foreground">due {formatDay(s.pickupDue)}</span>;
+}
+
+function KindTag({ s }: { s: TrackedShipment }) {
+  const kind = shipmentKind(s.shipment_ref);
+  if (kind === 'FORWARD') return null;
+  return (
+    <ToneBadge tone={kind === 'RETURN' ? 'brand' : 'info'} dot={false} className="px-1.5 py-0 text-[11px]">
+      {SHIPMENT_KIND_LABELS[kind]}
+    </ToneBadge>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stat pill — compact, clickable filter for one delivery check        */
+/* ------------------------------------------------------------------ */
+
+function StatPill({
+  label,
+  value,
+  tone,
+  active,
+  onClick,
+  loading,
+}: {
+  label: string;
+  value: number;
+  tone: Tone;
+  active: boolean;
+  onClick: () => void;
+  loading: boolean;
+}) {
+  const toned = value > 0 && tone !== 'neutral';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'min-w-[108px] shrink-0 rounded-xl border bg-card px-3.5 py-2.5 text-left transition-[border-color,background-color,box-shadow] duration-150 ease-out-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-w-0',
+        active
+          ? tone === 'danger'
+            ? 'border-destructive/60 bg-destructive/[0.06] ring-[3px] ring-destructive/10'
+            : 'border-primary ring-[3px] ring-primary/10'
+          : 'border-border hover:border-input hover:shadow-card-hover',
+      )}
+    >
+      {loading ? (
+        <span className="block h-6 w-8 rounded bg-muted animate-pulse" />
+      ) : (
+        <span
+          className={cn(
+            'block font-heading text-lg font-semibold leading-6 tabular',
+            toned && tone === 'danger' && 'text-destructive',
+            toned && tone === 'warning' && 'text-warning',
+            toned && tone === 'success' && 'text-success',
+            !toned && 'text-foreground',
+          )}
+        >
+          {value}
+        </span>
+      )}
+      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{label}</span>
+    </button>
+  );
+}
 
 /**
- * Summary, KPIs, filters and the table for one group of shipments: forward
- * orders on the Tracker tab, exchanges and returns (`reverse`) on theirs.
- * Same rules and actions for both; the reverse view adds a kind tag and
- * filter and dates rows by the day they were raised.
+ * Action banner, check pills, filters and the table for one group of
+ * shipments: forward orders on the Forward tab, exchanges and returns
+ * (`reverse`) on theirs. Same rules and actions for both; the reverse view
+ * adds a kind tag and filter and dates rows by the day they were raised.
  */
 export function ShipmentList({
   variant,
   shipments,
   isLoading,
+  isError,
+  onRetry,
   today,
   reportSince,
+  lookbackDays,
+  onLookbackChange,
   busy,
   onOpen,
   onChangeStatus,
   onMarkNotified,
+  onMarkAllNotified,
   onMarkDelivered,
   onMarkRto,
 }: {
   variant: 'forward' | 'reverse';
   shipments: TrackedShipment[];
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   today: string;
   reportSince: string | null;
+  lookbackDays: number | null;
+  onLookbackChange: (days: number | null) => void;
   busy: boolean;
   onOpen: (id: string) => void;
   onChangeStatus: (s: TrackedShipment, status: ShipmentStatus) => void;
   onMarkNotified: (s: TrackedShipment) => void;
+  onMarkAllNotified: (rows: TrackedShipment[]) => Promise<void>;
   onMarkDelivered: (s: TrackedShipment) => void;
   onMarkRto: (s: TrackedShipment) => void;
 }) {
@@ -139,15 +218,18 @@ export function ShipmentList({
   const reverse = variant === 'reverse';
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [checkFilter, setCheckFilter] = useState<CheckFilter>('open');
+  const [checkFilter, setCheckFilter] = useState<CheckFilter>(DEFAULT_CHECK);
   const [zoneFilter, setZoneFilter] = useState<'all' | DeliveryZone>('all');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [exporting, setExporting] = useState(false);
+  const [confirmNotifyOpen, setConfirmNotifyOpen] = useState(false);
+  const [notifyingAll, setNotifyingAll] = useState(false);
 
   const stats = useMemo(() => summarizeShipments(shipments, today), [shipments, today]);
-  const summary = dailySummary(stats, today);
+  const toNotify = useMemo(() => shipments.filter((s) => s.check === 'DELAYED_NOTIFY'), [shipments]);
+  const delayed = stats.delayedNotify + stats.delayedNotified + stats.escalated;
 
   const filtered = shipments.filter((s) => {
     const q = searchQuery.trim().toLowerCase();
@@ -177,306 +259,400 @@ export function ShipmentList({
     }
   };
 
-  const kpis: { title: string; value: number; icon: typeof Truck; color: string; filter: CheckFilter }[] = [
-    { title: 'Escalated – RTO Review', value: stats.escalated, icon: RotateCcw, color: 'text-destructive', filter: 'ESCALATED' },
-    { title: 'Delayed – Notify Now', value: stats.delayedNotify, icon: BellRing, color: 'text-destructive', filter: 'DELAYED_NOTIFY' },
-    { title: 'Pickup Delayed', value: stats.pickupDelayed, icon: AlertTriangle, color: 'text-destructive', filter: 'PICKUP_DELAYED' },
-    { title: 'Delayed – Notified', value: stats.delayedNotified, icon: Clock, color: 'text-warning', filter: 'DELAYED_NOTIFIED' },
-    { title: 'Awaiting Pickup', value: stats.awaitingPickup, icon: PackageSearch, color: 'text-muted-foreground', filter: 'AWAITING_PICKUP' },
-    { title: 'On Track', value: stats.onTrack, icon: Truck, color: 'text-info', filter: 'ON_TRACK' },
-    { title: 'Delivered On Time', value: stats.deliveredOnTime, icon: PackageCheck, color: 'text-success', filter: 'DELIVERED_ON_TIME' },
-    { title: 'Delivered Late', value: stats.deliveredLate, icon: PackageX, color: 'text-warning', filter: 'DELIVERED_LATE' },
+  const handleMarkAllNotified = async () => {
+    setNotifyingAll(true);
+    try {
+      await onMarkAllNotified(toNotify);
+      setConfirmNotifyOpen(false);
+    } finally {
+      setNotifyingAll(false);
+    }
+  };
+
+  const pills: { label: string; value: number; check: DeliveryCheck }[] = [
+    { label: 'RTO review', value: stats.escalated, check: 'ESCALATED' },
+    { label: 'Notify now', value: stats.delayedNotify, check: 'DELAYED_NOTIFY' },
+    { label: 'Pickup late', value: stats.pickupDelayed, check: 'PICKUP_DELAYED' },
+    { label: 'Notified', value: stats.delayedNotified, check: 'DELAYED_NOTIFIED' },
+    { label: 'Awaiting pickup', value: stats.awaitingPickup, check: 'AWAITING_PICKUP' },
+    { label: 'On track', value: stats.onTrack, check: 'ON_TRACK' },
+    { label: 'On time', value: stats.deliveredOnTime, check: 'DELIVERED_ON_TIME' },
+    { label: 'Delivered late', value: stats.deliveredLate, check: 'DELIVERED_LATE' },
   ];
+  // Pill tones follow the wireframe: only the late buckets carry colour.
+  const pillTone = (check: DeliveryCheck): Tone =>
+    check === 'DELAYED_NOTIFIED' || check === 'ON_TRACK' ? 'neutral' : CHECK_META[check].tone;
 
   const secondaryStats: [string, string][] = [
-    [reverse ? 'Total shipments' : 'Total orders', String(stats.total)],
-    [reverse ? 'Raised today' : "Today's orders", String(stats.todaysOrders)],
+    [reverse ? 'Total' : 'Total orders', String(stats.total)],
+    [reverse ? 'Raised today' : 'Today', String(stats.todaysOrders)],
     ['Out for delivery', String(stats.outForDelivery)],
     ['On-time', stats.onTimePercent === null ? '—' : `${stats.onTimePercent}%`],
-    ['Avg days · NCR', stats.avgDaysNcr === null ? '—' : stats.avgDaysNcr.toFixed(1)],
-    ['Avg days · Outside NCR', stats.avgDaysOutside === null ? '—' : stats.avgDaysOutside.toFixed(1)],
+    ['Avg days NCR', stats.avgDaysNcr === null ? '—' : stats.avgDaysNcr.toFixed(1)],
+    ['Avg days outside', stats.avgDaysOutside === null ? '—' : stats.avgDaysOutside.toFixed(1)],
   ];
 
   const rowAction = (s: TrackedShipment) => {
-    if (s.check === 'ESCALATED') return { label: 'Mark RTO', onClick: () => onMarkRto(s) };
-    if (s.check === 'DELAYED_NOTIFY') return { label: 'Mark notified', onClick: () => onMarkNotified(s) };
-    if (s.check === 'ON_TRACK' || s.check === 'DELAYED_NOTIFIED') return { label: 'Mark delivered', onClick: () => onMarkDelivered(s) };
+    if (s.check === 'ESCALATED') return { label: 'Mark RTO', urgent: true, onClick: () => onMarkRto(s) };
+    if (s.check === 'DELAYED_NOTIFY') return { label: 'Mark notified', urgent: true, onClick: () => onMarkNotified(s) };
+    if (s.check === 'ON_TRACK' || s.check === 'DELAYED_NOTIFIED') return { label: 'Mark delivered', urgent: false, onClick: () => onMarkDelivered(s) };
     return null;
   };
 
-  const emptyMessage =
-    shipments.length === 0
-      ? reverse
-        ? 'No exchanges or returns yet. They come in with the Shopify sync (F2 onwards and returns).'
-        : 'No shipments yet. Sync from Shopify or import the old tracker sheet.'
-      : 'No shipments match these filters.';
+  const activeChips: { key: string; label: string; clear: () => void }[] = [
+    searchQuery.trim() && { key: 'q', label: `“${searchQuery.trim()}”`, clear: () => setSearchQuery('') },
+    reverse && kindFilter !== 'all' && { key: 'kind', label: `Type: ${SHIPMENT_KIND_LABELS[kindFilter]}`, clear: () => setKindFilter('all') },
+    checkFilter !== DEFAULT_CHECK && { key: 'check', label: `Check: ${checkFilterLabel(checkFilter)}`, clear: () => setCheckFilter(DEFAULT_CHECK) },
+    zoneFilter !== 'all' && { key: 'zone', label: `Zone: ${DELIVERY_ZONE_LABELS[zoneFilter]}`, clear: () => setZoneFilter('all') },
+    lookbackDays !== DEFAULT_LOOKBACK_DAYS && {
+      key: 'lookback',
+      label: LOOKBACK_LABELS[lookbackDays === null ? 'all' : String(lookbackDays)] ?? `Last ${lookbackDays} days`,
+      clear: () => onLookbackChange(DEFAULT_LOOKBACK_DAYS),
+    },
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
-  return (
-    <div className="space-y-4">
-      {/* Daily summary — the two status lines from the sheet */}
-      <Card className="border shadow-card px-4 py-3 space-y-1.5">
-        {summary.map((line) => (
-          <div key={line.text} className={cn('flex items-center gap-2 text-sm', line.ok ? 'text-success' : 'text-destructive font-medium')}>
-            {line.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
-            <span>{line.text}</span>
-          </div>
-        ))}
-      </Card>
+  const clearAll = () => {
+    setSearchQuery('');
+    setKindFilter('all');
+    setCheckFilter(DEFAULT_CHECK);
+    setZoneFilter('all');
+    if (lookbackDays !== DEFAULT_LOOKBACK_DAYS) onLookbackChange(DEFAULT_LOOKBACK_DAYS);
+  };
 
-      {/* KPIs — click to filter the table */}
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {kpis.map((kpi) => (
-            <button
-              key={kpi.title}
-              type="button"
-              onClick={() => setCheckFilter((current) => (current === kpi.filter ? 'open' : kpi.filter))}
-              className={cn('text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', checkFilter === kpi.filter && 'ring-2 ring-primary')}
-              aria-pressed={checkFilter === kpi.filter}
-            >
-              <KPICard title={kpi.title} value={kpi.value} icon={kpi.icon} color={kpi.color} />
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 px-1 text-sm">
-          {secondaryStats.map(([label, value]) => (
-            <span key={label} className="text-muted-foreground">
-              {label}: <span className="font-medium text-foreground">{value}</span>
-            </span>
-          ))}
+  const noData = shipments.length === 0;
+  const emptyState = noData ? (
+    <EmptyState
+      icon={Truck}
+      title={reverse ? 'No exchanges or returns yet' : 'No shipments yet'}
+      description={
+        reverse
+          ? 'They come in with the Shopify sync (F2 onwards and returns).'
+          : 'Sync from Shopify or import the old tracker sheet.'
+      }
+    />
+  ) : (
+    <EmptyState
+      icon={Truck}
+      title="No shipments match these filters"
+      description="Try another check, zone or a longer period."
+      action={activeChips.length > 0 ? <Button variant="secondary" size="sm" onClick={clearAll}>Clear filters</Button> : undefined}
+    />
+  );
+
+  const errorState = (
+    <EmptyState
+      icon={AlertTriangle}
+      title="Couldn't load shipments"
+      description="Check your connection and try again."
+      action={<Button variant="secondary" size="sm" onClick={onRetry}>Try again</Button>}
+    />
+  );
+
+  /* ---------------------------------------------------------------- */
+  /* Banner                                                            */
+  /* ---------------------------------------------------------------- */
+
+  const banner = isLoading || isError ? null : delayed > 0 ? (
+    <div role="status" className="flex flex-col gap-3 rounded-xl bg-destructive/10 px-4 py-3 text-destructive sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">
+            {plural(delayed, 'shipment')} {delayed === 1 ? 'is' : 'are'} past {delayed === 1 ? 'its' : 'their'} delivery deadline
+          </p>
+          <p className="mt-0.5 text-xs text-destructive/90">
+            {[
+              stats.delayedNotify > 0 && `${plural(stats.delayedNotify, 'customer')} ${stats.delayedNotify === 1 ? "hasn't" : "haven't"} been told yet`,
+              stats.escalated > 0 && `${stats.escalated} ${stats.escalated === 1 ? 'needs' : 'need'} an RTO review`,
+              stats.pickupDelayed > 0 && `${plural(stats.pickupDelayed, 'order')} not picked up on time`,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Every customer has been told'}
+          </p>
         </div>
       </div>
+      {toNotify.length > 0 && (
+        <Button variant="destructive" size="sm" className="self-start sm:self-auto" onClick={() => setConfirmNotifyOpen(true)} disabled={busy || notifyingAll}>
+          Mark {toNotify.length} notified
+        </Button>
+      )}
+    </div>
+  ) : stats.pickupDelayed > 0 ? (
+    <div role="status" className="flex items-start gap-2.5 rounded-xl bg-warning/10 px-4 py-3 text-warning">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <div>
+        <p className="text-sm font-semibold">{plural(stats.pickupDelayed, 'order')} not picked up by the deadline</p>
+        <p className="mt-0.5 text-xs">No delivery delays — everything picked up is within its deadline.</p>
+      </div>
+    </div>
+  ) : (
+    <p role="status" className="flex items-center gap-2 px-1 text-sm text-success">
+      <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+      Nothing is late — no pickup or delivery delays today.
+    </p>
+  );
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Order, customer, phone, AWB…"
-            className="pl-10 w-full rounded-full bg-card border-border/60 shadow-sm"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {banner}
+
+      {/* Delivery-check pills — click to filter the table */}
+      <div className="space-y-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 scrollbar-hide sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 xl:grid-cols-8">
+          {pills.map((p) => (
+            <StatPill
+              key={p.check}
+              label={p.label}
+              value={p.value}
+              tone={pillTone(p.check)}
+              loading={isLoading}
+              active={checkFilter === p.check}
+              onClick={() => setCheckFilter((current) => (current === p.check ? DEFAULT_CHECK : p.check))}
+            />
+          ))}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {reverse && (
-            <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as KindFilter)}>
-              <SelectTrigger className="w-[170px] rounded-full bg-card border-border/60 shadow-sm">
+        {!isLoading && (
+          <p className="px-1 text-xs text-muted-foreground">
+            {secondaryStats.map(([label, value], i) => (
+              <span key={label}>
+                {i > 0 && <span className="px-1.5 text-faint" aria-hidden>·</span>}
+                {label} <span className="font-medium text-foreground tabular">{value}</span>
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
+
+      {/* Toolbar */}
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+          <SearchField
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Order, customer, phone, AWB…"
+            className="w-full md:w-64"
+          />
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {reverse && (
+              <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as KindFilter)}>
+                <SelectTrigger className="sm:w-[170px]" aria-label="Type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Exchanges &amp; returns</SelectItem>
+                  <SelectItem value="EXCHANGE">Exchanges only</SelectItem>
+                  <SelectItem value="RETURN">Returns only</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={checkFilter} onValueChange={(v) => setCheckFilter(v as CheckFilter)}>
+              <SelectTrigger className="sm:w-[190px]" aria-label="Delivery check">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Exchanges &amp; returns</SelectItem>
-                <SelectItem value="EXCHANGE">Exchanges only</SelectItem>
-                <SelectItem value="RETURN">Returns only</SelectItem>
+                <SelectItem value="open">Open shipments</SelectItem>
+                <SelectItem value="needs_action">Needs action ({stats.escalated + stats.delayedNotify + stats.pickupDelayed})</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="all">All shipments</SelectItem>
+                {(Object.keys(DELIVERY_CHECK_LABELS) as DeliveryCheck[]).map((check) => (
+                  <SelectItem key={check} value={check}>{DELIVERY_CHECK_LABELS[check]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          )}
-          <Select value={checkFilter} onValueChange={(v) => setCheckFilter(v as CheckFilter)}>
-            <SelectTrigger className="w-[200px] rounded-full bg-card border-border/60 shadow-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="open">Open shipments</SelectItem>
-              <SelectItem value="needs_action">Needs action ({stats.escalated + stats.delayedNotify + stats.pickupDelayed})</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="all">All shipments</SelectItem>
-              {(Object.keys(DELIVERY_CHECK_LABELS) as DeliveryCheck[]).map((check) => (
-                <SelectItem key={check} value={check}>{DELIVERY_CHECK_LABELS[check]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={zoneFilter} onValueChange={(v) => setZoneFilter(v as 'all' | DeliveryZone)}>
-            <SelectTrigger className="w-[150px] rounded-full bg-card border-border/60 shadow-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All zones</SelectItem>
-              {Object.entries(DELIVERY_ZONE_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={zoneFilter} onValueChange={(v) => setZoneFilter(v as 'all' | DeliveryZone)}>
+              <SelectTrigger className="sm:w-[140px]" aria-label="Zone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All zones</SelectItem>
+                {Object.entries(DELIVERY_ZONE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <LookbackSelect value={lookbackDays} onChange={onLookbackChange} className="sm:w-[140px]" />
+          </div>
+          <Button variant="secondary" className="md:ml-auto" onClick={handleExport} disabled={exporting || filtered.length === 0}>
+            <Download />
+            {exporting ? 'Preparing…' : 'Excel'}
+          </Button>
         </div>
-        <Button variant="outline" className="gap-2 sm:ml-auto rounded-full" onClick={handleExport} disabled={exporting || filtered.length === 0}>
-          <Download className="h-4 w-4" />
-          {exporting ? 'Preparing…' : 'Excel'}
-        </Button>
+        {activeChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {activeChips.map((c) => (
+              <FilterChip key={c.key} label={c.label} onRemove={c.clear} />
+            ))}
+            <button type="button" onClick={clearAll} className="px-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Mobile list (< lg) */}
-      <div className="block lg:hidden rounded-2xl overflow-hidden border border-border bg-card">
-        {isLoading ? (
-          <div className="flex justify-center py-16"><div className="loader" /></div>
+      {/* Phone list (< md) */}
+      <div className="md:hidden overflow-hidden rounded-xl border border-border bg-card">
+        {isError ? (
+          errorState
+        ) : isLoading ? (
+          <RowSkeleton rows={5} />
         ) : paginated.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+          emptyState
         ) : (
-          paginated.map((s, idx) => {
-            const action = rowAction(s);
-            return (
-              <div
-                key={s.id}
-                className={cn('px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50', idx < paginated.length - 1 && 'border-b border-border')}
-                onClick={() => onOpen(s.id)}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-[15px]">{s.shipment_ref}</span>
-                    <DeliveryCheckBadge check={s.check} />
-                  </div>
-                  <p className="text-[13px] text-muted-foreground mt-0.5 truncate">
-                    {s.customer_name || '—'} · {s.city || '—'} · {DELIVERY_ZONE_LABELS[s.delivery_zone]}
-                  </p>
-                  <p className="text-[12px] text-muted-foreground mt-0.5">
-                    {s.pickup_date ? `Picked up ${formatDay(s.pickup_date)}` : `Pickup due ${formatDay(s.pickupDue)}`}
-                    {s.expectedDelivery ? ` · Due ${formatDay(s.expectedDelivery)}` : ''}
-                    {s.daysDelayed ? ` · ${s.daysDelayed}d late` : ''}
-                  </p>
-                  <div className="flex items-center gap-4 mt-2">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <StatusSelect shipment={s} onChange={(status) => onChangeStatus(s, status)} disabled={busy} />
+          <ul className="divide-y divide-border">
+            {paginated.map((s) => {
+              const action = rowAction(s);
+              return (
+                <li
+                  key={s.id}
+                  className={cn('cursor-pointer px-4 py-3.5 active:bg-muted/60', s.needsAction && 'bg-destructive/[0.04]')}
+                  onClick={() => onOpen(s.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[15px] font-semibold text-foreground">{s.shipment_ref}</span>
+                        <KindTag s={s} />
+                      </div>
+                      <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                        {s.customer_name || '—'} · {s.city || '—'} · {DELIVERY_ZONE_LABELS[s.delivery_zone]}
+                      </p>
                     </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <DeliveryCheckBadge check={s.check} />
+                      <ChevronRight className="size-4 text-faint" aria-hidden />
+                    </div>
+                  </div>
+
+                  <dl className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Picked up</dt>
+                      <dd className="mt-0.5 text-foreground"><PickupCell s={s} /></dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Expected</dt>
+                      <dd className="mt-0.5 text-foreground">{formatDay(s.expectedDelivery)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Late</dt>
+                      <dd className={cn('mt-0.5', s.daysDelayed !== null ? 'font-medium text-destructive' : 'text-foreground')}>{delayLabel(s)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2 truncate text-xs text-muted-foreground">
+                    {s.courier || 'No courier'} · <AwbLink shipment={s} />
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <StatusSelect shipment={s} onChange={(status) => onChangeStatus(s, status)} disabled={busy} className="h-9 flex-1 min-w-[140px]" />
                     {s.customer_phone && (
-                      <a
-                        href={`tel:${s.customer_phone.replace(/\s/g, '')}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[12px] font-medium text-primary"
-                      >
-                        Call
-                      </a>
+                      <Button variant="secondary" size="icon" asChild>
+                        <a href={`tel:${s.customer_phone.replace(/\s/g, '')}`} aria-label={`Call ${s.customer_name || 'customer'}`}>
+                          <Phone />
+                        </a>
+                      </Button>
                     )}
                     {action && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-                        className="text-[12px] font-medium text-primary"
-                      >
+                      <Button variant={action.urgent ? 'secondary' : 'ghost'} onClick={action.onClick} disabled={busy}>
                         {action.label}
-                      </button>
+                      </Button>
                     )}
                   </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-              </div>
-            );
-          })
+                </li>
+              );
+            })}
+          </ul>
         )}
         {filtered.length > itemsPerPage && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <span className="text-xs text-muted-foreground tabular">Page {currentPage} of {totalPages}</span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+              <Button variant="secondary" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+              <Button variant="secondary" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Desktop table (≥ lg) */}
-      <div className="hidden lg:block">
-        <Card className="border shadow-card overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="whitespace-nowrap">Order No.</TableHead>
-                <TableHead>{reverse ? 'Raised' : 'Ordered'}</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>City / Zone</TableHead>
-                <TableHead>Courier · AWB</TableHead>
-                <TableHead>Pickup</TableHead>
-                <TableHead className="whitespace-nowrap">Expected</TableHead>
-                <TableHead>Delivered</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right whitespace-nowrap">Transit</TableHead>
-                <TableHead className="whitespace-nowrap">Delivery Check</TableHead>
-                <TableHead className="text-right whitespace-nowrap">Days Late</TableHead>
-                <TableHead>Notified</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={14} className="h-48 text-center">
-                    <div className="flex justify-center"><div className="loader" /></div>
-                  </TableCell>
+      {/* Table (md+) */}
+      <div className="hidden md:block space-y-3">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {isError ? (
+            errorState
+          ) : isLoading ? (
+            <RowSkeleton rows={8} />
+          ) : paginated.length === 0 ? (
+            emptyState
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Order · customer</TableHead>
+                  <TableHead>Courier · AWB</TableHead>
+                  <TableHead className="hidden lg:table-cell">Zone</TableHead>
+                  <TableHead className="whitespace-nowrap">Picked up</TableHead>
+                  <TableHead>Expected</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Check</TableHead>
+                  <TableHead className="text-right">Late</TableHead>
+                  <TableHead><span className="sr-only">Action</span></TableHead>
                 </TableRow>
-              ) : paginated.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={14} className="h-32 text-center text-muted-foreground">{emptyMessage}</TableCell>
-                </TableRow>
-              ) : (
-                paginated.map((s) => {
+              </TableHeader>
+              <TableBody>
+                {paginated.map((s) => {
                   const action = rowAction(s);
                   return (
                     <TableRow
                       key={s.id}
-                      className={cn('cursor-pointer hover:bg-muted/50', s.needsAction && 'bg-destructive/[0.03]')}
+                      className={cn('cursor-pointer', s.needsAction && 'bg-destructive/[0.04] hover:bg-destructive/[0.07]')}
                       onClick={() => onOpen(s.id)}
                     >
-                      <TableCell className="font-medium whitespace-nowrap text-primary">{s.shipment_ref}</TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">{formatDay(raisedOn(s))}</TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <div className="font-medium truncate">{s.customer_name || '—'}</div>
-                        {s.customer_phone && (
-                          <a href={`tel:${s.customer_phone.replace(/\s/g, '')}`} onClick={(e) => e.stopPropagation()} className="text-xs text-muted-foreground hover:text-primary">
-                            {s.customer_phone}
-                          </a>
-                        )}
+                      <TableCell className="max-w-[220px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-medium text-foreground">{s.shipment_ref}</span>
+                          <KindTag s={s} />
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground" title={`${reverse ? 'Raised' : 'Ordered'} ${formatDay(raisedOn(s), 'd MMM yyyy')}`}>
+                          {s.customer_name || '—'}{s.city ? ` · ${s.city}` : ''}
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <div>{s.city || '—'}</div>
-                        <div className="text-xs text-muted-foreground">{DELIVERY_ZONE_LABELS[s.delivery_zone]}</div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div>{s.courier || '—'}</div>
+                        <div className="text-foreground">{s.courier || '—'}</div>
                         <div className="text-xs"><AwbLink shipment={s} /></div>
                       </TableCell>
+                      <TableCell className="hidden whitespace-nowrap lg:table-cell">{DELIVERY_ZONE_LABELS[s.delivery_zone]}</TableCell>
+                      <TableCell className="whitespace-nowrap"><PickupCell s={s} /></TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {s.pickup_date ? (
-                          <span className={cn(s.pickedUpLate && 'text-warning')}>{formatDay(s.pickup_date)}</span>
-                        ) : (
-                          <span className="text-muted-foreground">due {formatDay(s.pickupDue)}</span>
+                        <div>{formatDay(s.expectedDelivery)}</div>
+                        {s.status === 'DELIVERED' && s.delivered_date && (
+                          <div className="text-xs text-muted-foreground">delivered {formatDay(s.delivered_date)}</div>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatDay(s.expectedDelivery)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{s.status === 'DELIVERED' ? formatDay(s.delivered_date) : '—'}</TableCell>
                       <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <StatusSelect shipment={s} onChange={(status) => onChangeStatus(s, status)} disabled={busy} />
                       </TableCell>
-                      <TableCell className="text-right">{s.daysInTransit ?? '—'}</TableCell>
                       <TableCell><DeliveryCheckBadge check={s.check} /></TableCell>
-                      <TableCell className={cn('text-right', s.daysDelayed !== null && 'text-destructive font-medium')}>{delayLabel(s)}</TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {s.customer_notified
-                          ? ['Yes', s.notified_on && formatDay(s.notified_on), s.notified_via && NOTIFICATION_CHANNEL_LABELS[s.notified_via]].filter(Boolean).join(' · ')
-                          : 'No'}
+                      <TableCell className={cn('whitespace-nowrap text-right tabular', s.daysDelayed !== null ? 'font-medium text-destructive' : 'text-muted-foreground')}>
+                        {delayLabel(s)}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                         {action && (
-                          <button
-                            type="button"
-                            onClick={action.onClick}
-                            disabled={busy}
-                            className="text-sm font-medium text-primary transition-all duration-150 hover:text-primary/70 disabled:opacity-50"
-                          >
+                          <Button variant={action.urgent ? 'secondary' : 'ghost'} size="sm" onClick={action.onClick} disabled={busy}>
                             {action.label}
-                          </button>
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-muted-foreground">
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} shipments
-            </div>
+        {!isLoading && !isError && filtered.length > 0 && (
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-sm text-muted-foreground tabular">
+              Showing {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} shipments
+            </p>
             <DataTablePagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -487,6 +663,38 @@ export function ShipmentList({
           </div>
         )}
       </div>
+
+      {/* Bulk "mark notified" confirmation */}
+      <Dialog open={confirmNotifyOpen} onOpenChange={(open) => !notifyingAll && setConfirmNotifyOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark {plural(toNotify.length, 'customer')} as notified?</DialogTitle>
+            <DialogDescription>
+              Records that {toNotify.length === 1 ? 'this customer was' : 'these customers were'} told about the delay today.
+              No message is sent from here — only do this once they've actually been contacted.
+            </DialogDescription>
+          </DialogHeader>
+          {toNotify.length > 0 && (
+            <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border text-sm">
+              {toNotify.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="truncate">
+                    <span className="font-medium text-foreground">{s.shipment_ref}</span>
+                    <span className="text-muted-foreground"> · {s.customer_name || '—'}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-medium text-destructive tabular">{delayLabel(s)} late</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmNotifyOpen(false)} disabled={notifyingAll}>Cancel</Button>
+            <Button variant="destructive" onClick={handleMarkAllNotified} disabled={notifyingAll || toNotify.length === 0}>
+              {notifyingAll ? 'Saving…' : `Mark ${toNotify.length} notified`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

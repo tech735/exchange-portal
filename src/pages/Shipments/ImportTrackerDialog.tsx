@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,7 +49,7 @@ export function ImportTrackerDialog({ open, onOpenChange }: { open: boolean; onO
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1.5">
-            <Label htmlFor="tracker-csv" className="text-xs font-medium text-muted-foreground">
+            <Label htmlFor="tracker-csv" className="text-[13px] font-medium text-foreground">
               Order Tracker sheet (in Google Sheets: File → Download → .csv)
             </Label>
             <Input id="tracker-csv" type="file" accept=".csv,text/csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -73,12 +73,12 @@ export function ImportTrackerDialog({ open, onOpenChange }: { open: boolean; onO
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
+          <DialogFooter className="border-t border-border pt-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={!file || importTracker.isPending}>
               {importTracker.isPending ? 'Importing…' : 'Import'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

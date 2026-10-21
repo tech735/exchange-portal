@@ -1,84 +1,61 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, Link } from "react-router-dom";
+import { ShieldAlert } from "lucide-react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserProvider, useUser } from "@/contexts/UserContext";
-import Dashboard from '@/pages/Dashboard';
-import ExchangeLodging from '@/pages/ExchangeLodging';
-import Warehouse from '@/pages/Warehouse';
-// Invoicing page is disabled for now — re-enable with its route below and the
-// sidebar nav entry in components/Layout.tsx.
-// import Invoicing from '@/pages/Invoicing';
-import TicketDetail from '@/pages/TicketDetail';
 import AuthScreens from '@/pages/auth_screens/AuthScreens';
-import Users from '@/pages/Users';
-import Orders from '@/pages/Orders/Orders';
-import Shipments from '@/pages/Shipments';
 import NotFound from '@/pages/NotFound';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import Layout from '@/components/Layout';
 import { useBodyPointerEventsGuard } from '@/hooks/useBodyPointerEventsGuard';
 import { PageLoader } from '@/components/ui/Loader';
-import type { UserRole as DatabaseUserRole } from '@/types/database';
+import { Button } from '@/components/ui/button';
+import { canAccess } from '@/lib/navigation';
 
-const queryClient = new QueryClient();
+// Pages load on demand so the first paint (login, dashboard) stays small.
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Exchanges = lazy(() => import('@/pages/Exchanges/ExchangesList'));
+const NewExchange = lazy(() => import('@/pages/Exchanges/NewExchange'));
+const ExchangeDetail = lazy(() => import('@/pages/Exchanges/ExchangeDetail'));
+const Orders = lazy(() => import('@/pages/Orders/Orders'));
+const Warehouse = lazy(() => import('@/pages/Warehouse'));
+const Shipments = lazy(() => import('@/pages/Shipments'));
+const Cases = lazy(() => import('@/pages/Cases/Cases'));
+const Finance = lazy(() => import('@/pages/Finance/Finance'));
+const Users = lazy(() => import('@/pages/Users'));
+const Settings = lazy(() => import('@/pages/Settings/Settings'));
 
-// Define role-based access to pages
-const roleAccess: Record<DatabaseUserRole, string[]> = {
-  ADMIN: ['/', '/dashboard', '/orders', '/shipments', '/exchange-lodging', '/warehouse', '/invoicing', '/users', '/ticket'],
-  SUPPORT: ['/', '/dashboard', '/orders', '/shipments', '/exchange-lodging', '/ticket'],
-  WAREHOUSE: ['/', '/dashboard', '/shipments', '/warehouse'],
-  INVOICING: ['/', '/dashboard', '/invoicing'],
-};
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
+});
 
-function ProtectedRoute({
-  children,
-  requiredPaths
-}: {
-  children: React.ReactNode
-  requiredPaths: string[]
-}) {
-  const { user, isLoading, hasFullAccess } = useUser();
-
-  if (isLoading) return <PageLoader />;
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // If user has full access (admin who switched roles), grant access to all pages
-  if (hasFullAccess()) {
-    return <>{children}</>;
-  }
-
-  // Get user role safely - handle both UserContext user and auth user
-  const userRole = user?.role || 'SUPPORT';
-  const userPaths = roleAccess[userRole as keyof typeof roleAccess] || [];
-
-  // Check if user has access to any of the required paths
-  const hasAccess = requiredPaths.some(path =>
-    userPaths.some(userPath => path.startsWith(userPath))
-  );
-
-  if (!hasAccess) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-4">
-            You don't have access to this page as a {userRole}
-          </p>
-          <a href="/" className="text-primary hover:underline">
-            Go to Dashboard
-          </a>
-        </div>
+function AccessDenied() {
+  const { user } = useUser();
+  return (
+    <Layout>
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"><ShieldAlert className="size-6" /></div>
+        <h1 className="text-xl font-semibold">This page isn’t part of your role</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          You’re signed in as {user?.role === 'INVOICING' ? 'Finance' : user?.role?.toLowerCase()}. Ask an admin if you need access.
+        </p>
+        <Button asChild variant="secondary"><Link to="/dashboard">Go to dashboard</Link></Button>
       </div>
-    );
-  }
+    </Layout>
+  );
+}
 
-  return <>{children}</>;
+function ProtectedRoute({ children, path }: { children: React.ReactNode; path: string }) {
+  const { user, isLoading, hasFullAccess } = useUser();
+  const location = useLocation();
+  if (isLoading) return <PageLoader />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!canAccess(user.role, path, hasFullAccess())) return <AccessDenied />;
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
 // Radix modal layers lock `pointer-events: none` onto <body> while open. If a
@@ -88,27 +65,39 @@ function ProtectedRoute({
 // route effect covers navigations that unmount a layer mid-flight.
 function BodyPointerEventsFix() {
   const location = useLocation();
-
   useBodyPointerEventsGuard();
-
   useEffect(() => {
     document.body.style.removeProperty('pointer-events');
   }, [location.pathname]);
-
   return null;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
-
   if (isLoading) return <PageLoader />;
-
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
+
+/** Old /ticket/:id links (emails, bookmarks) keep working. */
+function LegacyTicketRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/exchanges/${id}`} replace />;
+}
+
+const routes: { path: string; element: React.ReactNode; access?: string }[] = [
+  { path: '/dashboard', element: <Dashboard /> },
+  { path: '/exchanges', element: <Exchanges /> },
+  { path: '/exchanges/new', element: <NewExchange /> },
+  { path: '/exchanges/:id', element: <ExchangeDetail />, access: '/exchanges/detail' },
+  { path: '/orders', element: <Orders /> },
+  { path: '/warehouse', element: <Warehouse /> },
+  { path: '/shipments', element: <Shipments /> },
+  { path: '/cases', element: <Cases /> },
+  { path: '/finance', element: <Finance /> },
+  { path: '/users', element: <Users /> },
+  { path: '/settings', element: <Settings /> },
+];
 
 function AppContent() {
   return (
@@ -116,83 +105,20 @@ function AppContent() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <TooltipProvider>
+            <TooltipProvider delayDuration={300}>
               <BodyPointerEventsFix />
               <Toaster />
               <Sonner />
               <Routes>
-                <Route path="/login" element={
-                  <PublicRoute>
-                    <AuthScreens />
-                  </PublicRoute>
-                } />
+                <Route path="/login" element={<PublicRoute><AuthScreens /></PublicRoute>} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute requiredPaths={['/dashboard']}>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/exchange-lodging"
-                  element={
-                    <ProtectedRoute requiredPaths={['/exchange-lodging']}>
-                      <ExchangeLodging />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/orders"
-                  element={
-                    <ProtectedRoute requiredPaths={['/orders']}>
-                      <Orders />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/shipments"
-                  element={
-                    <ProtectedRoute requiredPaths={['/shipments']}>
-                      <Shipments />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/warehouse"
-                  element={
-                    <ProtectedRoute requiredPaths={['/warehouse']}>
-                      <Warehouse />
-                    </ProtectedRoute>
-                  }
-                />
-                {/* Invoicing page disabled for now.
-                <Route
-                  path="/invoicing"
-                  element={
-                    <ProtectedRoute requiredPaths={['/invoicing']}>
-                      <Invoicing />
-                    </ProtectedRoute>
-                  }
-                />
-                */}
-                <Route
-                  path="/users"
-                  element={
-                    <ProtectedRoute requiredPaths={['/users']}>
-                      <Users />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/ticket/:id"
-                  element={
-                    <ProtectedRoute requiredPaths={['/ticket']}>
-                      <TicketDetail />
-                    </ProtectedRoute>
-                  }
-                />
+                {routes.map((r) => (
+                  <Route key={r.path} path={r.path} element={<ProtectedRoute path={r.access ?? r.path}>{r.element}</ProtectedRoute>} />
+                ))}
+                {/* Legacy URLs */}
+                <Route path="/exchange-lodging" element={<Navigate to="/exchanges" replace />} />
+                <Route path="/invoicing" element={<Navigate to="/finance" replace />} />
+                <Route path="/ticket/:id" element={<LegacyTicketRedirect />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </TooltipProvider>
@@ -203,12 +129,10 @@ function AppContent() {
   );
 }
 
-const App = () => {
-  return (
-    <UserProvider>
-      <AppContent />
-    </UserProvider>
-  );
-};
+const App = () => (
+  <UserProvider>
+    <AppContent />
+  </UserProvider>
+);
 
 export default App;

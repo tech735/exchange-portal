@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { differenceInMinutes, formatDistanceToNow, parseISO, subDays } from 'date-fns';
-import { Plus, RefreshCw, Settings, Upload } from 'lucide-react';
+import { Plus, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
 import Layout from '@/components/Layout';
+import { PageHeader, ViewTabs } from '@/components/app';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 import {
@@ -13,7 +13,6 @@ import {
   useDeleteShipment,
   useShipmentSettings,
   useShipments,
-  useSpecialCases,
   useSyncShipments,
   useUpdateShipment,
   type ShipmentPatch,
@@ -27,9 +26,10 @@ import {
   toDateInput,
   trackShipments,
   type DeliveryCheck,
+  type ShipmentSettings,
   type TrackedShipment,
 } from '@/lib/shipmentTracking';
-import { SHIPMENT_STATUS_LABELS, type ShipmentStatus } from '@/types/database';
+import { DELIVERY_ZONE_LABELS, SHIPMENT_STATUS_LABELS, type ShipmentStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { DeliveryCheckBadge } from './DeliveryCheckBadge';
 import { ShipmentForm } from './ShipmentForm';
@@ -37,7 +37,8 @@ import { ShipmentList } from './ShipmentList';
 import { ShipmentSettingsDialog } from './ShipmentSettingsDialog';
 import { ImportTrackerDialog } from './ImportTrackerDialog';
 import { DailyReport } from './DailyReport';
-import { SpecialCases } from './SpecialCases';
+import { LookbackSelect } from './LookbackSelect';
+import { DEFAULT_LOOKBACK_DAYS } from './constants';
 
 // Most urgent first, so nothing that needs a call or a courier chase is
 // below the fold.
@@ -57,15 +58,32 @@ const CHECK_PRIORITY: Record<DeliveryCheck, number> = {
 // Re-pull from Shopify on open when the last sync is older than this.
 const AUTO_SYNC_AFTER_MINUTES = 30;
 
+type View = 'forward' | 'reverse' | 'daily';
+
+const hourLabel = (h: number) => (h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`);
+
+// The deadline rules in plain words, for the page description.
+function rulesSummary(s: ShipmentSettings) {
+  const by = hourLabel(s.pickup_deadline_hour);
+  const pickup =
+    s.pickup_deadline_days === 0
+      ? `pickup by ${by} same day`
+      : s.pickup_deadline_days === 1
+        ? `pickup by ${by} next day`
+        : `pickup within ${s.pickup_deadline_days} days, by ${by}`;
+  const delivery = `delivery ${s.ncr_delivery_days} days NCR / ${s.outside_ncr_delivery_days} days outside`;
+  return [pickup, delivery, s.skip_sundays && 'Sundays not counted'].filter(Boolean).join(' · ');
+}
+
 export default function Shipments() {
   const { toast } = useToast();
   const { user, hasFullAccess } = useUser();
   const isAdmin = hasFullAccess() || user?.role === 'ADMIN';
 
-  const [lookbackDays, setLookbackDays] = useState<number | null>(30);
-  const { data: shipments = [], isLoading } = useShipments(lookbackDays);
+  const [view, setView] = useState<View>('forward');
+  const [lookbackDays, setLookbackDays] = useState<number | null>(DEFAULT_LOOKBACK_DAYS);
+  const { data: shipments = [], isLoading, isError, refetch } = useShipments(lookbackDays);
   const { data: settings = DEFAULT_SHIPMENT_SETTINGS } = useShipmentSettings();
-  const { data: specialCases = [] } = useSpecialCases();
   const syncShipments = useSyncShipments();
   const updateShipment = useUpdateShipment();
   const createShipment = useCreateShipment();
@@ -75,6 +93,7 @@ export default function Shipments() {
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Checks depend on the clock (the pickup deadline is 1 PM), so re-evaluate
   // every minute while the page is open.
@@ -99,7 +118,7 @@ export default function Shipments() {
     [shipments, settings, clockKey]
   );
 
-  // Orders on the Tracker tab; exchanges (F2 onwards) and returns on their own.
+  // Orders on the Forward tab; exchanges (F2 onwards) and returns on their own.
   const forward = useMemo(() => tracked.filter((s) => shipmentKind(s.shipment_ref) === 'FORWARD'), [tracked]);
   const reverse = useMemo(() => tracked.filter((s) => shipmentKind(s.shipment_ref) !== 'FORWARD'), [tracked]);
   const reverseNeedsAction = reverse.filter((s) => s.needsAction).length;
@@ -109,9 +128,6 @@ export default function Shipments() {
     () => dailyReport(tracked.filter((s) => shipmentKind(s.shipment_ref) !== 'EXCHANGE'), reportSince),
     [tracked, reportSince]
   );
-  const rtoShipments = useMemo(() => tracked.filter((s) => s.check === 'RTO'), [tracked]);
-  const openSpecialCount =
-    rtoShipments.filter((s) => !s.resolved_on).length + specialCases.filter((c) => c.status === 'OPEN').length;
 
   const lastSyncedAt = useMemo(() => {
     const times = shipments.map((s) => s.last_synced_at).filter(Boolean) as string[];
@@ -162,6 +178,25 @@ export default function Shipments() {
       }
     );
 
+  // Same update as the row's "Mark notified", applied to every listed row.
+  const markAllNotified = async (rows: TrackedShipment[]) => {
+    const results = await Promise.allSettled(
+      rows.map((shipment) =>
+        updateShipment.mutateAsync({ shipment, patch: { customer_notified: true, notified_on: now.date } })
+      )
+    );
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    const done = results.length - failed.length;
+    if (done) toast({ title: `${done} ${done === 1 ? 'shipment' : 'shipments'} marked as notified` });
+    if (failed.length) {
+      toast({
+        title: `${failed.length} could not be saved`,
+        description: (failed[0].reason as Error)?.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Fill the dates a status implies; edit them in the panel if they differ.
   const changeStatus = (s: TrackedShipment, status: ShipmentStatus) => {
     if (status === s.status) return;
@@ -177,174 +212,179 @@ export default function Shipments() {
     );
   };
 
+  const deleteSelected = () => {
+    if (!selected) return;
+    deleteShipment.mutate(selected.id, {
+      onSuccess: () => {
+        toast({ title: 'Shipment deleted', description: selected.shipment_ref });
+        setConfirmDeleteOpen(false);
+        setSelectedId(null);
+      },
+      onError: (error: Error) => toast({ title: 'Could not delete', description: error.message, variant: 'destructive' }),
+    });
+  };
+
   const listProps = {
     isLoading,
+    isError,
+    onRetry: () => void refetch(),
     today: now.date,
     reportSince,
+    lookbackDays,
+    onLookbackChange: setLookbackDays,
     busy: updateShipment.isPending,
     onOpen: setSelectedId,
     onChangeStatus: changeStatus,
     onMarkNotified: (s: TrackedShipment) => save(s, { customer_notified: true, notified_on: now.date }, 'Marked as notified'),
+    onMarkAllNotified: markAllNotified,
     onMarkDelivered: (s: TrackedShipment) => save(s, { status: 'DELIVERED', delivered_date: now.date }, 'Marked as delivered'),
-    onMarkRto: (s: TrackedShipment) => save(s, { status: 'RTO' }, 'Marked for RTO — now under Special cases'),
+    onMarkRto: (s: TrackedShipment) => save(s, { status: 'RTO' }, 'Marked for RTO — now under Cases'),
   };
+
+  const syncState = syncShipments.isPending
+    ? 'Syncing with Shopify…'
+    : lastSyncedAt
+      ? `Synced with Shopify ${formatDistanceToNow(parseISO(lastSyncedAt), { addSuffix: true })}`
+      : 'Not synced with Shopify yet';
 
   return (
     <Layout>
-      <div className="page-shell animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Shipment Tracker</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {syncShipments.isPending
-                ? 'Syncing with Shopify…'
-                : lastSyncedAt
-                  ? `Synced with Shopify ${formatDistanceToNow(parseISO(lastSyncedAt), { addSuffix: true })}`
-                  : 'Not synced with Shopify yet'}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {isAdmin && (
-              <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Tracker settings">
-                <Settings className="h-4 w-4" />
+      <div className="space-y-5">
+        <PageHeader
+          title="Shipments"
+          description={`${syncState} · ${rulesSummary(settings)}`}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                <Upload />
+                Import
               </Button>
-            )}
-            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Import</span>
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add</span>
-            </Button>
-            <Button className="gap-2" onClick={() => runSync()} disabled={syncShipments.isPending}>
-              <RefreshCw className={cn('h-4 w-4', syncShipments.isPending && 'animate-spin')} />
-              <span className="hidden sm:inline">Sync Shopify</span>
-            </Button>
-          </div>
-        </div>
-
-        <Tabs defaultValue="tracker" className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <TabsList className="h-auto flex-wrap justify-start">
-              <TabsTrigger value="tracker">Forward</TabsTrigger>
-              <TabsTrigger value="reverse">
-                Exchanges &amp; Returns{reverseNeedsAction ? ` (${reverseNeedsAction})` : ''}
-              </TabsTrigger>
-              <TabsTrigger value="daily">Daily report</TabsTrigger>
-              <TabsTrigger value="special">
-                Special cases{openSpecialCount ? ` (${openSpecialCount})` : ''}
-              </TabsTrigger>
-            </TabsList>
-            <Select value={lookbackDays === null ? 'all' : String(lookbackDays)} onValueChange={(v) => setLookbackDays(v === 'all' ? null : Number(v))}>
-              <SelectTrigger className="w-[150px] rounded-full bg-card border-border/60 shadow-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <TabsContent value="tracker" className="mt-0">
-            <ShipmentList variant="forward" shipments={forward} {...listProps} />
-          </TabsContent>
-
-          <TabsContent value="reverse" className="mt-0">
-            <ShipmentList variant="reverse" shipments={reverse} {...listProps} />
-          </TabsContent>
-
-          <TabsContent value="daily" className="mt-0">
-            <DailyReport rows={report} />
-          </TabsContent>
-
-          <TabsContent value="special" className="mt-0">
-            <SpecialCases rtoShipments={rtoShipments} onOpenShipment={setSelectedId} />
-          </TabsContent>
-        </Tabs>
-
-        {/* Edit */}
-        <Sheet open={!!selected} onOpenChange={(open) => !open && setSelectedId(null)}>
-          <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-            {selected && (
-              <>
-                <SheetHeader className="text-left space-y-2">
-                  <SheetTitle>{selected.shipment_ref}</SheetTitle>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <DeliveryCheckBadge check={selected.check} />
-                    <span>Ordered {formatDay(selected.order_date)}</span>
-                    {selected.raised_date && <span>· Raised {formatDay(selected.raised_date)}</span>}
-                    {selected.expectedDelivery && <span>· Due {formatDay(selected.expectedDelivery)}</span>}
-                    {selected.daysDelayed ? <span className="text-destructive">· {selected.daysDelayed} day(s) late</span> : null}
-                  </div>
-                </SheetHeader>
-                <div className="mt-6">
-                  <ShipmentForm
-                    key={selected.updated_at}
-                    shipment={selected}
-                    settings={settings}
-                    submitting={updateShipment.isPending || deleteShipment.isPending}
-                    submitLabel="Save changes"
-                    onSubmit={(patch) => save(selected, patch, 'Shipment updated', () => setSelectedId(null))}
-                    onDelete={
-                      selected.source === 'MANUAL'
-                        ? () => {
-                            if (!window.confirm(`Delete ${selected.shipment_ref}? This cannot be undone.`)) return;
-                            deleteShipment.mutate(selected.id, {
-                              onSuccess: () => {
-                                toast({ title: 'Shipment deleted', description: selected.shipment_ref });
-                                setSelectedId(null);
-                              },
-                              onError: (error: Error) => toast({ title: 'Could not delete', description: error.message, variant: 'destructive' }),
-                            });
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-              </>
-            )}
-          </SheetContent>
-        </Sheet>
-
-        {/* Add (orders shipped outside Shopify) */}
-        <Sheet open={addOpen} onOpenChange={setAddOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-            <SheetHeader className="text-left">
-              <SheetTitle>Add shipment</SheetTitle>
-              <SheetDescription>For orders, exchanges or returns that don't come in from Shopify.</SheetDescription>
-            </SheetHeader>
-            <div className="mt-6">
-              {addOpen && (
-                <ShipmentForm
-                  settings={settings}
-                  submitting={createShipment.isPending}
-                  submitLabel="Add shipment"
-                  onSubmit={(patch) =>
-                    createShipment.mutate(
-                      { ...patch, order_name: patch.order_name!, order_date: patch.order_date! },
-                      {
-                        onSuccess: () => {
-                          toast({ title: 'Shipment added', description: patch.order_name });
-                          setAddOpen(false);
-                        },
-                        onError: (error: Error) => toast({ title: 'Could not add shipment', description: error.message, variant: 'destructive' }),
-                      }
-                    )
-                  }
-                />
+              <Button variant="secondary" onClick={() => setAddOpen(true)}>
+                <Plus />
+                Add
+              </Button>
+              {isAdmin && (
+                <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
+                  <SlidersHorizontal />
+                  Rules
+                </Button>
               )}
-            </div>
-          </SheetContent>
-        </Sheet>
+              <Button onClick={() => runSync()} disabled={syncShipments.isPending}>
+                <RefreshCw className={cn(syncShipments.isPending && 'animate-spin')} />
+                {syncShipments.isPending ? 'Syncing…' : 'Sync'}
+              </Button>
+            </>
+          }
+        />
 
-        {isAdmin && <ShipmentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} />}
-        <ImportTrackerDialog open={importOpen} onOpenChange={setImportOpen} />
+        <ViewTabs<View>
+          value={view}
+          onChange={setView}
+          views={[
+            { id: 'forward', label: 'Forward' },
+            { id: 'reverse', label: 'Exchanges & returns', count: reverseNeedsAction || undefined },
+            { id: 'daily', label: 'Daily report' },
+          ]}
+        />
+
+        {view === 'forward' && <ShipmentList key="forward" variant="forward" shipments={forward} {...listProps} />}
+
+        {view === 'reverse' && <ShipmentList key="reverse" variant="reverse" shipments={reverse} {...listProps} />}
+
+        {view === 'daily' && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Orders placed, picked up and delivered each day. Returns count on the day they were raised.
+              </p>
+              <LookbackSelect value={lookbackDays} onChange={setLookbackDays} className="sm:w-[150px]" />
+            </div>
+            <DailyReport rows={report} isLoading={isLoading} isError={isError} onRetry={() => void refetch()} />
+          </div>
+        )}
       </div>
+
+      {/* Edit */}
+      <Sheet open={!!selected} onOpenChange={(open) => !open && setSelectedId(null)}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 bg-card p-0 sm:max-w-xl">
+          {selected && (
+            <>
+              <SheetHeader className="space-y-2 border-b border-border px-5 pb-4 pt-5 pr-12 text-left sm:px-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SheetTitle className="font-heading">{selected.shipment_ref}</SheetTitle>
+                  <DeliveryCheckBadge check={selected.check} />
+                </div>
+                <SheetDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px]">
+                  <span>{selected.customer_name || 'No customer name'}{selected.city ? ` · ${selected.city}` : ''} · {DELIVERY_ZONE_LABELS[selected.delivery_zone]}</span>
+                </SheetDescription>
+                <p className="flex flex-wrap gap-x-1.5 text-xs text-muted-foreground">
+                  <span>Ordered {formatDay(selected.order_date)}</span>
+                  {selected.raised_date && <span>· Raised {formatDay(selected.raised_date)}</span>}
+                  {selected.expectedDelivery && <span>· Due {formatDay(selected.expectedDelivery)}</span>}
+                  {selected.daysDelayed ? <span className="font-medium text-destructive">· {selected.daysDelayed} day(s) late</span> : null}
+                </p>
+              </SheetHeader>
+              <ShipmentForm
+                key={selected.updated_at}
+                shipment={selected}
+                settings={settings}
+                submitting={updateShipment.isPending || deleteShipment.isPending}
+                submitLabel="Save changes"
+                onSubmit={(patch) => save(selected, patch, 'Shipment updated', () => setSelectedId(null))}
+                onDelete={selected.source === 'MANUAL' ? () => setConfirmDeleteOpen(true) : undefined}
+              />
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Add (orders shipped outside Shopify) */}
+      <Sheet open={addOpen} onOpenChange={setAddOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 bg-card p-0 sm:max-w-xl">
+          <SheetHeader className="space-y-1 border-b border-border px-5 pb-4 pt-5 pr-12 text-left sm:px-6">
+            <SheetTitle className="font-heading">Add shipment</SheetTitle>
+            <SheetDescription>For orders, exchanges or returns that don't come in from Shopify.</SheetDescription>
+          </SheetHeader>
+          {addOpen && (
+            <ShipmentForm
+              settings={settings}
+              submitting={createShipment.isPending}
+              submitLabel="Add shipment"
+              onSubmit={(patch) =>
+                createShipment.mutate(
+                  { ...patch, order_name: patch.order_name!, order_date: patch.order_date! },
+                  {
+                    onSuccess: () => {
+                      toast({ title: 'Shipment added', description: patch.order_name });
+                      setAddOpen(false);
+                    },
+                    onError: (error: Error) => toast({ title: 'Could not add shipment', description: error.message, variant: 'destructive' }),
+                  }
+                )
+              }
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete confirmation (manual shipments only) */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !deleteShipment.isPending && setConfirmDeleteOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {selected?.shipment_ref}?</DialogTitle>
+            <DialogDescription>This removes the shipment from the tracker. It cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)} disabled={deleteShipment.isPending}>Cancel</Button>
+            <Button variant="destructive" onClick={deleteSelected} disabled={deleteShipment.isPending}>
+              {deleteShipment.isPending ? 'Deleting…' : 'Delete shipment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isAdmin && <ShipmentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} />}
+      <ImportTrackerDialog open={importOpen} onOpenChange={setImportOpen} />
     </Layout>
   );
 }

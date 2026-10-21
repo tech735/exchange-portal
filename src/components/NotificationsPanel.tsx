@@ -45,14 +45,14 @@ export function NotificationsPanel() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="h-10 w-10 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition relative">
-          <Bell className="h-4 w-4" />
+        <button aria-label="Notifications" className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <Bell className="size-[18px]" />
           {hasRecent && (
-            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-primary border border-background rounded-full" />
+            <span className="absolute right-2 top-2 size-2 rounded-full bg-destructive ring-2 ring-card" />
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 p-0 rounded-2xl overflow-hidden">
+      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1.5rem))] p-0 rounded-xl overflow-hidden shadow-overlay">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <p className="font-heading font-semibold text-sm">Notifications</p>
           <span className="text-xs text-muted-foreground">{activity?.length ?? 0} recent</span>
@@ -68,11 +68,11 @@ export function NotificationsPanel() {
                   key={item.id}
                   onClick={() => {
                     setOpen(false);
-                    navigate(`/ticket/${item.ticketId}`);
+                    navigate(`/exchanges/${item.ticketId}`);
                   }}
                   className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors border-b border-border last:border-0"
                 >
-                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <div className="grid size-8 shrink-0 place-items-center rounded-full bg-accent">
                     <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0 flex-1">

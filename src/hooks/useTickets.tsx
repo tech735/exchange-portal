@@ -17,6 +17,11 @@ interface CreateTicketData {
   return_items: TicketItem[];
   exchange_items: TicketItem[];
   notes?: string;
+  request_source?: Ticket['request_source'];
+  request_ref?: string;
+  request_received_at?: string;
+  delivery_charge?: number;
+  assigned_to?: string | null;
 }
 
 interface UpdateTicketData {
@@ -49,6 +54,12 @@ interface UpdateTicketData {
   qc_notes?: string;
   exchange_booked_at?: string;
   is_paid?: boolean;
+  assigned_to?: string | null;
+  delivery_charge?: number | null;
+  qc_checklist?: Record<string, boolean> | null;
+  qc_photos?: string[];
+  request_source?: Ticket['request_source'];
+  request_ref?: string | null;
 }
 
 function parseTicketItems(items: unknown): TicketItem[] {
@@ -114,6 +125,13 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     qc_decision: data.qc_decision ? (data.qc_decision as any) : null,
     qc_notes: data.qc_notes ? String(data.qc_notes) : null,
     exchange_booked_at: data.exchange_booked_at ? String(data.exchange_booked_at) : null,
+    request_source: (data.request_source as Ticket['request_source']) ?? null,
+    request_ref: data.request_ref ? String(data.request_ref) : null,
+    request_received_at: data.request_received_at ? String(data.request_received_at) : null,
+    assigned_to: data.assigned_to ? String(data.assigned_to) : null,
+    delivery_charge: data.delivery_charge === null || data.delivery_charge === undefined ? null : Number(data.delivery_charge),
+    qc_checklist: (data.qc_checklist as Record<string, boolean>) ?? null,
+    qc_photos: Array.isArray(data.qc_photos) ? (data.qc_photos as string[]) : [],
   };
 }
 
@@ -206,6 +224,9 @@ export function useCreateTicket() {
           return_items: data.return_items as TicketItem[],
           exchange_items: data.exchange_items as TicketItem[],
           notes: data.notes || null,
+          ...(data.request_source ? { request_source: data.request_source, request_ref: data.request_ref || null, request_received_at: data.request_received_at || null } : {}),
+          ...(data.delivery_charge !== undefined ? { delivery_charge: data.delivery_charge } : {}),
+          ...(data.assigned_to ? { assigned_to: data.assigned_to } : {}),
           created_by_user_id: user?.id || null,
           stage: 'LODGED',
           status: 'NEW',
@@ -230,7 +251,8 @@ export function useCreateTicket() {
             event_payload: {
               order_id: data.order_id,
               customer_name: data.customer_name,
-              reason_code: data.reason_code
+              reason_code: data.reason_code,
+              request_source: data.request_source ?? null,
             },
           });
         } catch (eventError) {

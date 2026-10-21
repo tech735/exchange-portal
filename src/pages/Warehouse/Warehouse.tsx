@@ -1,245 +1,238 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { ScanLine, Truck, PackageCheck, ClipboardCheck, Send, Download, LayoutGrid, List } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { useTickets, useUpdateTicket } from '@/hooks/useTickets';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { PageHeader, ToneBadge, EmptyState, ConfirmDialog, SearchField } from '@/components/app';
+import { Button } from '@/components/ui/button';
+import { BookShipmentDialog } from '@/components/exchange/BookShipmentDialog';
+import { QcDialog } from '@/components/exchange/QcDialog';
+import { useTickets } from '@/hooks/useTickets';
+import { useExchangeActions } from '@/hooks/useExchangeActions';
 import { useToast } from '@/hooks/use-toast';
-import { Search } from 'lucide-react';
-import { type TicketStage, type Ticket } from '@/types/database';
-import { WarehouseTable } from './WarehouseTable';
-import { AggregatorSelector } from '@/components/AggregatorSelector';
-import { QCActionDialog } from '@/components/QCActionDialog';
+import { exportTicketsToCSV } from '@/utils/exportUtils';
+import { getExchangeStatus, slaRemaining, type ExchangeStatusKey } from '@/lib/exchangeStatus';
+import { itemSummary } from '@/pages/Exchanges/ExchangesList';
+import type { Ticket } from '@/types/database';
+import { cn } from '@/lib/utils';
 
-const stageTabs = [
-  { key: 'new_warehouse', label: 'New Requests' },
-  { key: 'return_pending', label: 'Return Pending' },
-  { key: 'return_received', label: 'QC Pending' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'denied', label: 'Denied' },
-  { key: 'exchange_booked', label: 'Exchange Booked' },
+type ColumnKey = 'TO_BOOK_PICKUP' | 'RETURN_IN_TRANSIT' | 'QC_PENDING' | 'READY_TO_SHIP' | 'SHIPPED';
+const COLUMNS: { key: ColumnKey; title: string; icon: React.ElementType; action?: string; empty: string }[] = [
+  { key: 'TO_BOOK_PICKUP', title: 'To book pickup', icon: Truck, action: 'Book pickup', empty: 'No pickups to book' },
+  { key: 'RETURN_IN_TRANSIT', title: 'Return in transit', icon: PackageCheck, action: 'Mark received', empty: 'Nothing on the way' },
+  { key: 'QC_PENDING', title: 'Quality check', icon: ClipboardCheck, action: 'Start QC', empty: 'Nothing to check' },
+  { key: 'READY_TO_SHIP', title: 'Ready to ship', icon: Send, action: 'Ship replacement', empty: 'Nothing to ship' },
+  { key: 'SHIPPED', title: 'Shipped (7 days)', icon: Send, empty: 'Nothing shipped this week' },
 ];
 
+function age(t: Ticket, key: ColumnKey) {
+  const ref = key === 'RETURN_IN_TRANSIT' ? t.return_booked_at : key === 'QC_PENDING' ? t.return_received_at : key === 'READY_TO_SHIP' ? t.warehouse_approved_at : key === 'SHIPPED' ? t.exchange_booked_at : t.exchange_completed_at;
+  return ref ? new Date(ref) : new Date(t.updated_at);
+}
+
 export default function Warehouse() {
-  const [tab, setTab] = useState('new_warehouse');
-  const [search, setSearch] = useState('');
-
-  // Dialog States
-  const [aggregatorDialogOpen, setAggregatorDialogOpen] = useState(false);
-  const [qcDialogOpen, setQcDialogOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-
-  // To track which action opened the aggregator dialog (RETURN or EXCHANGE)
-  const [aggregatorActionType, setAggregatorActionType] = useState<'RETURN' | 'EXCHANGE'>('RETURN');
-
-  // To track QC action
-  const [qcActionType, setQcActionType] = useState<'APPROVE' | 'DENY'>('APPROVE');
-
   const { toast } = useToast();
-  const updateTicket = useUpdateTicket();
+  const { data: tickets = [], isLoading } = useTickets();
+  const actions = useExchangeActions();
+  const [q, setQ] = useState('');
+  const [scan, setScan] = useState('');
+  const [scanMsg, setScanMsg] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null);
+  const [view, setView] = useState<'board' | 'list'>('board');
+  const [mobileCol, setMobileCol] = useState<ColumnKey>('TO_BOOK_PICKUP');
+  const [active, setActive] = useState<{ kind: 'return' | 'replacement' | 'qc' | 'received'; t: Ticket } | null>(null);
+  const scanRef = useRef<HTMLInputElement>(null);
 
-  const stageFilters: Record<string, TicketStage[]> = {
-    new_warehouse: ['LODGED'], // AND payment collected (handled by backend or assumed for now based on flow)
-    return_pending: ['RETURN_PENDING'],
-    return_received: ['RETURN_RECEIVED'],
-    approved: ['WAREHOUSE_APPROVED'],
-    denied: ['WAREHOUSE_DENIED'],
-    exchange_booked: ['EXCHANGE_BOOKED'], // Removed EXCHANGE_COMPLETED to avoid potential query issues if enum missing
-  };
-
-  const { data: rawTickets, isLoading } = useTickets({ stage: stageFilters[tab], search });
-
-  // Filter tickets: For 'new_warehouse', show tickets where payment is confirmed OR status is In Process and marked as paid
-  const tickets = rawTickets?.filter(ticket => {
-    if (tab === 'new_warehouse') {
-      return ticket.is_paid === true || (ticket.status === 'IN_PROCESS' && ticket.exchange_completed_at != null);
+  const grouped = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 864e5;
+    const s = q.trim().toLowerCase();
+    const g: Record<ColumnKey, Ticket[]> = { TO_BOOK_PICKUP: [], RETURN_IN_TRANSIT: [], QC_PENDING: [], READY_TO_SHIP: [], SHIPPED: [] };
+    for (const t of tickets) {
+      const k = getExchangeStatus(t).key as ExchangeStatusKey;
+      if (!(k in g)) continue;
+      if (k === 'SHIPPED' && (!t.exchange_booked_at || +new Date(t.exchange_booked_at) < weekAgo)) continue;
+      if (s && ![t.order_id, t.customer_name, t.customer_phone, t.return_awb, t.exchange_awb].some((v) => v && String(v).toLowerCase().includes(s))) continue;
+      g[k as ColumnKey].push(t);
     }
-    return true;
-  });
+    for (const k of Object.keys(g) as ColumnKey[]) g[k].sort((a, b) => +age(a, k) - +age(b, k));
+    return g;
+  }, [tickets, q]);
 
-  // HANDLERS
-
-  const handleBookReturn = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setAggregatorActionType('RETURN');
-    setAggregatorDialogOpen(true);
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    try { await fn(); toast({ title: ok }); setActive(null); }
+    catch (e) { toast({ title: 'Couldn’t save', description: (e as Error).message, variant: 'destructive' }); throw e; }
   };
 
-  const handleAggregatorSubmit = async (aggregator: 'SHIPDELIGHT' | 'ITHINK' | 'SHIPROCKET', awb: string) => {
-    if (!selectedTicket) {
-      toast({ title: 'Error', description: 'No ticket selected', variant: 'destructive' });
-      return;
+  const openAction = (t: Ticket) => {
+    const k = getExchangeStatus(t).key;
+    if (k === 'TO_BOOK_PICKUP') setActive({ kind: 'return', t });
+    else if (k === 'RETURN_IN_TRANSIT') setActive({ kind: 'received', t });
+    else if (k === 'QC_PENDING') setActive({ kind: 'qc', t });
+    else if (k === 'READY_TO_SHIP') setActive({ kind: 'replacement', t });
+  };
+
+  /** Scan station: an AWB or order number finds the ticket and runs its next step. */
+  const onScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = scan.trim().toUpperCase();
+    if (!code) return;
+    const t = tickets.find((x) => [x.return_awb, x.exchange_awb, x.order_id].some((v) => v && String(v).toUpperCase() === code))
+      ?? tickets.find((x) => x.order_id.toUpperCase().endsWith(code));
+    setScan('');
+    if (!t) { setScanMsg({ tone: 'danger', text: `No exchange found for “${code}”.` }); return; }
+    const k = getExchangeStatus(t).key;
+    if (k === 'RETURN_IN_TRANSIT') {
+      try {
+        await actions.markReceived(t);
+        setScanMsg({ tone: 'success', text: `#${t.order_id} received · opening quality check` });
+        setActive({ kind: 'qc', t: { ...t, stage: 'RETURN_RECEIVED', return_received_at: new Date().toISOString() } });
+      } catch (err) { setScanMsg({ tone: 'danger', text: (err as Error).message }); }
+    } else if (['TO_BOOK_PICKUP', 'QC_PENDING', 'READY_TO_SHIP'].includes(k)) {
+      setScanMsg({ tone: 'warning', text: `#${t.order_id} is at “${getExchangeStatus(t).label}”.` });
+      openAction(t);
+    } else {
+      setScanMsg({ tone: 'warning', text: `#${t.order_id} is “${getExchangeStatus(t).label}” — nothing to do at the warehouse.` });
     }
-
-    try {
-      if (aggregatorActionType === 'RETURN') {
-        await updateTicket.mutateAsync({
-          id: selectedTicket.id,
-          stage: 'RETURN_PENDING',
-          return_aggregator: aggregator,
-          return_awb: awb,
-          return_booked_at: new Date().toISOString(),
-          eventType: 'UPDATED',
-        });
-        toast({ title: 'Return Booked', description: 'Ticket moved to Return Pending' });
-      } else {
-        await updateTicket.mutateAsync({
-          id: selectedTicket.id,
-          stage: 'EXCHANGE_BOOKED',
-          // Booking the exchange is the end of the support workflow, so the
-          // ticket's status settles at COMPLETED even though later stages
-          // (invoicing, closure) still move the stage forward.
-          status: 'COMPLETED',
-          exchange_aggregator: aggregator,
-          exchange_awb: awb,
-          exchange_booked_at: new Date().toISOString(),
-          eventType: 'EXCHANGE_DONE',
-        });
-        toast({ title: 'Exchange Booked', description: 'Ticket moved to Exchange Booked' });
-      }
-      setAggregatorDialogOpen(false); // Close dialog on success
-    } catch (error: any) {
-      console.error('Aggregator Submit Error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to submit booking. Please check console.',
-        variant: 'destructive'
-      });
-      throw error;
-    }
+    scanRef.current?.focus();
   };
 
-  const handleReceive = async (id: string) => {
-    try {
-      await updateTicket.mutateAsync({
-        id,
-        stage: 'RETURN_RECEIVED',
-        return_received_at: new Date().toISOString(),
-        eventType: 'RECEIVED',
-      });
-      toast({ title: 'Received', description: 'Return received. Moved to QC Pending.' });
-    } catch (error: any) {
-      toast({ title: 'Error', description: 'Failed to receive return.', variant: 'destructive' });
-    }
+  const Card = ({ t, col }: { t: Ticket; col: (typeof COLUMNS)[number] }) => {
+    const since = age(t, col.key);
+    const stuck = col.key === 'RETURN_IN_TRANSIT' && Date.now() - +since > 3 * 864e5;
+    const sla = slaRemaining(t);
+    return (
+      <div className="group rounded-lg border border-border bg-card p-3 shadow-card transition-[border-color,box-shadow] duration-150 hover:border-input hover:shadow-card-hover">
+        <div className="flex items-center gap-2">
+          <Link to={`/exchanges/${t.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground hover:text-primary">#{t.order_id}</Link>
+          {stuck ? <ToneBadge tone="danger">Stuck {formatDistanceToNowStrict(since)}</ToneBadge>
+            : sla.tone !== 'neutral' && col.key !== 'SHIPPED' ? <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>
+            : <span className="text-[11px] text-faint whitespace-nowrap">{formatDistanceToNowStrict(since, { addSuffix: true })}</span>}
+        </div>
+        <p className="mt-1 truncate text-xs text-muted-foreground">{t.customer_name} · {itemSummary(t)}</p>
+        {(col.key === 'RETURN_IN_TRANSIT' || col.key === 'SHIPPED') && (t.return_awb || t.exchange_awb) && (
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">AWB {col.key === 'SHIPPED' ? t.exchange_awb : t.return_awb}</p>
+        )}
+        {col.action && (
+          <Button size="sm" variant="secondary" className="mt-2.5 w-full" onClick={() => openAction(t)}>{col.action}</Button>
+        )}
+      </div>
+    );
   };
 
-  const handleQCAction = (ticket: Ticket, action: 'APPROVE' | 'DENY') => {
-    setSelectedTicket(ticket);
-    setQcActionType(action);
-    setQcDialogOpen(true);
-  };
-
-  const handleQCSubmit = async (decision: 'APPROVED' | 'DENIED', notes: string) => {
-    if (!selectedTicket) {
-      toast({ title: 'Error', description: 'No ticket selected', variant: 'destructive' });
-      return;
-    }
-
-    try {
-      if (decision === 'APPROVED') {
-        await updateTicket.mutateAsync({
-          id: selectedTicket.id,
-          stage: 'WAREHOUSE_APPROVED',
-          qc_decision: 'APPROVED',
-          qc_notes: notes,
-          eventType: 'APPROVED',
-        });
-        toast({ title: 'Approved', description: 'Ticket moved to Approved tab.' });
-      } else {
-        await updateTicket.mutateAsync({
-          id: selectedTicket.id,
-          stage: 'WAREHOUSE_DENIED',
-          qc_decision: 'DENIED',
-          qc_notes: notes,
-          eventType: 'DENIED',
-        });
-        toast({ title: 'Denied', description: 'Ticket moved to Denied tab.' });
-      }
-      setQcDialogOpen(false); // Close dialog on success
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to submit QC decision.',
-        variant: 'destructive'
-      });
-      throw error;
-    }
-  };
-
-  const handleBookExchange = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setAggregatorActionType('EXCHANGE');
-    setAggregatorDialogOpen(true);
-  };
+  const total = COLUMNS.slice(0, 4).reduce((s, c) => s + grouped[c.key].length, 0);
 
   return (
     <Layout>
-      <div className="page-shell animate-fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Warehouse Processing</h1>
-          </div>
-        </div>
+      <div className="space-y-5">
+        <PageHeader
+          title="Warehouse"
+          description={isLoading ? 'Loading…' : `${total} active · ${grouped.QC_PENDING.length} waiting for quality check`}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => exportTicketsToCSV(grouped.TO_BOOK_PICKUP)} disabled={!grouped.TO_BOOK_PICKUP.length}><Download /> Pickup list</Button>
+              <div className="hidden md:inline-flex rounded-lg border border-input bg-card p-0.5">
+                {(['board', 'list'] as const).map((v) => (
+                  <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={cn('inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium transition-colors', view === v ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                    {v === 'board' ? <LayoutGrid className="size-4" /> : <List className="size-4" />}{v === 'board' ? 'Board' : 'List'}
+                  </button>
+                ))}
+              </div>
+            </>
+          }
+        />
 
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-          <div className="relative w-full sm:w-64 shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search warehouse tickets..."
-              className="pl-10 w-full rounded-full bg-card border-border/60 shadow-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        {/* Scan station */}
+        <form onSubmit={onScan} className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-card p-3 sm:flex-row sm:items-center sm:p-4">
+          <div className="relative flex-1">
+            <ScanLine className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-primary" />
+            <input
+              ref={scanRef}
+              value={scan}
+              onChange={(e) => setScan(e.target.value)}
+              placeholder="Scan an AWB or type an order number to receive a return…"
+              className="h-12 w-full rounded-lg border border-input bg-background pl-11 pr-3 text-base font-medium shadow-sm placeholder:font-normal placeholder:text-faint focus-visible:outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/15"
+              autoComplete="off"
+              aria-label="Scan AWB or order number"
             />
           </div>
+          <Button type="submit" size="lg" className="sm:w-auto">Find</Button>
+        </form>
+        {scanMsg && (
+          <p className={cn('-mt-2 rounded-lg px-3 py-2 text-sm animate-fade-in', scanMsg.tone === 'success' ? 'bg-success/10 text-success' : scanMsg.tone === 'warning' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive')}>{scanMsg.text}</p>
+        )}
 
-          <Select value={tab} onValueChange={setTab}>
-            <SelectTrigger className="w-full sm:w-[180px] rounded-full bg-card border-border/60 shadow-sm">
-              <SelectValue placeholder="Stage" />
-            </SelectTrigger>
-            <SelectContent>
-              {stageTabs.map(({ key, label }) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
+        <SearchField value={q} onChange={setQ} placeholder="Filter by order, customer, AWB…" className="w-full sm:w-72" />
+
+        {isLoading ? (
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">{COLUMNS.map((c) => <div key={c.key} className="h-72 rounded-xl bg-muted animate-pulse" />)}</div>
+        ) : view === 'list' ? (
+          <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
+            {COLUMNS.slice(0, 4).flatMap((c) => grouped[c.key].map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                <Link to={`/exchanges/${t.id}`} className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">#{t.order_id} <span className="font-normal text-muted-foreground">· {t.customer_name}</span></p>
+                  <p className="truncate text-xs text-muted-foreground">{itemSummary(t)}</p>
+                </Link>
+                <ToneBadge tone="neutral">{c.title}</ToneBadge>
+                {c.action && <Button size="sm" variant="secondary" onClick={() => openAction(t)}>{c.action}</Button>}
+              </div>
+            )))}
+            {total === 0 && <EmptyState icon={PackageCheck} title="Warehouse is clear" description="New work appears here once support records payment." />}
+          </div>
+        ) : (
+          <>
+            {/* Phones: one column at a time with a segmented switcher */}
+            <div className="md:hidden flex gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4">
+              {COLUMNS.map((c) => (
+                <button key={c.key} onClick={() => setMobileCol(c.key)} className={cn('shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors', mobileCol === c.key ? 'border-primary bg-accent text-accent-foreground' : 'border-input bg-card text-muted-foreground')}>
+                  {c.title} · {grouped[c.key].length}
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <WarehouseTable
-          tickets={tickets}
-          isLoading={isLoading}
-          onBookReturn={handleBookReturn}
-          onReceive={handleReceive}
-          onQCAction={handleQCAction}
-          onBookExchange={handleBookExchange}
-        />
-
-        <AggregatorSelector
-          open={aggregatorDialogOpen}
-          onOpenChange={setAggregatorDialogOpen}
-          onSubmit={handleAggregatorSubmit}
-          title={aggregatorActionType === 'RETURN' ? 'Book Return Request' : 'Book Exchange Shipment'}
-          description={aggregatorActionType === 'RETURN'
-            ? 'Select an aggregator to book the return pickup. You must enter the generated Return AWB.'
-            : 'Select an aggregator to ship the exchange item. You must enter the generated Exchange AWB.'}
-          isLoading={updateTicket.isPending}
-          previousAggregatorInfo={selectedTicket?.notes}
-        />
-
-        <QCActionDialog
-          open={qcDialogOpen}
-          onOpenChange={setQcDialogOpen}
-          onSubmit={handleQCSubmit}
-          title={qcActionType === 'APPROVE' ? 'Approve Return' : 'Deny Return'}
-          actionType={qcActionType}
-          isLoading={updateTicket.isPending}
-        />
+            </div>
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+              {COLUMNS.map((c) => (
+                <section key={c.key} className={cn('flex min-h-[200px] flex-col rounded-xl bg-muted/70 p-2.5', mobileCol !== c.key && 'hidden md:flex')} aria-label={c.title}>
+                  <header className="flex items-center gap-2 px-1 pb-2.5 pt-1">
+                    <c.icon className="size-4 text-muted-foreground" />
+                    <h2 className="flex-1 truncate text-sm font-semibold font-sans">{c.title}</h2>
+                    <span className="rounded-full bg-card px-2 text-xs font-medium leading-5 text-muted-foreground tabular">{grouped[c.key].length}</span>
+                  </header>
+                  <div className="flex flex-1 flex-col gap-2">
+                    {grouped[c.key].length === 0
+                      ? <p className="py-8 text-center text-xs text-faint">{c.empty}</p>
+                      : grouped[c.key].map((t) => <Card key={t.id} t={t} col={c} />)}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
       </div>
+
+      <BookShipmentDialog
+        open={active?.kind === 'return' || active?.kind === 'replacement'}
+        onOpenChange={(o) => !o && setActive(null)}
+        kind={active?.kind === 'replacement' ? 'replacement' : 'return'}
+        orderLabel={active ? `#${active.t.order_id}` : ''}
+        context={active?.t.notes}
+        onSubmit={(agg, awb) => active!.kind === 'replacement'
+          ? run(() => actions.bookReplacement(active!.t, agg, awb), 'Replacement shipment booked')
+          : run(() => actions.bookReturn(active!.t, agg, awb), 'Return pickup booked')}
+      />
+      <QcDialog
+        ticket={active?.kind === 'qc' ? active.t : null}
+        open={active?.kind === 'qc'}
+        onOpenChange={(o) => { if (!o) { setActive(null); scanRef.current?.focus(); } }}
+        onSubmit={(d, notes, checklist, photos) => run(() => actions.recordQc(active!.t, d, notes, checklist, photos), d === 'APPROVED' ? 'QC approved · ready to ship' : 'Return rejected')}
+      />
+      <ConfirmDialog
+        open={active?.kind === 'received'}
+        onOpenChange={(o) => !o && setActive(null)}
+        title={`Mark #${active?.t.order_id} as received?`}
+        description="Tip: scanning the AWB in the box above does this and opens QC in one step."
+        confirmLabel="Mark received"
+        loading={actions.pending}
+        onConfirm={() => run(() => actions.markReceived(active!.t), 'Return received').catch(() => {})}
+      />
     </Layout>
   );
 }

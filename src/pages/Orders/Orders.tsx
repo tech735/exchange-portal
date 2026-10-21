@@ -1,706 +1,507 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, RefreshCw, ShoppingBag } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { shopifyService, type ShopifyOrder } from '@/services/shopify';
+import { shopifyService } from '@/services/shopify';
+import { useAppSettings } from '@/hooks/useAppData';
 import { useToast } from '@/hooks/use-toast';
-import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card } from '@/components/ui/card';
-import { BulkActionToolbar, BulkAction } from '@/components/ui/bulk-action-toolbar';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { RefreshCw, Package, Search, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { ShopifyExchangeCreate } from '../ExchangeLodging/ShopifyExchangeCreate';
 import { exportOrdersToCSV } from '@/utils/exportUtils';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  BulkBar,
+  BulkBarButton,
+  EmptyState,
+  FilterChip,
+  PageHeader,
+  RowSkeleton,
+  SearchField,
+  ToneBadge,
+} from '@/components/app';
+import { OrderPanel } from './OrderPanel';
+import {
+  customerEmail,
+  customerName,
+  eligibility,
+  fulfillmentPill,
+  itemCount,
+  matchesSearch,
+  money,
+  orderNumber,
+  paymentPill,
+  relativeTime,
+  type OrderRecord,
+} from './orderUtils';
+
+const PAYMENT_OPTIONS = [
+  { value: 'paid', label: 'Paid' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'partially_paid', label: 'Partially paid' },
+  { value: 'refunded', label: 'Refunded' },
+  { value: 'partially_refunded', label: 'Partially refunded' },
+  { value: 'voided', label: 'Voided' },
+];
+
+const FULFILLMENT_OPTIONS = [
+  { value: 'fulfilled', label: 'Fulfilled' },
+  { value: 'partial', label: 'Partial' },
+  { value: 'unfulfilled', label: 'Unfulfilled' },
+];
+
+const PAGE_SIZES = [10, 25, 50, 100];
+
+/**
+ * True at Tailwind's `xl` breakpoint and up. The split view needs ~1280px: at `lg` the 240px sidebar
+ * plus a 420px panel would leave the table under 300px wide, so tablets/small laptops get the Sheet.
+ */
+function useIsWide() {
+  const query = '(min-width: 1280px)';
+  const [isWide, setIsWide] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : true));
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setIsWide(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+  return isWide;
+}
+
+/** Re-renders periodically so relative times ("2 min ago", "Nd left") stay fresh. */
+function useNow(intervalMs = 30_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
 
 export default function Orders() {
-    const [orders, setOrders] = useState<ShopifyOrder[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const { toast } = useToast();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const isWide = useIsWide();
+  const now = useNow();
 
-    const [exchangeOpen, setExchangeOpen] = useState(false);
-    const [selectedOrderForExchange, setSelectedOrderForExchange] = useState<ShopifyOrder | null>(null);
+  const { data: settings } = useAppSettings();
+  const windowDays = settings?.exchange_policy?.window_days ?? 10;
 
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const [selectedOrderDetails, setSelectedOrderDetails] = useState<ShopifyOrder | null>(null);
+  const ordersQuery = useQuery({
+    queryKey: ['shopify', 'recent-orders'],
+    queryFn: async () => (await shopifyService.getRecentOrders()) as OrderRecord[],
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+  const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+  const { isLoading, isFetching, isError, error, dataUpdatedAt } = ordersQuery;
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [paymentFilter, setPaymentFilter] = useState('all');
-    const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(50);
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [activeId, setActiveId] = useState<number | null>(null);
 
-    const fetchOrders = async () => {
-        setIsLoading(true);
-        try {
-            const data = await shopifyService.getRecentOrders();
-            setOrders(data);
-        } catch (error: any) {
-            console.error('Failed to fetch orders:', error);
-            toast({
-                title: 'Error',
-                description: error.message || 'Failed to sync with Shopify',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsLoading(false);
+  const syncNow = async () => {
+    const res = await ordersQuery.refetch();
+    if (res.error) {
+      toast({
+        title: 'Sync failed',
+        description: (res.error as Error).message || 'Failed to sync with Shopify',
+        variant: 'destructive',
+      });
+    } else {
+      toast({ title: 'Orders synced', description: `${res.data?.length ?? 0} recent orders loaded from Shopify.` });
+    }
+  };
+
+  const filteredOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (!matchesSearch(o, searchQuery)) return false;
+        if (paymentFilter !== 'all' && o.financial_status?.toLowerCase() !== paymentFilter) return false;
+        if (fulfillmentFilter !== 'all') {
+          if (fulfillmentFilter === 'unfulfilled') return !o.fulfillment_status;
+          return o.fulfillment_status?.toLowerCase() === fulfillmentFilter;
         }
-    };
+        return true;
+      }),
+    [orders, searchQuery, paymentFilter, fulfillmentFilter],
+  );
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
 
-    const filteredOrders = orders.filter((o) => {
-        const matchesSearch =
-            o.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.customer?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.customer?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            o.phone?.includes(searchQuery);
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [searchQuery, paymentFilter, fulfillmentFilter]);
 
-        const matchesPayment = paymentFilter === 'all' || o.financial_status?.toLowerCase() === paymentFilter;
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
-        const matchesFulfillment =
-            fulfillmentFilter === 'all' ||
-            (fulfillmentFilter === 'unfulfilled' ? !o.fulfillment_status : o.fulfillment_status?.toLowerCase() === fulfillmentFilter);
+  const activeOrder = useMemo(() => orders.find((o) => o.id === activeId) ?? null, [orders, activeId]);
 
-        return matchesSearch && matchesPayment && matchesFulfillment;
+  /* ---------------- selection ---------------- */
+  const allOnPageSelected = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedIds.has(o.id));
+  const someOnPageSelected = paginatedOrders.some((o) => selectedIds.has(o.id));
+
+  const toggleAllOnPage = (checked: boolean) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      paginatedOrders.forEach((o) => (checked ? next.add(o.id) : next.delete(o.id)));
+      return next;
     });
 
-    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+  const toggleOne = (id: number, checked: boolean) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
-    useEffect(() => {
-        setCurrentPage(1);
-        setSelectedIds(new Set());
-    }, [searchQuery, paymentFilter, fulfillmentFilter]);
+  const clearSelection = () => setSelectedIds(new Set());
 
-    const selectAllOnPage = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedIds.has(o.id));
+  const exportSelected = () => {
+    const selected = filteredOrders.filter((o) => selectedIds.has(o.id));
+    exportOrdersToCSV(selected as Parameters<typeof exportOrdersToCSV>[0]);
+  };
 
-    const handleSelectAllOnPage = (checked: boolean) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            paginatedOrders.forEach((o) => (checked ? next.add(o.id) : next.delete(o.id)));
-            return next;
-        });
-    };
+  const selectedTotal = useMemo(
+    () => orders.filter((o) => selectedIds.has(o.id)).reduce((s, o) => s + Number(o.total_price || 0), 0),
+    [orders, selectedIds],
+  );
 
-    const handleSelectOrder = (id: number, checked: boolean) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            if (checked) next.add(id);
-            else next.delete(id);
-            return next;
-        });
-    };
+  const startExchange = (o: OrderRecord) => navigate(`/exchanges/new?order=${encodeURIComponent(orderNumber(o))}`);
 
-    const handleSelectAllMatching = () => {
-        setSelectedIds(new Set(filteredOrders.map((o) => o.id)));
-    };
+  const hasFilters = !!searchQuery || paymentFilter !== 'all' || fulfillmentFilter !== 'all';
+  const clearFilters = () => {
+    setSearchQuery('');
+    setPaymentFilter('all');
+    setFulfillmentFilter('all');
+  };
 
-    const clearSelection = () => setSelectedIds(new Set());
+  const showSplit = isWide && !!activeOrder;
+  // In split view the table is ~520–700px wide, so low-priority columns drop out sooner.
+  const dateCol = showSplit ? 'hidden min-[1400px]:table-cell' : 'hidden lg:table-cell';
+  const paymentCol = showSplit ? 'hidden' : 'hidden lg:table-cell';
 
-    const bulkPrimaryActions: BulkAction[] = [
-        {
-            label: 'Export Selected',
-            onClick: () => {
-                const selected = filteredOrders.filter((o) => selectedIds.has(o.id));
-                exportOrdersToCSV(selected);
-            },
-        },
-    ];
+  /* ---------------- states ---------------- */
+  const listBody = (renderRows: () => React.ReactNode) => {
+    if (isLoading) return <RowSkeleton rows={8} />;
+    if (isError && orders.length === 0) {
+      return (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn't load orders"
+          description={(error as Error)?.message || 'Failed to sync with Shopify.'}
+          action={
+            <Button variant="secondary" onClick={() => ordersQuery.refetch()} disabled={isFetching}>
+              <RefreshCw className={cn(isFetching && 'animate-spin')} />
+              Try again
+            </Button>
+          }
+        />
+      );
+    }
+    if (orders.length === 0) {
+      return <EmptyState icon={ShoppingBag} title="No orders yet" description="Recent Shopify orders will appear here once customers start ordering." />;
+    }
+    if (filteredOrders.length === 0) {
+      return (
+        <EmptyState
+          icon={ShoppingBag}
+          title="No matching orders"
+          description={searchQuery ? `Nothing matches "${searchQuery}" with the current filters.` : 'No orders match the current filters.'}
+          action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>}
+        />
+      );
+    }
+    return renderRows();
+  };
 
-    // Group paginated orders by date for the mobile list view
-    const groupedOrders = useMemo(() => {
-        const groups: { label: string; key: string; orders: ShopifyOrder[] }[] = [];
-        const seen: Record<string, number> = {};
+  const pagination = filteredOrders.length > 0 && !isLoading && (
+    <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-muted-foreground tabular">
+        {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+      </p>
+      <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Rows</span>
+          <Select
+            value={String(itemsPerPage)}
+            onValueChange={(v) => {
+              setItemsPerPage(Number(v));
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="h-8 w-[72px]" aria-label="Rows per page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map((n) => (
+                <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} aria-label="Previous page">
+            <ChevronLeft />
+          </Button>
+          <span className="min-w-[64px] text-center text-xs text-muted-foreground tabular">
+            {currentPage} / {totalPages}
+          </span>
+          <Button variant="ghost" size="icon-sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} aria-label="Next page">
+            <ChevronRight />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
-        paginatedOrders.forEach(order => {
-            const date = new Date(order.created_at);
-            const key = format(date, 'yyyy-MM-dd');
+  const paymentLabel = PAYMENT_OPTIONS.find((o) => o.value === paymentFilter)?.label;
+  const fulfillmentLabel = FULFILLMENT_OPTIONS.find((o) => o.value === fulfillmentFilter)?.label;
 
-            let label: string;
-            if (isToday(date)) label = 'Today';
-            else if (isYesterday(date)) label = 'Yesterday';
-            else if (isThisWeek(date, { weekStartsOn: 1 })) label = format(date, 'EEEE');
-            else label = format(date, 'MMMM d');
+  return (
+    <Layout>
+      <div className="space-y-5 animate-fade-in">
+        <PageHeader
+          title="Orders"
+          description={
+            isLoading && !dataUpdatedAt ? 'Syncing from Shopify…' : `Synced from Shopify · ${relativeTime(dataUpdatedAt, now)}`
+          }
+          actions={
+            <Button variant="secondary" onClick={syncNow} disabled={isFetching}>
+              <RefreshCw className={cn(isFetching && 'animate-spin')} />
+              Sync now
+            </Button>
+          }
+        />
 
-            if (seen[key] === undefined) {
-                seen[key] = groups.length;
-                groups.push({ label, key, orders: [] });
-            }
-            groups[seen[key]].orders.push(order);
-        });
-
-        return groups;
-    }, [paginatedOrders]);
-
-    return (
-        <Layout>
-            <div className="page-shell animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Shopify Orders</h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            className="gap-2"
-                            onClick={fetchOrders}
-                            disabled={isLoading}
-                        >
-                            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                            <span className="hidden sm:inline">Refresh Sync</span>
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-                    <div className="relative w-full sm:w-64 shrink-0">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                            type="search"
-                            placeholder="Search orders, customers..."
-                            className="pl-10 w-full rounded-full bg-card border-border/60 shadow-sm"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                            <SelectTrigger className="w-[150px] rounded-full bg-card border-border/60 shadow-sm">
-                                <SelectValue placeholder="All Payment" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Payment</SelectItem>
-                                <SelectItem value="paid">Paid</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="partially_paid">Partially Paid</SelectItem>
-                                <SelectItem value="refunded">Refunded</SelectItem>
-                                <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
-                                <SelectItem value="voided">Voided</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={fulfillmentFilter} onValueChange={setFulfillmentFilter}>
-                            <SelectTrigger className="w-[160px] rounded-full bg-card border-border/60 shadow-sm">
-                                <SelectValue placeholder="All Fulfillment" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Fulfillment</SelectItem>
-                                <SelectItem value="fulfilled">Fulfilled</SelectItem>
-                                <SelectItem value="partial">Partial</SelectItem>
-                                <SelectItem value="unfulfilled">Unfulfilled</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
-                {/* ── Mobile list (< lg) ────────────────────────────── */}
-                <div className="block lg:hidden mt-6 rounded-2xl overflow-hidden border border-border bg-card">
-                    {isLoading ? (
-                        <div className="flex justify-center py-16">
-                            <div className="loader" />
-                        </div>
-                    ) : paginatedOrders.length === 0 ? (
-                        <p className="py-10 text-center text-sm text-muted-foreground">
-                            {orders.length === 0 ? 'No orders found in Shopify.' : `No orders matching "${searchQuery}".`}
-                        </p>
-                    ) : (
-                        <>
-                            {groupedOrders.map(({ label, key, orders: group }) => (
-                                <div key={key}>
-                                    {/* Date group header */}
-                                    <div className="px-4 py-1.5 bg-muted/40 border-b border-border">
-                                        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-                                    </div>
-
-                                    {group.map((order, idx) => {
-                                        const itemCount = order.line_items.reduce((s, i) => s + i.quantity, 0);
-                                        const time = format(new Date(order.created_at), 'hh:mma');
-                                        const customer = [order.customer?.first_name, order.customer?.last_name].filter(Boolean).join(' ') || order.email || '—';
-                                        const price = `₹${parseFloat(order.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-                                        const financialLabel = order.financial_status
-                                            ? order.financial_status.charAt(0).toUpperCase() + order.financial_status.slice(1)
-                                            : 'Unknown';
-
-                                        return (
-                                            <div
-                                                key={order.id}
-                                                className={`px-4 py-3 flex items-center gap-2 cursor-pointer active:bg-muted/50 transition-colors ${idx < group.length - 1 ? 'border-b border-border' : ''}`}
-                                                onClick={() => { setSelectedOrderDetails(order); setDetailsOpen(true); }}
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    {/* Row 1: order # + price */}
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="font-semibold text-[15px] text-foreground leading-snug">{order.name}</span>
-                                                        <span className="text-[15px] text-foreground font-medium shrink-0">{price}</span>
-                                                    </div>
-                                                    {/* Row 2: customer • items • time */}
-                                                    <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
-                                                        {customer} · {itemCount} {itemCount === 1 ? 'item' : 'items'} · {time}
-                                                    </p>
-                                                    {/* Row 3: status badge + exchange button */}
-                                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                        <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0.5 h-auto rounded-full">
-                                                            {financialLabel}
-                                                        </Badge>
-                                                        {order.fulfillment_status && (
-                                                            <span className="text-[11px] text-muted-foreground capitalize">
-                                                                {order.fulfillment_status}
-                                                            </span>
-                                                        )}
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedOrderForExchange(order);
-                                                                setExchangeOpen(true);
-                                                            }}
-                                                            className="text-[11px] font-medium text-primary transition-all duration-150 hover:text-primary/70 inline-block"
-                                                        >
-                                                            Exchange
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-
-                            {/* Mobile pagination */}
-                            {orders.length > 0 && (
-                                <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                                    <span className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</span>
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 p-0">
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 p-0">
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* ── Desktop table (≥ lg) ───────────────────────────── */}
-                <div className="hidden lg:block">
-                    <Card className="border shadow-card overflow-hidden">
-                        <Table className="table-fixed">
-                            <colgroup>
-                                <col className="w-[4%]" />
-                                <col className="w-[13%]" />
-                                <col className="w-[11%]" />
-                                <col className="w-[18%]" />
-                                <col className="w-[11%]" />
-                                <col className="w-[11%]" />
-                                <col className="w-[11%]" />
-                                <col className="w-[8%]" />
-                                <col className="w-[13%]" />
-                            </colgroup>
-                            <TableHeader>
-                                {selectedIds.size > 0 ? (
-                                    <TableRow>
-                                        <TableHead colSpan={9} className="p-2">
-                                            <BulkActionToolbar
-                                                selectedCount={selectedIds.size}
-                                                totalMatching={filteredOrders.length}
-                                                onSelectAllMatching={handleSelectAllMatching}
-                                                onClearSelection={clearSelection}
-                                                primaryActions={bulkPrimaryActions}
-                                                itemLabel="selected"
-                                            />
-                                        </TableHead>
-                                    </TableRow>
-                                ) : (
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead>
-                                            <Checkbox
-                                                id="select-all-orders"
-                                                name="select-all-orders"
-                                                checked={selectAllOnPage}
-                                                onCheckedChange={(checked) => handleSelectAllOnPage(checked === true)}
-                                                aria-label="Select all orders on this page"
-                                            />
-                                        </TableHead>
-                                        <TableHead className="whitespace-nowrap">Order</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead className="whitespace-nowrap">Total</TableHead>
-                                        <TableHead>Payment</TableHead>
-                                        <TableHead>Fulfillment</TableHead>
-                                        <TableHead className="text-right">Items</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                )}
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={9} className="h-48 text-center">
-                                            <div className="flex justify-center">
-                                                <div className="loader" />
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) :orders.length === 0 && !searchQuery ? (
-                                    <TableRow>
-                                        <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                                            No orders found in Shopify.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : filteredOrders.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                                            No orders found matching "{searchQuery}".
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    paginatedOrders.map((order) => (
-                                        <TableRow
-                                            key={order.id}
-                                            className="cursor-pointer hover:bg-muted/50 transition-colors"
-                                            data-state={selectedIds.has(order.id) ? 'selected' : undefined}
-                                            onClick={() => {
-                                                setSelectedOrderDetails(order);
-                                                setDetailsOpen(true);
-                                            }}
-                                        >
-                                            <TableCell onClick={(e) => e.stopPropagation()}>
-                                                <Checkbox
-                                                    id={`select-order-${order.id}`}
-                                                    name={`select-order-${order.id}`}
-                                                    checked={selectedIds.has(order.id)}
-                                                    onCheckedChange={(checked) => handleSelectOrder(order.id, checked === true)}
-                                                    aria-label={`Select order ${order.name}`}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="font-medium whitespace-nowrap">
-                                                <span className="text-primary">{order.name}</span>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {format(new Date(order.created_at), 'MMM d, h:mm a')}
-                                            </TableCell>
-                                            <TableCell className="max-w-[200px]">
-                                                <div className="font-medium truncate">
-                                                    {order.customer?.first_name} {order.customer?.last_name}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground truncate">
-                                                    {order.email}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="font-medium whitespace-nowrap">
-                                                {order.currency} {parseFloat(order.total_price).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={order.financial_status === 'paid' ? 'default' : 'secondary'}
-                                                    className={order.financial_status === 'paid' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
-                                                >
-                                                    {order.financial_status?.toUpperCase() || 'UNKNOWN'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={order.fulfillment_status === 'fulfilled' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}>
-                                                    {order.fulfillment_status ? order.fulfillment_status.toUpperCase() : 'UNFULFILLED'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right text-muted-foreground">
-                                                {order.line_items.reduce((sum, item) => sum + item.quantity, 0)}
-                                            </TableCell>
-                                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                {/* Text action, matching the warehouse tickets table */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedOrderForExchange(order);
-                                                        setExchangeOpen(true);
-                                                    }}
-                                                    className="text-sm font-medium text-primary transition-all duration-150 hover:text-primary/70 hover:scale-105 inline-block"
-                                                >
-                                                    Exchange
-                                                </button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </Card>
-
-                    {/* Desktop Footer Stats and Pagination */}
-                    {orders.length > 0 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="text-sm text-muted-foreground">
-                                Showing {paginatedOrders.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + itemsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
-                            </div>
-                            <DataTablePagination
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                onPageChange={setCurrentPage}
-                                pageSize={itemsPerPage}
-                                setPageSize={setItemsPerPage}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                <Dialog open={exchangeOpen} onOpenChange={setExchangeOpen}>
-                    <DialogContent className="sm:max-w-[1200px] sm:w-[95vw] sm:max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>Create Exchange from Shopify Order</DialogTitle>
-                        </DialogHeader>
-                        {selectedOrderForExchange && (
-                            <ShopifyExchangeCreate
-                                onSuccess={() => setExchangeOpen(false)}
-                                initialOrder={selectedOrderForExchange}
-                            />
-                        )}
-                    </DialogContent>
-                </Dialog>
-
-                <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-                    <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-                        <SheetHeader className="text-left">
-                            <SheetTitle>Order Details: {selectedOrderDetails?.name}</SheetTitle>
-                        </SheetHeader>
-                        {selectedOrderDetails && (
-                            <div className="space-y-6 mt-4">
-                                <div className="grid grid-cols-1 gap-6">
-                                    {/* Main Content: Line Items & Fulfillments */}
-                                    <div className="space-y-6">
-                                        {/* Fulfillment Cards */}
-                                        {selectedOrderDetails.fulfillments && selectedOrderDetails.fulfillments.length > 0 ? (
-                                            selectedOrderDetails.fulfillments.map((fulfillment, idx) => {
-                                                // Create a map to quickly look up line item details by ID
-                                                const lineItemMap = new Map(selectedOrderDetails.line_items.map(i => [i.id, i]));
-
-                                                // If fulfillment has specific line_items, filter them, else show all (fallback for older API behavior)
-                                                const fulfilledItems = fulfillment.line_items
-                                                    ? fulfillment.line_items.map(fi => ({ ...lineItemMap.get(fi.id)!, quantity: fi.quantity }))
-                                                    : selectedOrderDetails.line_items;
-
-                                                return (
-                                                    <div key={idx} className="bg-card border rounded-xl overflow-hidden shadow-sm">
-                                                        {/* Card Header */}
-                                                        <div className="bg-muted/30 px-6 py-4 border-b flex justify-between items-center text-sm">
-                                                            <div className="flex items-center gap-2">
-                                                                <Package className="h-4 w-4 text-muted-foreground" />
-                                                                <span className="font-medium text-base">Fulfilled ({fulfilledItems.length})</span>
-                                                            </div>
-                                                            <div className="text-muted-foreground text-base">
-                                                                {fulfillment.created_at ? format(new Date(fulfillment.created_at), 'MMM d, yyyy') : 'Recently'}
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="px-6 py-5 text-sm text-foreground">
-                                                            <div className="text-base mb-2">
-                                                                <span className="font-medium">{fulfillment.tracking_company || 'Carrier'}</span> tracking: {' '}
-                                                                {fulfillment.tracking_url ? (
-                                                                    <a href={fulfillment.tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
-                                                                        {fulfillment.tracking_number}
-                                                                    </a>
-                                                                ) : (
-                                                                    <span className="font-medium">{fulfillment.tracking_number || 'N/A'}</span>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Items List */}
-                                                            <div className="space-y-5 pt-4 mt-2 border-t border-muted/30">
-                                                                {fulfilledItems.map((item, idxi) => (
-                                                                    <div key={idxi} className="grid grid-cols-[1fr_auto_auto] gap-6 items-center">
-                                                                        <div>
-                                                                            <p className="font-medium text-foreground text-base hover:underline cursor-pointer">{item.name}</p>
-                                                                            <div className="flex flex-wrap items-center gap-2 mt-2">
-                                                                                {item.variant_title && item.variant_title !== 'Default Title' && (
-                                                                                    <Badge variant="secondary" className="font-normal rounded-md px-2 py-0.5 text-xs bg-muted/60 text-muted-foreground">{item.variant_title}</Badge>
-                                                                                )}
-                                                                                <span className="text-sm text-muted-foreground">{item.sku}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-right text-base text-muted-foreground font-medium">
-                                                                            {selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{parseFloat(item.price).toFixed(2)} × {item.quantity}
-                                                                        </div>
-                                                                        <div className="text-right font-medium text-foreground text-base w-24">
-                                                                            {selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{(parseFloat(item.price) * item.quantity).toFixed(2)}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            /* Unfulfilled / Default List View */
-                                            <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-                                                <div className="bg-yellow-50/50 dark:bg-yellow-900/10 px-6 py-4 border-b flex items-center gap-2 text-base text-yellow-800 dark:text-yellow-400">
-                                                    <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
-                                                    <span className="font-medium">Unfulfilled ({selectedOrderDetails.line_items.length})</span>
-                                                </div>
-                                                <div className="px-6 py-5 space-y-5">
-                                                    {selectedOrderDetails.line_items.map((item) => (
-                                                        <div key={item.id} className="grid grid-cols-[1fr_auto_auto] gap-4 items-center">
-                                                            <div>
-                                                                <p className="font-medium text-foreground text-base hover:underline cursor-pointer">{item.name}</p>
-                                                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                                                    {item.variant_title && item.variant_title !== 'Default Title' && (
-                                                                        <Badge variant="secondary" className="font-normal rounded-md px-2 py-0.5 text-xs bg-muted/60">{item.variant_title}</Badge>
-                                                                    )}
-                                                                    <span className="text-sm text-muted-foreground">{item.sku}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-right text-base text-muted-foreground">
-                                                                {selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{parseFloat(item.price).toFixed(2)} × {item.quantity}
-                                                            </div>
-                                                            <div className="text-right font-medium text-foreground text-base w-24">
-                                                                {selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{(parseFloat(item.price) * item.quantity).toFixed(2)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Payment Summary Footer Card */}
-                                        <div className="bg-card border rounded-lg p-5 shadow-sm space-y-3 text-sm">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Badge variant={selectedOrderDetails.financial_status === 'paid' ? 'default' : 'secondary'} className="rounded-sm font-medium">
-                                                    {selectedOrderDetails.financial_status === 'paid' ? 'Paid' : selectedOrderDetails.financial_status?.toUpperCase() || 'UNKNOWN'}
-                                                </Badge>
-                                            </div>
-
-                                            <div className="flex justify-between items-center text-muted-foreground">
-                                                <span>Subtotal</span>
-                                                <span>
-                                                    {selectedOrderDetails.line_items.reduce((sum, item) => sum + item.quantity, 0)} items
-                                                </span>
-                                                <span className="text-foreground">{selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{parseFloat(selectedOrderDetails.subtotal_price || selectedOrderDetails.total_price).toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-muted-foreground">
-                                                <span>Shipping</span>
-                                                {/* Shopify summary often includes weight, we'll omit if not immediately available */}
-                                                <span>Standard</span>
-                                                <span className="text-foreground">
-                                                    {/* Rough estimation if subtotal/total differ, otherwise 0 for demo */}
-                                                    {parseFloat(selectedOrderDetails.total_price) > parseFloat(selectedOrderDetails.subtotal_price || selectedOrderDetails.total_price)
-                                                        ? `${selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}${(parseFloat(selectedOrderDetails.total_price) - parseFloat(selectedOrderDetails.subtotal_price || selectedOrderDetails.total_price)).toFixed(2)}`
-                                                        : '₹0.00'}
-                                                </span>
-                                            </div>
-                                            {parseFloat(selectedOrderDetails.total_tax) > 0 && (
-                                                <div className="flex justify-between items-center text-muted-foreground">
-                                                    <span>Taxes</span>
-                                                    <span>Included</span>
-                                                    <span className="text-foreground">{selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{parseFloat(selectedOrderDetails.total_tax).toFixed(2)}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="pt-3 border-t flex justify-between items-center font-medium text-base">
-                                                <span>Total</span>
-                                                <span>{selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}{parseFloat(selectedOrderDetails.total_price).toFixed(2)}</span>
-                                            </div>
-
-                                            <div className="pt-3 border-t flex justify-between items-center font-medium">
-                                                <span>Paid</span>
-                                                <span>{selectedOrderDetails.financial_status === 'paid' ? `${selectedOrderDetails.currency === 'INR' ? '₹' : selectedOrderDetails.currency}${parseFloat(selectedOrderDetails.total_price).toFixed(2)}` : '₹0.00'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Sidebar: Notes, Customer, Details */}
-                                    <div className="space-y-6 pt-2 border-t">
-                                        {/* Customer Header Info */}
-                                        <div className="bg-card border rounded-lg p-5 shadow-sm">
-                                            <h3 className="font-medium text-sm text-muted-foreground flex justify-between items-center mb-3">
-                                                Notes
-                                                <Button variant="ghost" size="icon" className="h-6 w-6"><span className="sr-only">Edit node</span>✎</Button>
-                                            </h3>
-                                            <p className="text-sm text-muted-foreground">No notes from customer</p>
-                                        </div>
-
-                                        <div className="bg-card border rounded-lg p-5 shadow-sm space-y-4">
-                                            <h3 className="font-medium text-sm text-foreground flex justify-between items-center mb-2">
-                                                Customer
-                                            </h3>
-                                            <div>
-                                                <a href={`mailto:${selectedOrderDetails.email}`} className="text-primary hover:underline text-sm font-medium">
-                                                    {selectedOrderDetails.customer?.first_name} {selectedOrderDetails.customer?.last_name}
-                                                </a>
-                                                <p className="text-sm text-muted-foreground ">{selectedOrderDetails.email}</p>
-                                                {selectedOrderDetails.phone && <p className="text-sm text-muted-foreground mt-1">{selectedOrderDetails.phone}</p>}
-                                            </div>
-
-                                            <div className="pt-4 border-t">
-                                                <h3 className="font-medium text-sm text-foreground mb-2 flex justify-between items-center">
-                                                    Shipping address
-                                                </h3>
-                                                {selectedOrderDetails.shipping_address ? (
-                                                    <div className="text-sm text-muted-foreground space-y-0.5">
-                                                        <p className="font-medium text-foreground">{selectedOrderDetails.shipping_address.first_name} {selectedOrderDetails.shipping_address.last_name}</p>
-                                                        <p>{selectedOrderDetails.shipping_address.address1}</p>
-                                                        {selectedOrderDetails.shipping_address.address2 && <p>{selectedOrderDetails.shipping_address.address2}</p>}
-                                                        <p>{selectedOrderDetails.shipping_address.city}, {selectedOrderDetails.shipping_address.province} {selectedOrderDetails.shipping_address.zip}</p>
-                                                        <p>{selectedOrderDetails.shipping_address.country}</p>
-                                                        {selectedOrderDetails.shipping_address.phone && <p className="mt-2 text-foreground">{selectedOrderDetails.shipping_address.phone}</p>}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground italic">No shipping address provided</p>
-                                                )}
-                                            </div>
-
-                                            <div className="pt-4 border-t">
-                                                <h3 className="font-medium text-sm text-foreground mb-2">
-                                                    Billing address
-                                                </h3>
-                                                {selectedOrderDetails.billing_address || selectedOrderDetails.shipping_address ? (
-                                                    <p className="text-sm text-muted-foreground">Same as shipping address</p>
-                                                ) : null}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-card border rounded-lg p-5 shadow-sm">
-                                            <h3 className="font-medium text-sm text-muted-foreground flex justify-between items-center mb-3">
-                                                Additional details
-                                            </h3>
-                                            <div className="space-y-4 text-sm">
-                                                <div>
-                                                    <p className="font-medium">Paid via</p>
-                                                    <p className="text-muted-foreground">Standard Checkout</p>
-                                                </div>
-                                                <div className="pt-2">
-                                                    <p className="text-muted-foreground">Order Date</p>
-                                                    <p>{format(new Date(selectedOrderDetails.created_at), 'MMM d, yyyy h:mm a')}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </SheetContent>
-                </Sheet>
+        {/* Toolbar */}
+        <div className="space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <SearchField
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Order #, name, phone, email…"
+              className="w-full sm:w-72"
+            />
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                <SelectTrigger className="sm:w-[168px]" aria-label="Payment status">
+                  <SelectValue placeholder="Payment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All payments</SelectItem>
+                  {PAYMENT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={fulfillmentFilter} onValueChange={setFulfillmentFilter}>
+                <SelectTrigger className="sm:w-[168px]" aria-label="Fulfillment status">
+                  <SelectValue placeholder="Fulfillment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All fulfillment</SelectItem>
+                  {FULFILLMENT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-        </Layout>
-    );
+          </div>
+          {(paymentFilter !== 'all' || fulfillmentFilter !== 'all') && (
+            <div className="flex flex-wrap items-center gap-2">
+              {paymentFilter !== 'all' && <FilterChip label={`Payment: ${paymentLabel}`} onRemove={() => setPaymentFilter('all')} />}
+              {fulfillmentFilter !== 'all' && <FilterChip label={`Fulfillment: ${fulfillmentLabel}`} onRemove={() => setFulfillmentFilter('all')} />}
+              {hasFilters && (
+                <button type="button" onClick={clearFilters} className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* List + panel */}
+        <div className={cn('grid items-start gap-5', showSplit && 'xl:grid-cols-[minmax(0,1fr)_420px]')}>
+          {/* Phones: stacked cards */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card md:hidden">
+            {listBody(() => (
+              <ul className="divide-y divide-border">
+                {paginatedOrders.map((order) => {
+                  const pay = paymentPill(order);
+                  const ful = fulfillmentPill(order);
+                  const elig = eligibility(order, windowDays, new Date(now));
+                  const checked = selectedIds.has(order.id);
+                  return (
+                    <li key={order.id} className={cn('flex items-start gap-3 px-4 py-3 transition-colors', checked && 'bg-accent')}>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(c) => toggleOne(order.id, c === true)}
+                        aria-label={`Select order ${order.name}`}
+                        className="mt-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setActiveId(order.id)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-foreground">{order.name}</span>
+                            <span className="shrink-0 text-sm font-medium tabular text-foreground">{money(order.total_price, order.currency)}</span>
+                          </div>
+                          <p className="truncate text-[13px] text-muted-foreground">
+                            {customerName(order)} · {itemCount(order)} {itemCount(order) === 1 ? 'item' : 'items'} · {format(new Date(order.created_at), 'd MMM')}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            <ToneBadge tone={pay.tone}>{pay.label}</ToneBadge>
+                            <ToneBadge tone={ful.tone}>{ful.label}</ToneBadge>
+                            <ToneBadge tone={elig.tone}>{elig.label}</ToneBadge>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ))}
+            {pagination}
+          </div>
+
+          {/* Tablet / desktop: table */}
+          <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+            {listBody(() => (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allOnPageSelected ? true : someOnPageSelected ? 'indeterminate' : false}
+                        onCheckedChange={(c) => toggleAllOnPage(c === true)}
+                        aria-label="Select all orders on this page"
+                      />
+                    </TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead className={dateCol}>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className={paymentCol}>Payment</TableHead>
+                    <TableHead>Fulfillment</TableHead>
+                    <TableHead>Exchange</TableHead>
+                    {!showSplit && <TableHead className="hidden xl:table-cell w-[1%]"><span className="sr-only">Actions</span></TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedOrders.map((order) => {
+                    const pay = paymentPill(order);
+                    const ful = fulfillmentPill(order);
+                    const elig = eligibility(order, windowDays, new Date(now));
+                    const checked = selectedIds.has(order.id);
+                    const active = order.id === activeId;
+                    const email = customerEmail(order);
+                    return (
+                      <TableRow
+                        key={order.id}
+                        data-state={checked || active ? 'selected' : undefined}
+                        aria-selected={active}
+                        tabIndex={0}
+                        onClick={() => setActiveId(order.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setActiveId(order.id);
+                          }
+                        }}
+                        className={cn('group cursor-pointer focus-visible:outline-none focus-visible:bg-muted/60', active && 'bg-accent hover:bg-accent')}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => toggleOne(order.id, c === true)}
+                            aria-label={`Select order ${order.name}`}
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-medium text-foreground">{order.name}</TableCell>
+                        <TableCell className={cn('whitespace-nowrap text-muted-foreground', dateCol)}>
+                          {format(new Date(order.created_at), 'd MMM')}
+                        </TableCell>
+                        <TableCell className={cn(showSplit ? 'max-w-[160px]' : 'max-w-[220px]')}>
+                          <div className="truncate font-medium text-foreground">{customerName(order)}</div>
+                          {email && <div className="truncate text-xs text-muted-foreground">{email}</div>}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-medium tabular">{money(order.total_price, order.currency)}</TableCell>
+                        <TableCell className={paymentCol}>
+                          <ToneBadge tone={pay.tone}>{pay.label}</ToneBadge>
+                        </TableCell>
+                        <TableCell>
+                          <ToneBadge tone={ful.tone}>{ful.label}</ToneBadge>
+                        </TableCell>
+                        <TableCell>
+                          <ToneBadge tone={elig.tone}>{elig.label}</ToneBadge>
+                        </TableCell>
+                        {!showSplit && (
+                          <TableCell className="hidden py-0 text-right xl:table-cell" onClick={(e) => e.stopPropagation()}>
+                            {elig.eligible && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startExchange(order)}
+                                className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                              >
+                                Exchange
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ))}
+            {pagination}
+          </div>
+
+          {/* xl+: order panel beside the table */}
+          {showSplit && activeOrder && (
+            <aside className="hidden rounded-xl border border-border bg-card p-5 animate-fade-in xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
+              <OrderPanel key={activeOrder.id} order={activeOrder} windowDays={windowDays} onClose={() => setActiveId(null)} />
+            </aside>
+          )}
+        </div>
+      </div>
+
+      {/* Below xl: order panel in a sheet */}
+      <Sheet open={!isWide && !!activeOrder} onOpenChange={(open) => !open && setActiveId(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto bg-card p-5 sm:max-w-[440px]" aria-describedby={undefined}>
+          <SheetTitle className="sr-only">Order {activeOrder?.name}</SheetTitle>
+          {activeOrder && <OrderPanel order={activeOrder} windowDays={windowDays} onClose={() => setActiveId(null)} showClose={false} />}
+        </SheetContent>
+      </Sheet>
+
+      <BulkBar count={selectedIds.size} onClear={clearSelection} summary={money(selectedTotal)}>
+        <BulkBarButton onClick={exportSelected}>
+          <Download />
+          Export CSV
+        </BulkBarButton>
+      </BulkBar>
+    </Layout>
+  );
 }

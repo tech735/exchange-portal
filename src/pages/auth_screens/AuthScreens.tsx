@@ -4,8 +4,11 @@ import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import type { UserRole as DatabaseUserRole } from '@/types/database';
-import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
-import backgroundImage from '@/assets/background-image.png';
+import { AlertCircle, Eye, EyeOff, Info, Loader2, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { EXCHANGE_STEPS } from '@/lib/exchangeStatus';
 
 export default function AuthScreens() {
   const [email, setEmail] = useState('');
@@ -71,17 +74,18 @@ export default function AuthScreens() {
       };
 
       setUser(userFromProfile);
-      
+
       // If Admin, also set original admin for switching logic support
       if (typedProfile.role === 'ADMIN') {
         setOriginalAdminUser(userFromProfile);
       }
 
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Auth error:', err);
-      const msg: string = err.message || '';
-      if (msg.includes('Invalid login credentials') || err.status === 400) {
+      const e = err as { message?: string; status?: number };
+      const msg: string = e.message || '';
+      if (msg.includes('Invalid login credentials') || e.status === 400) {
         setError('Incorrect email or password. If you need access, contact your administrator to ensure your account exists in the system.');
       } else if (msg.includes('Email not confirmed')) {
         setError('Your account email is not confirmed. Please contact your administrator.');
@@ -94,116 +98,164 @@ export default function AuthScreens() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage: `url(${backgroundImage})`
-      }}
-    >
-      <div className="w-full max-w-md bg-white rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-12 relative overflow-hidden">
-        {/* Decorative background blur */}
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/20 to-transparent pointer-events-none" />
+    <div className="grid min-h-screen bg-card lg:grid-cols-2">
+      {/* Form panel */}
+      <main className="flex min-h-screen flex-col px-4 py-8 sm:px-10 lg:px-16 xl:px-24">
+        <div className="flex items-center gap-2.5">
+          <img src="/Vector-Blue-KOTU-Logo.png" alt="KOTU" className="size-8 rounded-full" />
+          <span className="text-sm font-medium text-foreground">
+            KOTU <span className="text-muted-foreground">·</span> Exchange portal
+          </span>
+        </div>
 
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-6">
-            <LogIn className="w-8 h-8 text-primary" />
+        <div className="flex flex-1 items-center py-12">
+          <div className="mx-auto w-full max-w-sm animate-fade-in lg:mx-0">
+            <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-[28px] sm:leading-tight">Welcome back</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Sign in to manage exchanges, returns and shipments.</p>
+
+            <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="login-email">Work email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="you@kotu.co.in"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  aria-invalid={!!error || undefined}
+                  className="h-10 text-base md:text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="login-password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactAdmin((v) => !v)}
+                    aria-expanded={showContactAdmin}
+                    aria-controls="forgot-password-note"
+                    className="rounded text-sm font-medium text-primary transition-colors duration-150 hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    aria-invalid={!!error || undefined}
+                    className="h-10 pr-10 text-base md:text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-lg text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {showContactAdmin && (
+                <div
+                  id="forgot-password-note"
+                  role="status"
+                  className="flex items-start gap-2.5 rounded-lg bg-accent px-3 py-2.5 text-sm text-accent-foreground animate-fade-in"
+                >
+                  <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <p className="flex-1">
+                    <span className="font-medium">Contact your administrator.</span>{' '}
+                    Passwords are reset by an admin from Users &amp; roles.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactAdmin(false)}
+                    aria-label="Dismiss"
+                    className="-m-1 grid size-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-primary/10"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="animate-spin" />}
+                {isLoading ? 'Signing in…' : 'Sign in'}
+              </Button>
+
+              {error && (
+                <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive animate-fade-in">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">You'll stay signed in on this device until you sign out.</p>
+            </form>
           </div>
+        </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in with email</h1>
-          <p className="text-gray-500 text-center text-sm max-w-xs leading-relaxed">
-            Please enter your email and password to sign in
+        <p className="text-xs text-muted-foreground">
+          Need access? Ask your admin to add you from Users &amp; roles.
+        </p>
+      </main>
+
+      {/* Brand panel (desktop only) */}
+      <aside className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:flex lg:items-center" aria-hidden>
+        <div className="pointer-events-none absolute -right-24 -top-24 size-96 rounded-full bg-primary-foreground/5" />
+        <div className="pointer-events-none absolute -bottom-32 -left-16 size-80 rounded-full bg-primary-foreground/5" />
+
+        <div className="relative w-full max-w-lg px-12 xl:px-16">
+          <p className="font-heading text-2xl font-semibold leading-snug xl:text-[28px]">
+            Every exchange — from request to refund — in one place.
           </p>
+          <p className="mt-3 text-sm text-primary-foreground/70">
+            Support, warehouse and finance work from the same record, so nothing falls between teams.
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 p-4">
+              <p className="text-xs text-primary-foreground/70">Steps, one timeline</p>
+              <p className="mt-1 font-heading text-2xl font-semibold tabular">{EXCHANGE_STEPS.length}</p>
+              <p className="mt-1 text-xs text-primary-foreground/70">Request to close</p>
+            </div>
+            <div className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 p-4">
+              <p className="text-xs text-primary-foreground/70">Teams, one queue each</p>
+              <p className="mt-1 font-heading text-2xl font-semibold tabular">4</p>
+              <p className="mt-1 text-xs text-primary-foreground/70">Admin · Support · Warehouse · Finance</p>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 p-4">
+            <p className="text-xs text-primary-foreground/70">The exchange journey</p>
+            <ol className="mt-3 flex flex-wrap gap-1.5">
+              {EXCHANGE_STEPS.map((s, i) => (
+                <li
+                  key={s}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/10 py-0.5 pl-0.5 pr-2.5 text-xs"
+                >
+                  <span className="grid size-5 place-items-center rounded-full bg-primary-foreground text-[11px] font-semibold text-primary tabular">
+                    {i + 1}
+                  </span>
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative group">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">
-              <Mail className="w-5 h-5" />
-            </div>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-100 text-gray-900 rounded-xl px-12 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 focus:bg-white transition-all placeholder:text-gray-400 font-medium"
-              required
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="relative group">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">
-              <Lock className="w-5 h-5" />
-            </div>
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-100 text-gray-900 rounded-xl px-12 py-3.5 pr-12 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 focus:bg-white transition-all placeholder:text-gray-400 font-medium"
-              required
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
-          </div>
-
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowContactAdmin(true)}
-              className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors bg-transparent border-none cursor-pointer p-0"
-            >
-              Forgot password?
-            </button>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-[15px] hover:bg-primary/90 transform active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-primary/20 mt-2"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Signing in...' : 'Get Started'}
-          </button>
-        </form>
-      </div>
-
-      {/* Contact Admin Message */}
-      {showContactAdmin && (
-        <div className="fixed bottom-6 right-6 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 p-4 max-w-sm animate-in slide-in-from-bottom-2 fade-in duration-300 z-50 flex items-start gap-3">
-          <div className="bg-blue-50 text-primary p-2 rounded-lg">
-            <Mail className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <h4 className="text-sm font-semibold text-gray-900">Contact Administrator</h4>
-            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-              Please contact your system administrator to reset your password.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowContactAdmin(false)}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-          >
-            <span className="sr-only">Dismiss</span>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
+      </aside>
     </div>
   );
 }

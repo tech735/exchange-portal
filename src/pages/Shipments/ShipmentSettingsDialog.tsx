@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,7 +31,7 @@ function NumberField({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-[13px] font-medium text-foreground">{label}</Label>
       <div className="flex items-center gap-2">
         <Input
           id={id}
@@ -87,7 +87,7 @@ export function ShipmentSettingsDialog({
       },
       {
         onSuccess: () => {
-          toast({ title: 'Tracker settings saved' });
+          toast({ title: 'Tracker rules saved' });
           onOpenChange(false);
         },
         onError: (error: Error) => toast({ title: 'Could not save settings', description: error.message, variant: 'destructive' }),
@@ -99,21 +99,21 @@ export function ShipmentSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tracker settings</DialogTitle>
+          <DialogTitle>Tracker rules</DialogTitle>
           <DialogDescription>Deadlines, the Delhi NCR list and alerts. Changes apply to every shipment straight away.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Pickup deadline</h3>
+        <form onSubmit={handleSubmit} className="space-y-6 pt-1">
+          <section className="space-y-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+            <h3 className="font-heading text-sm font-semibold text-foreground">Pickup deadline</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <NumberField id="pickup-days" label="Picked up within" value={draft.pickup_deadline_days} onChange={(v) => set('pickup_deadline_days', v)} suffix="day(s) of the order" />
               <NumberField id="pickup-hour" label="By (24h, IST)" value={draft.pickup_deadline_hour} onChange={(v) => set('pickup_deadline_hour', v)} max={23} suffix=":00" />
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Delivery deadline (from pickup)</h3>
+          <section className="space-y-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+            <h3 className="font-heading text-sm font-semibold text-foreground">Delivery deadline (from pickup)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <NumberField id="ncr-days" label="Delhi NCR" value={draft.ncr_delivery_days} onChange={(v) => set('ncr_delivery_days', v)} suffix="days" />
               <NumberField id="outside-days" label="Outside NCR" value={draft.outside_ncr_delivery_days} onChange={(v) => set('outside_ncr_delivery_days', v)} suffix="days" />
@@ -124,8 +124,8 @@ export function ShipmentSettingsDialog({
             </label>
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">RTO escalation</h3>
+          <section className="space-y-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+            <h3 className="font-heading text-sm font-semibold text-foreground">RTO escalation</h3>
             <NumberField
               id="rto-days"
               label="Flag for RTO review when still undelivered"
@@ -137,22 +137,22 @@ export function ShipmentSettingsDialog({
             <p className="text-xs text-muted-foreground">Flagged shipments get a "Mark RTO" button. Shipments the courier reports as RTO move there automatically.</p>
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Delhi NCR</h3>
+          <section className="space-y-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+            <h3 className="font-heading text-sm font-semibold text-foreground">Delhi NCR</h3>
             <div className="space-y-1.5">
-              <Label htmlFor="ncr-cities" className="text-xs font-medium text-muted-foreground">Cities (one per line — matches any city or state containing the name)</Label>
+              <Label htmlFor="ncr-cities" className="text-[13px] font-medium text-foreground">Cities (one per line — matches any city or state containing the name)</Label>
               <Textarea id="ncr-cities" rows={5} value={cities} onChange={(e) => setCities(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ncr-prefixes" className="text-xs font-medium text-muted-foreground">PIN code prefixes</Label>
+              <Label htmlFor="ncr-prefixes" className="text-[13px] font-medium text-foreground">PIN code prefixes</Label>
               <Input id="ncr-prefixes" value={prefixes} onChange={(e) => setPrefixes(e.target.value)} placeholder="110, 1220, 2013" />
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Alerts</h3>
+          <section className="space-y-3 border-t border-border pt-5 first:border-t-0 first:pt-0">
+            <h3 className="font-heading text-sm font-semibold text-foreground">Alerts</h3>
             <div className="space-y-1.5">
-              <Label htmlFor="team-emails" className="text-xs font-medium text-muted-foreground">Team alert emails (late pickups and delayed orders, hourly)</Label>
+              <Label htmlFor="team-emails" className="text-[13px] font-medium text-foreground">Team alert emails (late pickups and delayed orders, hourly)</Label>
               <Input id="team-emails" value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="Blank = the logistics and admin notification lists" />
             </div>
             <div className="space-y-2">
@@ -172,10 +172,10 @@ export function ShipmentSettingsDialog({
             </div>
           </section>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
+          <DialogFooter className="border-t border-border pt-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateSettings.isPending}>{updateSettings.isPending ? 'Saving…' : 'Save settings'}</Button>
-          </div>
+            <Button type="submit" disabled={updateSettings.isPending}>{updateSettings.isPending ? 'Saving…' : 'Save rules'}</Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
