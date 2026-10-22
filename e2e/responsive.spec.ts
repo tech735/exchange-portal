@@ -11,7 +11,11 @@ async function noSideScroll(page: Page) {
   return sw <= cw + 1;
 }
 
-for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'tablet', width: 834, height: 1112 }, { name: 'laptop', width: 1280, height: 800 }]) {
+for (const vp of [
+  { name: 'small phone', width: 320, height: 640 }, { name: 'phone', width: 390, height: 844 }, { name: 'large phone', width: 430, height: 932 },
+  { name: 'tablet', width: 768, height: 1024 }, { name: 'tablet landscape', width: 1024, height: 768 },
+  { name: 'laptop', width: 1280, height: 800 }, { name: 'large monitor', width: 1920, height: 1080 },
+]) {
   test(`${vp.name} (${vp.width}px): every page fits without sideways scrolling`, async ({ page }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: vp.width, height: vp.height });
