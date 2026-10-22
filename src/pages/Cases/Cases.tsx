@@ -15,14 +15,15 @@ import { useCaseUpdates, useAddCaseUpdate, useStaff } from '@/hooks/useAppData';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
-import { SPECIAL_CASE_TYPE_LABELS, type SpecialCase, type SpecialCaseType, type Shipment } from '@/types/database';
+import { SPECIAL_CASE_TYPE_LABELS, type CaseBoardStage, type SpecialCase, type SpecialCaseType, type Shipment } from '@/types/database';
+import { CaseBoard, BOARD_COLUMNS, type BoardColumn } from './CaseBoard';
 import { cn } from '@/lib/utils';
 
-type Tab = 'open' | 'rto' | 'resolved';
+type Tab = 'board' | 'open' | 'rto' | 'resolved';
 const TYPE_TONE: Record<SpecialCaseType, 'danger' | 'warning' | 'info' | 'neutral'> = { RTO: 'danger', RETURN: 'warning', EXCHANGE: 'info', OTHER: 'neutral' };
 const today = () => format(new Date(), 'yyyy-MM-dd');
 
-function NewCaseDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (orderName: string) => void }) {
+function NewCaseDialog({ open, onOpenChange, onCreated, stage = 'NEW' }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (orderName: string) => void; stage?: CaseBoardStage }) {
   const save = useSaveSpecialCase();
   const { profile, user } = useAuth();
   const { toast } = useToast();
@@ -32,7 +33,7 @@ function NewCaseDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpe
     try {
       await save.mutateAsync({ values: {
         order_name: v.order_name.trim(), case_type: v.case_type, issue: v.issue.trim(), awb_number: v.awb_number.trim() || null,
-        action_taken: null, latest_update: null, status: 'OPEN', resolved_on: null, updated_by: profile?.full_name ?? null, owner_id: user?.id ?? null,
+        action_taken: null, latest_update: null, status: 'OPEN', resolved_on: null, updated_by: profile?.full_name ?? null, owner_id: user?.id ?? null, board_stage: stage,
       } as SpecialCaseValues });
       toast({ title: 'Case logged' });
       onCreated(v.order_name.trim());
@@ -121,6 +122,12 @@ function CaseDetail({ c, onBack }: { c: SpecialCase; onBack: () => void }) {
                 {staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name || s.email}</SelectItem>)}
               </SelectContent>
             </Select>
+            {open && (
+              <Select value={c.board_stage ?? 'NEW'} onValueChange={(v) => patch({ board_stage: v as CaseBoardStage } as Partial<SpecialCaseValues>, 'Moved')}>
+                <SelectTrigger className="h-9 w-[180px]" aria-label="Stage"><SelectValue /></SelectTrigger>
+                <SelectContent>{BOARD_COLUMNS.filter((b) => b.key !== 'CLOSED').map((b) => <SelectItem key={b.key} value={b.key}>{b.title}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
             {open
               ? <Button onClick={() => patch({ status: 'RESOLVED', resolved_on: today() }, 'Case resolved')}><CheckCircle2 /> Resolve</Button>
               : <Button variant="secondary" onClick={() => patch({ status: 'OPEN', resolved_on: null }, 'Case reopened')}><RotateCcw /> Reopen</Button>}
@@ -214,7 +221,21 @@ function RtoList({ shipments }: { shipments: Shipment[] }) {
 export default function Cases() {
   const { data: cases = [], isLoading } = useSpecialCases();
   const { data: shipments = [] } = useShipments(null);
-  const [tab, setTab] = useState<Tab>('open');
+  const [tab, setTab] = useState<Tab>('board');
+  const [newStage, setNewStage] = useState<CaseBoardStage>('NEW');
+  const save = useSaveSpecialCase();
+  const { data: staff = [] } = useStaff();
+  const { profile } = useAuth();
+  const { toast } = useToast();
+  const moveCase = async (c: SpecialCase, to: BoardColumn) => {
+    const patch = to === 'CLOSED'
+      ? { status: 'RESOLVED', resolved_on: today() }
+      : { status: 'OPEN', resolved_on: null, board_stage: to };
+    try {
+      await save.mutateAsync({ id: c.id, values: { ...patch, updated_by: profile?.full_name ?? c.updated_by } as unknown as SpecialCaseValues });
+      toast({ title: `${c.order_name} → ${BOARD_COLUMNS.find((b) => b.key === to)?.title}` });
+    } catch (e) { toast({ title: 'Couldn’t move the case', description: (e as Error).message, variant: 'destructive' }); }
+  };
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -229,7 +250,7 @@ export default function Cases() {
   const selected = cases.find((c) => c.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (tab === 'rto') return;
+    if (tab === 'rto' || tab === 'board') return;
     if (typeof window !== 'undefined' && window.innerWidth >= 1024 && !selected && list[0]) setSelectedId(list[0].id);
   }, [list, selected, tab]);
 
@@ -241,15 +262,25 @@ export default function Cases() {
         <PageHeader
           title="Cases"
           description="RTOs, damaged parcels, wrong deliveries and anything else that needs follow-up"
-          actions={<Button onClick={() => setCreating(true)}><Plus /> Log a case</Button>}
+          actions={<Button onClick={() => { setNewStage('NEW'); setCreating(true); }}><Plus /> Log a case</Button>}
         />
         <ViewTabs
-          views={[{ id: 'open', label: 'Open', count: openCount }, { id: 'rto', label: 'RTO', count: rtos.length }, { id: 'resolved', label: 'Resolved' }]}
+          views={[{ id: 'board', label: 'Board' }, { id: 'open', label: 'Open', count: openCount }, { id: 'rto', label: 'RTO', count: rtos.length }, { id: 'resolved', label: 'Resolved' }]}
           value={tab}
           onChange={(t) => { setTab(t); setSelectedId(null); }}
         />
 
-        {tab === 'rto' ? (
+        {tab === 'board' ? (
+          isLoading
+            ? <div className="grid grid-cols-5 gap-3">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-96 rounded-xl bg-muted animate-pulse" />)}</div>
+            : <CaseBoard
+                cases={cases}
+                staff={staff}
+                onOpen={(c) => { setTab(c.status === 'RESOLVED' ? 'resolved' : 'open'); setSelectedId(c.id); }}
+                onCreate={(stage) => { setNewStage(stage); setCreating(true); }}
+                onMove={moveCase}
+              />
+        ) : tab === 'rto' ? (
           <div className="overflow-hidden rounded-xl border border-border bg-card"><RtoList shipments={rtos} /></div>
         ) : (
           <div className="grid overflow-hidden rounded-xl border border-border bg-card lg:h-[calc(100vh-15rem)] lg:min-h-[520px] lg:grid-cols-[380px_minmax(0,1fr)]">
@@ -286,7 +317,7 @@ export default function Cases() {
           </div>
         )}
       </div>
-      <NewCaseDialog open={creating} onOpenChange={setCreating} onCreated={() => setTab('open')} />
+      <NewCaseDialog open={creating} onOpenChange={setCreating} stage={newStage} onCreated={() => { if (tab !== 'board') setTab('open'); }} />
     </Layout>
   );
 }

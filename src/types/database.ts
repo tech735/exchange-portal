@@ -207,6 +207,7 @@ export interface Shipment {
 
 export type SpecialCaseType = 'EXCHANGE' | 'RETURN' | 'RTO' | 'OTHER';
 export type SpecialCaseStatus = 'OPEN' | 'RESOLVED';
+export type CaseBoardStage = 'NEW' | 'ON_US' | 'ON_CUSTOMER' | 'ON_HOLD';
 
 export interface SpecialCase {
   id: string;
@@ -220,6 +221,7 @@ export interface SpecialCase {
   resolved_on: string | null; // yyyy-MM-dd
   updated_by: string | null;
   owner_id?: string | null;
+  board_stage?: CaseBoardStage;
   created_at: string;
   updated_at: string;
 }
