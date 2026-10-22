@@ -257,7 +257,7 @@ export function SectionCard({
   description?: React.ReactNode;
 }) {
   return (
-    <section className={cn('rounded-xl border border-border bg-card', className)}>
+    <section className={cn('min-w-0 rounded-xl border border-border bg-card', className)}>
       {title && (
         <header className="flex items-center gap-3 px-4 sm:px-5 pt-4 pb-3">
           <div className="min-w-0 flex-1">

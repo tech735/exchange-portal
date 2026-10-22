@@ -51,17 +51,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
+    // Never await Supabase calls inside this callback: supabase-js holds its auth
+    // lock while the callback runs, so a query here (which reads the session)
+    // deadlocks, and a page reload with a stored session hangs on the loader.
+    // Defer the profile fetch until the callback has returned.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-            setLoading(false);
-          }
+      (_event, session) => {
+        if (!isMounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const id = session.user.id;
+          setTimeout(() => { if (isMounted) void fetchProfile(id); }, 0);
+        } else {
+          setProfile(null);
+          setLoading(false);
         }
       }
     );

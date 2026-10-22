@@ -125,7 +125,11 @@ export function slaRemaining(t: Pick<Ticket, 'created_at' | 'sla_breached'>, now
 }
 
 function formatHours(h: number) {
-  if (h < 1) return `${Math.max(1, Math.round(h * 60))}m`;
-  if (h < 24) return `${Math.round(h)}h`;
-  return `${Math.floor(h / 24)}d ${Math.round(h % 24)}h`;
+  // Round once, then split, so 47.6h shows "2d 0h" rather than "1d 24h".
+  const mins = Math.max(1, Math.round(h * 60));
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const d = Math.floor(hours / 24), rem = hours % 24;
+  return rem ? `${d}d ${rem}h` : `${d}d`;
 }

@@ -29,3 +29,7 @@ build*.log
 
 #Exclude env files
 .env
+# Playwright
+/.e2e/
+/test-results/
+/playwright-report/
