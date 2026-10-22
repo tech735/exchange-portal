@@ -133,12 +133,15 @@ export default function Warehouse() {
     scanRef.current?.focus();
   };
 
-  const Card = ({ t, col }: { t: Ticket; col: (typeof COLUMNS)[number] }) => {
+  // Rendered by a plain function call (not <Card />): a component defined inside the page would be
+  // remounted on every re-render, which cancels an in-progress drag.
+  const renderCard = (t: Ticket, col: (typeof COLUMNS)[number]) => {
     const since = age(t, col.key);
     const stuck = col.key === 'RETURN_IN_TRANSIT' && Date.now() - +since > 3 * 864e5;
     const sla = slaRemaining(t);
     return (
       <div
+        key={t.id}
         draggable={!!col.action || col.key === 'SHIPPED'}
         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setDrag({ id: t.id, from: col.key }); }}
         onDragEnd={() => { setDrag(null); setOver(null); }}
@@ -264,7 +267,7 @@ export default function Warehouse() {
                   <div className="flex flex-1 flex-col gap-2">
                     {grouped[c.key].length === 0
                       ? <p className="py-8 text-center text-xs text-faint">{c.empty}</p>
-                      : grouped[c.key].map((t) => <Card key={t.id} t={t} col={c} />)}
+                      : grouped[c.key].map((t) => renderCard(t, c))}
                     {drag && canDrop(c.key) && (
                       <div className={cn('grid place-items-center rounded-lg border-2 border-dashed py-6 text-xs font-medium transition-colors', over === c.key ? 'border-primary text-primary' : 'border-primary/30 text-muted-foreground')}>
                         {isBack(c.key) ? 'Drop to move back (undo)' : `Drop to ${COLUMNS[colIndex(drag.from)].action?.toLowerCase()}`}
