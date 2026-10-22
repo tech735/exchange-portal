@@ -102,3 +102,13 @@ export function displayPhone(p?: string | null) {
   const v = (p || '').trim();
   return EMPTY_VARIANTS.has(v.toLowerCase()) ? '' : v;
 }
+
+/** Drops emoji / pictographs from a name copied out of Shopify, e.g. "Priyanka 👸" → "Priyanka". */
+export function cleanPersonName(n?: string | null) {
+  return (n || '')
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '') // skin-tone modifiers
+    .replace(/‍|️/g, '') // joiners / variation selectors
+    .replace(/\s+/g, ' ')
+    .trim();
+}

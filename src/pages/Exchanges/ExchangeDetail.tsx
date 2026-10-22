@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
-  ArrowRight, ChevronLeft, ChevronRight, Copy, ExternalLink, Mail, MessageCircle, MoreHorizontal, Phone, Trash2, AlertTriangle,
+  ArrowRight, ChevronLeft, ChevronRight, Copy, ExternalLink, Mail, MessageCircle, MoreHorizontal, Phone, Trash2, AlertTriangle, Undo2,
 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import {
@@ -101,7 +101,7 @@ export default function ExchangeDetail() {
   const deleteTicket = useDeleteTicket();
   const { user, hasFullAccess } = useUser();
   const full = hasFullAccess() || user?.role === 'ADMIN';
-  const [dialog, setDialog] = useState<null | 'pay' | 'return' | 'replacement' | 'qc' | 'delete' | 'received'>(null);
+  const [dialog, setDialog] = useState<null | 'pay' | 'return' | 'replacement' | 'qc' | 'delete' | 'received' | 'undo'>(null);
 
   const ids = location.state?.ids;
   const pos = ids && id ? ids.indexOf(id) : -1;
@@ -185,6 +185,9 @@ export default function ExchangeDetail() {
                   <DropdownMenuTrigger asChild><Button variant="secondary" size="icon" aria-label="More"><MoreHorizontal /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(window.location.href); toast({ title: 'Link copied' }); }}><Copy className="mr-2 size-4" />Copy link</DropdownMenuItem>
+                    {['RETURN_PENDING', 'RETURN_RECEIVED', 'WAREHOUSE_APPROVED', 'WAREHOUSE_DENIED', 'EXCHANGE_BOOKED'].includes(t.stage) && (full || user?.role === 'WAREHOUSE') && (
+                      <DropdownMenuItem onClick={() => setDialog('undo')}><Undo2 className="mr-2 size-4" />Undo last step</DropdownMenuItem>
+                    )}
                     {(st.key === 'REQUESTED') && mayAct && (
                       <DropdownMenuItem onClick={() => { window.open(RAZORPAY_LINKS_URL, '_blank', 'noopener'); run(() => actions.markLinkSent(t), 'Marked as payment link sent').catch(() => {}); }}>
                         <ExternalLink className="mr-2 size-4" />Send payment link (Razorpay)
@@ -330,6 +333,21 @@ export default function ExchangeDetail() {
         confirmLabel={amounts.net >= 0 ? 'Record payment' : 'Record refund due'}
         loading={actions.pending}
         onConfirm={() => run(() => actions.settlePayment(t), amounts.net >= 0 ? 'Payment recorded' : 'Refund marked as due').catch(() => {})}
+      />
+      <ConfirmDialog
+        open={dialog === 'undo'}
+        onOpenChange={(o) => !o && setDialog(null)}
+        title="Undo the last step?"
+        description={({
+          RETURN_PENDING: 'Removes the pickup booking (courier and AWB). It goes back to “To book pickup”.',
+          RETURN_RECEIVED: 'Undoes “received”. It goes back to “Return in transit”.',
+          WAREHOUSE_APPROVED: 'Clears the QC result, notes and photos. It goes back to “QC pending”.',
+          WAREHOUSE_DENIED: 'Clears the QC result, notes and photos. It goes back to “QC pending”.',
+          EXCHANGE_BOOKED: 'Removes the replacement booking (courier and AWB). It goes back to “Ready to ship”.',
+        } as Record<string, string>)[t.stage]}
+        confirmLabel="Undo step"
+        loading={actions.pending}
+        onConfirm={() => run(() => actions.stepBack(t), 'Step undone').catch(() => {})}
       />
       <ConfirmDialog
         open={dialog === 'received'}

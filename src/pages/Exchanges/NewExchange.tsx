@@ -4,7 +4,7 @@ import { differenceInCalendarDays, format } from 'date-fns';
 import { ArrowRight, Check, Loader2, Mail, MessageCircle, Minus, Phone, Plus, Search, LifeBuoy, MoreHorizontal, Trash2, ArrowLeftRight, Undo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { PageHeader, SectionCard, ToneBadge, KV, ProductThumb, formatINR } from '@/components/app';
-import { describeItem } from '@/lib/items';
+import { cleanPersonName, describeItem } from '@/lib/items';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -103,7 +103,7 @@ export default function NewExchange() {
       setManual(false);
       setCustomer({
         order_id: o.name.replace(/^#/, ''),
-        name: [o.customer?.first_name, o.customer?.last_name].filter(Boolean).join(' ') || [o.shipping_address?.first_name, o.shipping_address?.last_name].filter(Boolean).join(' '),
+        name: cleanPersonName([o.customer?.first_name, o.customer?.last_name].filter(Boolean).join(' ') || [o.shipping_address?.first_name, o.shipping_address?.last_name].filter(Boolean).join(' ')),
         phone: o.phone || o.customer?.phone || o.shipping_address?.phone || '',
         email: o.email || o.customer?.email || '',
       });

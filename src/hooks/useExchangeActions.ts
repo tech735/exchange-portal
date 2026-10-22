@@ -81,7 +81,34 @@ export function useExchangeActions() {
     [update],
   );
 
-  return { amountsFor, settlePayment, markLinkSent, bookReturn, markReceived, recordQc, bookReplacement, update, pending: update.isPending };
+  /**
+   * Undo the most recent warehouse step: puts the ticket back where it was and
+   * clears what that step recorded. Returns false if there's nothing to undo.
+   */
+  const stepBack = useCallback(
+    async (t: Ticket) => {
+      switch (t.stage) {
+        case 'RETURN_PENDING': // pickup booked → to book
+          await update.mutateAsync({ id: t.id, stage: 'LODGED', return_aggregator: null, return_awb: null, return_booked_at: null, eventType: 'UPDATED' });
+          return true;
+        case 'RETURN_RECEIVED': // received → in transit
+          await update.mutateAsync({ id: t.id, stage: 'RETURN_PENDING', return_received_at: null, eventType: 'UPDATED' });
+          return true;
+        case 'WAREHOUSE_APPROVED':
+        case 'WAREHOUSE_DENIED': // QC decided → QC pending
+          await update.mutateAsync({ id: t.id, stage: 'RETURN_RECEIVED', qc_decision: null, qc_notes: null, qc_checklist: null, qc_photos: [], warehouse_approved_at: null, warehouse_denied_at: null, eventType: 'UPDATED' });
+          return true;
+        case 'EXCHANGE_BOOKED': // replacement booked → ready to ship
+          await update.mutateAsync({ id: t.id, stage: 'WAREHOUSE_APPROVED', exchange_aggregator: null, exchange_awb: null, exchange_booked_at: null, eventType: 'UPDATED' });
+          return true;
+        default:
+          return false;
+      }
+    },
+    [update],
+  );
+
+  return { amountsFor, settlePayment, markLinkSent, bookReturn, markReceived, recordQc, bookReplacement, stepBack, update, pending: update.isPending };
 }
 
 export const RAZORPAY_LINKS_URL =

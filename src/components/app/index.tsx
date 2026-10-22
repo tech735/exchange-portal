@@ -358,7 +358,9 @@ export function KV({ label, children, strong }: { label: React.ReactNode; childr
 }
 
 export function initials(name?: string | null) {
-  return (name || '?').split(/\s+/).filter(Boolean).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+  // Letters/digits only: emoji and symbols in names would otherwise show as a broken character.
+  const words = (name || '').split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  return words.length ? words.map((w) => Array.from(w)[0]).slice(0, 2).join('').toUpperCase() : '?';
 }
 
 export const formatINR = (n: number | null | undefined) =>

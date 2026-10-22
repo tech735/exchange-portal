@@ -5,6 +5,7 @@ import { ScanLine, Truck, PackageCheck, ClipboardCheck, Send, Download, LayoutGr
 import Layout from '@/components/Layout';
 import { PageHeader, ToneBadge, EmptyState, ConfirmDialog, SearchField, ProductThumb } from '@/components/app';
 import { Button } from '@/components/ui/button';
+import { ToastAction } from '@/components/ui/toast';
 import { BookShipmentDialog } from '@/components/exchange/BookShipmentDialog';
 import { QcDialog } from '@/components/exchange/QcDialog';
 import { useTickets } from '@/hooks/useTickets';
@@ -38,7 +39,7 @@ export default function Warehouse() {
   const actions = useExchangeActions();
   const [q, setQ] = useState('');
   const [scan, setScan] = useState('');
-  const [scanMsg, setScanMsg] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null);
+  const [scanMsg, setScanMsg] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string; undoRow?: unknown } | null>(null);
   const [view, setView] = useState<'board' | 'list'>('board');
   const [mobileCol, setMobileCol] = useState<ColumnKey>('TO_BOOK_PICKUP');
   const [active, setActive] = useState<{ kind: 'return' | 'replacement' | 'qc' | 'received'; t: Ticket } | null>(null);
@@ -59,8 +60,25 @@ export default function Warehouse() {
     return g;
   }, [tickets, q]);
 
+  /** Undo the step just taken (the saved row tells us where the ticket now is). */
+  const undo = async (row: unknown) => {
+    try {
+      const done = await actions.stepBack(row as Ticket);
+      toast(done ? { title: 'Undone', description: 'Moved back one step.' } : { title: 'Nothing to undo' });
+    } catch (e) { toast({ title: 'Couldn’t undo', description: (e as Error).message, variant: 'destructive' }); }
+  };
+
   const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try { await fn(); toast({ title: ok }); setActive(null); }
+    try {
+      const row = await fn();
+      toast({
+        title: ok,
+        action: row && typeof row === 'object' && 'stage' in row
+          ? <ToastAction altText="Undo this step" onClick={() => undo(row)}>Undo</ToastAction>
+          : undefined,
+      });
+      setActive(null);
+    }
     catch (e) { toast({ title: 'Couldn’t save', description: (e as Error).message, variant: 'destructive' }); throw e; }
   };
 
@@ -68,13 +86,18 @@ export default function Warehouse() {
   const [drag, setDrag] = useState<{ id: string; from: ColumnKey } | null>(null);
   const [over, setOver] = useState<ColumnKey | null>(null);
   const colIndex = (k: ColumnKey) => COLUMNS.findIndex((c) => c.key === k);
-  const canDrop = (to: ColumnKey) => !!drag && colIndex(to) === colIndex(drag.from) + 1;
+  const [back, setBack] = useState<{ t: Ticket; from: ColumnKey } | null>(null);
+  const isBack = (to: ColumnKey) => !!drag && colIndex(drag.from) > 0 && colIndex(to) === colIndex(drag.from) - 1;
+  const canDrop = (to: ColumnKey) => !!drag && (colIndex(to) === colIndex(drag.from) + 1 || isBack(to));
   const onDropTo = (to: ColumnKey) => {
     const d = drag;
+    const backwards = isBack(to);
     setDrag(null); setOver(null);
-    if (!d || colIndex(to) !== colIndex(d.from) + 1) return;
+    if (!d || !canDrop(to)) return;
     const t = tickets.find((x) => x.id === d.id);
-    if (t) openAction(t);
+    if (!t) return;
+    if (backwards) setBack({ t, from: d.from });
+    else openAction(t);
   };
 
   const openAction = (t: Ticket) => {
@@ -97,8 +120,8 @@ export default function Warehouse() {
     const k = getExchangeStatus(t).key;
     if (k === 'RETURN_IN_TRANSIT') {
       try {
-        await actions.markReceived(t);
-        setScanMsg({ tone: 'success', text: `${t.order_id} received · opening quality check` });
+        const row = await actions.markReceived(t);
+        setScanMsg({ tone: 'success', text: `${t.order_id} received · opening quality check`, undoRow: row });
         setActive({ kind: 'qc', t: { ...t, stage: 'RETURN_RECEIVED', return_received_at: new Date().toISOString() } });
       } catch (err) { setScanMsg({ tone: 'danger', text: (err as Error).message }); }
     } else if (['TO_BOOK_PICKUP', 'QC_PENDING', 'READY_TO_SHIP'].includes(k)) {
@@ -116,11 +139,11 @@ export default function Warehouse() {
     const sla = slaRemaining(t);
     return (
       <div
-        draggable={!!col.action}
+        draggable={!!col.action || col.key === 'SHIPPED'}
         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setDrag({ id: t.id, from: col.key }); }}
         onDragEnd={() => { setDrag(null); setOver(null); }}
         className={cn('group rounded-lg border border-border bg-card p-3 shadow-card transition-[border-color,box-shadow,opacity,transform] duration-150 hover:border-input hover:shadow-card-hover',
-          col.action && 'cursor-grab active:cursor-grabbing',
+          (col.action || col.key === 'SHIPPED') && 'cursor-grab active:cursor-grabbing',
           drag?.id === t.id && 'opacity-40 rotate-[1deg] scale-[0.98]')}
       >
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
@@ -185,12 +208,12 @@ export default function Warehouse() {
           <Button type="submit" size="lg" className="sm:w-auto">Find</Button>
         </form>
         {scanMsg && (
-          <p className={cn('-mt-2 rounded-lg px-3 py-2 text-sm animate-fade-in', scanMsg.tone === 'success' ? 'bg-success/10 text-success' : scanMsg.tone === 'warning' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive')}>{scanMsg.text}</p>
+          <p className={cn('-mt-2 rounded-lg px-3 py-2 text-sm animate-fade-in', scanMsg.tone === 'success' ? 'bg-success/10 text-success' : scanMsg.tone === 'warning' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive')}>{scanMsg.text}{scanMsg.undoRow ? <button type="button" className="ml-2 font-medium underline underline-offset-2" onClick={() => { const r = scanMsg.undoRow; setScanMsg(null); setActive(null); undo(r); }}>Undo</button> : null}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={q} onChange={setQ} placeholder="Filter by order, customer, AWB…" className="w-full sm:w-72" />
-          {view === 'board' && <p className="hidden md:block text-xs text-muted-foreground">Tip: drag a card into the next column to move it forward.</p>}
+          {view === 'board' && <p className="hidden md:block text-xs text-muted-foreground">Tip: drag a card to the next column to move it forward, or one column back to undo. Esc cancels a drag.</p>}
         </div>
 
         {isLoading ? (
@@ -244,7 +267,7 @@ export default function Warehouse() {
                       : grouped[c.key].map((t) => <Card key={t.id} t={t} col={c} />)}
                     {drag && canDrop(c.key) && (
                       <div className={cn('grid place-items-center rounded-lg border-2 border-dashed py-6 text-xs font-medium transition-colors', over === c.key ? 'border-primary text-primary' : 'border-primary/30 text-muted-foreground')}>
-                        Drop to {COLUMNS[colIndex(drag.from)].action?.toLowerCase()}
+                        {isBack(c.key) ? 'Drop to move back (undo)' : `Drop to ${COLUMNS[colIndex(drag.from)].action?.toLowerCase()}`}
                       </div>
                     )}
                   </div>
@@ -270,6 +293,25 @@ export default function Warehouse() {
         open={active?.kind === 'qc'}
         onOpenChange={(o) => { if (!o) { setActive(null); scanRef.current?.focus(); } }}
         onSubmit={(d, notes, checklist, photos) => run(() => actions.recordQc(active!.t, d, notes, checklist, photos), d === 'APPROVED' ? 'QC approved · ready to ship' : 'Return rejected')}
+      />
+      <ConfirmDialog
+        open={!!back}
+        onOpenChange={(o) => !o && setBack(null)}
+        title={back ? `Move ${back.t.order_id} back to “${COLUMNS[colIndex(back.from) - 1]?.title}”?` : ''}
+        description={back ? ({
+          RETURN_IN_TRANSIT: 'This removes the pickup booking (courier and AWB) so it can be booked again.',
+          QC_PENDING: 'This undoes “received” — use it if the wrong parcel was scanned.',
+          READY_TO_SHIP: 'This clears the quality-check result, notes and photos so QC can be done again.',
+          SHIPPED: 'This removes the replacement booking (courier and AWB) so it can be booked again.',
+          TO_BOOK_PICKUP: '',
+        } as Record<ColumnKey, string>)[back.from] : undefined}
+        confirmLabel="Move back"
+        loading={actions.pending}
+        onConfirm={async () => {
+          const t = back!.t;
+          setBack(null);
+          await undo(t);
+        }}
       />
       <ConfirmDialog
         open={active?.kind === 'received'}
