@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Check, ChevronDown, Package, Search } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -27,39 +27,96 @@ export function productForSku(products: ProductCatalog[], sku: string | undefine
   return products.find((p) => p.sku === sku || p.variant_skus?.includes(sku));
 }
 
-/** Size chips with stock. Out-of-stock sizes are disabled; `current` marks the size being returned. */
+const COLOURS = /^(red|blue|green|yellow|white|black|grey|gray|navy|maroon|orange|pink|purple|brown|beige|cream|sky|olive)\b/i;
+const FITS = /^(male|female|unisex|boys?|girls?|men|women|kids?)$/i;
+const LOW_STOCK = 3;
+
+function groupLabel(groups: string[]) {
+  if (groups.some((g) => COLOURS.test(g))) return 'Colour';
+  if (groups.some((g) => FITS.test(g))) return 'Fit';
+  return 'Style';
+}
+
+/**
+ * Size picker. Single-part variants ("28×40") show one row of chips.
+ * Two-part variants ("Red / 10-12Y", "Female / M") split into two short steps:
+ * pick the colour / fit first (pre-selected to match the returned item), then
+ * only that group's sizes, so staff never scan 40+ chips.
+ */
 export function SizeChips({ product, value, current, onChange }: { product: ProductCatalog | undefined; value?: string; current?: string; onChange: (o: SizeOption) => void }) {
   const sizes = sizesFor(product);
-  if (!product) return <p className="text-sm text-muted-foreground">Product not found in the catalogue. Pick one below.</p>;
+  const parts = sizes.map((o) => o.size.split(' / '));
+  const grouped = sizes.length > 0 && parts.every((p) => p.length >= 2);
+  const groups = grouped ? [...new Set(parts.map((p) => p[0]))] : [];
+  const inStock = (o: SizeOption) => o.stock === null || o.stock > 0;
+  const initialGroup = () => {
+    const from = (value || current || '').split(' / ')[0];
+    if (groups.includes(from)) return from;
+    return groups.find((g) => sizes.some((o, i) => parts[i][0] === g && inStock(o))) ?? groups[0];
+  };
+  const [group, setGroup] = useState<string | undefined>(initialGroup);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setGroup(initialGroup()); }, [product?.id]);
+
+  if (!product) return <p className="text-sm text-muted-foreground">Product not found in the catalogue. Use “Change product” to pick one.</p>;
   if (sizes.length === 0) return <p className="text-sm text-muted-foreground">This product has no sizes in the catalogue.</p>;
+
+  const visible = sizes.map((o, i) => ({ o, label: grouped ? parts[i].slice(1).join(' / ') : o.size, g: grouped ? parts[i][0] : '' }))
+    .filter((x) => !grouped || x.g === group);
+  const selected = sizes.find((o) => o.size === value);
+
   return (
-    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Size">
-      {sizes.map((o) => {
-        const out = o.stock !== null && o.stock <= 0;
-        const on = value === o.size;
-        const isCurrent = current === o.size;
-        return (
-          <button
-            key={o.size}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            disabled={out}
-            onClick={() => onChange(o)}
-            className={cn(
-              'min-w-[64px] rounded-lg border px-3 py-1.5 text-center transition-all duration-150 active:scale-[0.97]',
-              on && 'border-primary bg-accent text-accent-foreground ring-[3px] ring-primary/10',
-              !on && !out && 'border-input bg-card hover:border-primary/50',
-              out && 'cursor-not-allowed border-transparent bg-muted text-faint line-through decoration-faint/60',
-            )}
-          >
-            <span className="block text-sm font-semibold">{o.size}</span>
-            <span className={cn('block text-[11px]', on ? 'text-primary' : 'text-muted-foreground', out && 'no-underline')}>
-              {out ? 'Sold out' : isCurrent ? 'Current' : o.stock === null ? 'Stock ?' : `${o.stock} left`}
-            </span>
-          </button>
-        );
-      })}
+    <div className="space-y-3">
+      {grouped && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">{groupLabel(groups)}</p>
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={groupLabel(groups)}>
+            {groups.map((g) => {
+              const available = sizes.filter((o, i) => parts[i][0] === g && inStock(o)).length;
+              const on = g === group;
+              return (
+                <button key={g} type="button" role="radio" aria-checked={on} onClick={() => setGroup(g)}
+                  className={cn('inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]',
+                    on ? 'border-primary bg-primary text-primary-foreground' : available ? 'border-input bg-card hover:border-primary/50' : 'border-transparent bg-muted text-faint')}>
+                  {g}
+                  {!available && <span className="text-[11px] font-normal">· sold out</span>}
+                  {current?.split(' / ')[0] === g && <span className={cn('text-[11px] font-normal', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>· current</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        {grouped && <p className="text-xs font-medium text-muted-foreground">Size</p>}
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Size">
+          {visible.map(({ o, label }) => {
+            const out = !inStock(o);
+            const on = value === o.size;
+            const isCurrent = current === o.size;
+            const low = !out && o.stock !== null && o.stock <= LOW_STOCK;
+            return (
+              <button key={o.size} type="button" role="radio" aria-checked={on} disabled={out} onClick={() => onChange(o)}
+                title={out ? 'Sold out' : o.stock === null ? 'Stock unknown' : `${o.stock} in stock`}
+                className={cn('relative inline-flex h-9 min-w-[52px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-all duration-150 active:scale-[0.97]',
+                  on && 'border-primary bg-accent text-accent-foreground ring-[3px] ring-primary/10',
+                  !on && !out && 'border-input bg-card hover:border-primary/50',
+                  isCurrent && !on && 'border-dashed',
+                  out && 'cursor-not-allowed border-transparent bg-muted text-faint line-through decoration-faint/60')}>
+                {label}
+                {low && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-warning" aria-hidden />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {selected
+          ? <>Selected <span className="font-medium text-foreground">{selected.size}</span> · {selected.stock === null ? 'stock unknown' : `${selected.stock} in stock`}</>
+          : <>Pick a size. <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-warning" /> {LOW_STOCK} or fewer left</span>{current ? ' · dashed = current size' : ''}</>}
+      </p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { differenceInCalendarDays, format } from 'date-fns';
-import { ArrowRight, Check, Loader2, Mail, MessageCircle, Minus, Phone, Plus, Search, LifeBuoy, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, Loader2, Mail, MessageCircle, Minus, Phone, Plus, Search, LifeBuoy, MoreHorizontal, Trash2, ArrowLeftRight, Undo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { PageHeader, SectionCard, ToneBadge, KV, ProductThumb, formatINR } from '@/components/app';
 import { describeItem } from '@/lib/items';
@@ -389,25 +389,36 @@ export default function NewExchange() {
               ) : (
                 <div className="space-y-5">
                   {chosen.map((l) => (
-                    <div key={l.key} className="space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <p className="min-w-0 flex-1 truncate text-sm font-medium">{l.repProduct?.product_name ?? l.name}</p>
-                        <span className="text-xs text-muted-foreground">for size {l.size || '—'} × {l.qty}</span>
-                      </div>
-                      {l.repDifferent || !l.repProduct ? (
-                        <ProductCombobox value={l.repProduct} onChange={(p) => setLine(l.key, { repProduct: p, repSize: undefined, repDifferent: true })} placeholder="Choose the replacement product…" />
-                      ) : null}
-                      <SizeChips product={l.repProduct} value={l.repSize?.size} current={l.repDifferent ? undefined : l.size} onChange={(o) => setLine(l.key, { repSize: o })} />
-                      <div className="flex flex-wrap items-center gap-3 text-xs">
-                        {l.repSize && (
-                          <span className={cn((l.repSize.price ?? 0) === (l.price ?? 0) ? 'text-success' : 'text-muted-foreground')}>
-                            {l.repSize.price === null ? 'No price in catalogue' : (l.repSize.price ?? 0) === (l.price ?? 0) ? 'Same price · nothing extra for the item' : `${formatINR(l.repSize.price)} (difference ${formatINR((l.repSize.price ?? 0) - (l.price ?? 0))})`}
-                          </span>
+                    <div key={l.key} className="space-y-3 rounded-lg border border-border p-3 sm:p-4">
+                      {/* Product + change control together, so it's obvious what is being chosen */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <ProductThumb src={l.repProduct?.image_url} alt={l.repProduct?.product_name ?? l.name} size={44} />
+                        <div className="min-w-0 flex-1">
+                          {l.repDifferent || !l.repProduct ? (
+                            <ProductCombobox value={l.repProduct} onChange={(p) => setLine(l.key, { repProduct: p, repSize: undefined, repDifferent: true })} placeholder="Search the replacement product…" />
+                          ) : (
+                            <p className="truncate text-sm font-medium" title={l.repProduct.product_name}>{l.repProduct.product_name}</p>
+                          )}
+                          <p className="mt-0.5 text-xs text-muted-foreground">Replacing {l.size || 'item'} × {l.qty}</p>
+                        </div>
+                        {l.repDifferent || !l.repProduct ? (
+                          productForSku(products, l.sku) && (
+                            <Button variant="ghost" size="sm" onClick={() => setLine(l.key, { repDifferent: false, repSize: undefined, repProduct: productForSku(products, l.sku) })}>
+                              <Undo2 /> Same product
+                            </Button>
+                          )
+                        ) : (
+                          <Button variant="secondary" size="sm" onClick={() => setLine(l.key, { repDifferent: true, repSize: undefined })}>
+                            <ArrowLeftRight /> Change product
+                          </Button>
                         )}
-                        <button className="font-medium text-primary hover:underline" onClick={() => setLine(l.key, { repDifferent: !l.repDifferent, repSize: undefined, repProduct: l.repDifferent ? productForSku(products, l.sku) : l.repProduct })}>
-                          {l.repDifferent ? 'Use the same product' : 'Different product…'}
-                        </button>
                       </div>
+                      {l.repProduct && <SizeChips product={l.repProduct} value={l.repSize?.size} current={l.repDifferent ? undefined : l.size} onChange={(o) => setLine(l.key, { repSize: o })} />}
+                      {l.repSize && (
+                        <p className={cn('text-xs', (l.repSize.price ?? 0) === (l.price ?? 0) ? 'text-success' : 'text-muted-foreground')}>
+                          {l.repSize.price === null ? 'No price in catalogue' : (l.repSize.price ?? 0) === (l.price ?? 0) ? 'Same price · nothing extra for the item' : `${formatINR(l.repSize.price)} (difference ${formatINR((l.repSize.price ?? 0) - (l.price ?? 0))})`}
+                        </p>
+                      )}
                     </div>
                   ))}
                   <div className="space-y-1.5">
