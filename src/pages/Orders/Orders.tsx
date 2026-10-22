@@ -296,7 +296,7 @@ export default function Orders() {
             <SearchField
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Order #, name, phone, email…"
+              placeholder="Order no., name, phone, email…"
               className="w-full sm:w-72"
             />
             <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -353,7 +353,7 @@ export default function Orders() {
                       <Checkbox
                         checked={checked}
                         onCheckedChange={(c) => toggleOne(order.id, c === true)}
-                        aria-label={`Select order ${order.name}`}
+                        aria-label={`Select order ${orderNumber(order)}`}
                         className="mt-1"
                       />
                       <button
@@ -363,7 +363,7 @@ export default function Orders() {
                       >
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-foreground">{order.name}</span>
+                            <span className="font-semibold text-foreground">{orderNumber(order)}</span>
                             <span className="shrink-0 text-sm font-medium tabular text-foreground">{money(order.total_price, order.currency)}</span>
                           </div>
                           <p className="truncate text-[13px] text-muted-foreground">
@@ -435,10 +435,10 @@ export default function Orders() {
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(c) => toggleOne(order.id, c === true)}
-                            aria-label={`Select order ${order.name}`}
+                            aria-label={`Select order ${orderNumber(order)}`}
                           />
                         </TableCell>
-                        <TableCell className="whitespace-nowrap font-medium text-foreground">{order.name}</TableCell>
+                        <TableCell className="whitespace-nowrap font-medium text-foreground">{orderNumber(order)}</TableCell>
                         <TableCell className={cn('whitespace-nowrap text-muted-foreground', dateCol)}>
                           {format(new Date(order.created_at), 'd MMM')}
                         </TableCell>
@@ -491,7 +491,7 @@ export default function Orders() {
       {/* Below xl: order panel in a sheet */}
       <Sheet open={!isWide && !!activeOrder} onOpenChange={(open) => !open && setActiveId(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto bg-card p-5 sm:max-w-[440px]" aria-describedby={undefined}>
-          <SheetTitle className="sr-only">Order {activeOrder?.name}</SheetTitle>
+          <SheetTitle className="sr-only">Order {activeOrder ? orderNumber(activeOrder) : ""}</SheetTitle>
           {activeOrder && <OrderPanel order={activeOrder} windowDays={windowDays} onClose={() => setActiveId(null)} showClose={false} />}
         </SheetContent>
       </Sheet>

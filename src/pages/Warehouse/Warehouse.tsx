@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { ScanLine, Truck, PackageCheck, ClipboardCheck, Send, Download, LayoutGrid, List } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { PageHeader, ToneBadge, EmptyState, ConfirmDialog, SearchField } from '@/components/app';
+import { PageHeader, ToneBadge, EmptyState, ConfirmDialog, SearchField, ProductThumb } from '@/components/app';
 import { Button } from '@/components/ui/button';
 import { BookShipmentDialog } from '@/components/exchange/BookShipmentDialog';
 import { QcDialog } from '@/components/exchange/QcDialog';
@@ -12,7 +12,8 @@ import { useExchangeActions } from '@/hooks/useExchangeActions';
 import { useToast } from '@/hooks/use-toast';
 import { exportTicketsToCSV } from '@/utils/exportUtils';
 import { getExchangeStatus, slaRemaining, type ExchangeStatusKey } from '@/lib/exchangeStatus';
-import { itemSummary } from '@/pages/Exchanges/ExchangesList';
+import { useProducts } from '@/hooks/useProducts';
+import { describeSwap, swapText } from '@/lib/items';
 import type { Ticket } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +34,7 @@ function age(t: Ticket, key: ColumnKey) {
 export default function Warehouse() {
   const { toast } = useToast();
   const { data: tickets = [], isLoading } = useTickets();
+  const { data: products = [] } = useProducts();
   const actions = useExchangeActions();
   const [q, setQ] = useState('');
   const [scan, setScan] = useState('');
@@ -62,6 +64,19 @@ export default function Warehouse() {
     catch (e) { toast({ title: 'Couldn’t save', description: (e as Error).message, variant: 'destructive' }); throw e; }
   };
 
+  // Drag & drop: a card can move one step forward; dropping opens that step's dialog.
+  const [drag, setDrag] = useState<{ id: string; from: ColumnKey } | null>(null);
+  const [over, setOver] = useState<ColumnKey | null>(null);
+  const colIndex = (k: ColumnKey) => COLUMNS.findIndex((c) => c.key === k);
+  const canDrop = (to: ColumnKey) => !!drag && colIndex(to) === colIndex(drag.from) + 1;
+  const onDropTo = (to: ColumnKey) => {
+    const d = drag;
+    setDrag(null); setOver(null);
+    if (!d || colIndex(to) !== colIndex(d.from) + 1) return;
+    const t = tickets.find((x) => x.id === d.id);
+    if (t) openAction(t);
+  };
+
   const openAction = (t: Ticket) => {
     const k = getExchangeStatus(t).key;
     if (k === 'TO_BOOK_PICKUP') setActive({ kind: 'return', t });
@@ -83,14 +98,14 @@ export default function Warehouse() {
     if (k === 'RETURN_IN_TRANSIT') {
       try {
         await actions.markReceived(t);
-        setScanMsg({ tone: 'success', text: `#${t.order_id} received · opening quality check` });
+        setScanMsg({ tone: 'success', text: `${t.order_id} received · opening quality check` });
         setActive({ kind: 'qc', t: { ...t, stage: 'RETURN_RECEIVED', return_received_at: new Date().toISOString() } });
       } catch (err) { setScanMsg({ tone: 'danger', text: (err as Error).message }); }
     } else if (['TO_BOOK_PICKUP', 'QC_PENDING', 'READY_TO_SHIP'].includes(k)) {
-      setScanMsg({ tone: 'warning', text: `#${t.order_id} is at “${getExchangeStatus(t).label}”.` });
+      setScanMsg({ tone: 'warning', text: `${t.order_id} is at “${getExchangeStatus(t).label}”.` });
       openAction(t);
     } else {
-      setScanMsg({ tone: 'warning', text: `#${t.order_id} is “${getExchangeStatus(t).label}” — nothing to do at the warehouse.` });
+      setScanMsg({ tone: 'warning', text: `${t.order_id} is “${getExchangeStatus(t).label}” — nothing to do at the warehouse.` });
     }
     scanRef.current?.focus();
   };
@@ -100,14 +115,27 @@ export default function Warehouse() {
     const stuck = col.key === 'RETURN_IN_TRANSIT' && Date.now() - +since > 3 * 864e5;
     const sla = slaRemaining(t);
     return (
-      <div className="group rounded-lg border border-border bg-card p-3 shadow-card transition-[border-color,box-shadow] duration-150 hover:border-input hover:shadow-card-hover">
-        <div className="flex items-center gap-2">
-          <Link to={`/exchanges/${t.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground hover:text-primary">#{t.order_id}</Link>
+      <div
+        draggable={!!col.action}
+        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setDrag({ id: t.id, from: col.key }); }}
+        onDragEnd={() => { setDrag(null); setOver(null); }}
+        className={cn('group rounded-lg border border-border bg-card p-3 shadow-card transition-[border-color,box-shadow,opacity,transform] duration-150 hover:border-input hover:shadow-card-hover',
+          col.action && 'cursor-grab active:cursor-grabbing',
+          drag?.id === t.id && 'opacity-40 rotate-[1deg] scale-[0.98]')}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <Link to={`/exchanges/${t.id}`} className="shrink-0 text-sm font-semibold text-foreground hover:text-primary">{t.order_id}</Link>
           {stuck ? <ToneBadge tone="danger">Stuck {formatDistanceToNowStrict(since)}</ToneBadge>
             : sla.tone !== 'neutral' && col.key !== 'SHIPPED' ? <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>
             : <span className="text-[11px] text-faint whitespace-nowrap">{formatDistanceToNowStrict(since, { addSuffix: true })}</span>}
         </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{t.customer_name} · {itemSummary(t)}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.customer_name}</p>
+        {(() => { const sw = describeSwap(t, products); return (
+          <div className="mt-2 flex items-center gap-2">
+            <ProductThumb src={sw.returnItem?.image ?? sw.exchangeItem?.image} alt={sw.title} size={32} />
+            <div className="min-w-0"><p className="truncate text-xs font-medium text-foreground">{sw.title}</p><p className="truncate text-[11px] text-muted-foreground">{sw.detail}{sw.more > 0 ? ` · +${sw.more}` : ''}</p></div>
+          </div>
+        ); })()}
         {(col.key === 'RETURN_IN_TRANSIT' || col.key === 'SHIPPED') && (t.return_awb || t.exchange_awb) && (
           <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">AWB {col.key === 'SHIPPED' ? t.exchange_awb : t.return_awb}</p>
         )}
@@ -160,7 +188,10 @@ export default function Warehouse() {
           <p className={cn('-mt-2 rounded-lg px-3 py-2 text-sm animate-fade-in', scanMsg.tone === 'success' ? 'bg-success/10 text-success' : scanMsg.tone === 'warning' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive')}>{scanMsg.text}</p>
         )}
 
-        <SearchField value={q} onChange={setQ} placeholder="Filter by order, customer, AWB…" className="w-full sm:w-72" />
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchField value={q} onChange={setQ} placeholder="Filter by order, customer, AWB…" className="w-full sm:w-72" />
+          {view === 'board' && <p className="hidden md:block text-xs text-muted-foreground">Tip: drag a card into the next column to move it forward.</p>}
+        </div>
 
         {isLoading ? (
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">{COLUMNS.map((c) => <div key={c.key} className="h-72 rounded-xl bg-muted animate-pulse" />)}</div>
@@ -169,8 +200,8 @@ export default function Warehouse() {
             {COLUMNS.slice(0, 4).flatMap((c) => grouped[c.key].map((t) => (
               <div key={t.id} className="flex items-center gap-3 px-4 py-3">
                 <Link to={`/exchanges/${t.id}`} className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">#{t.order_id} <span className="font-normal text-muted-foreground">· {t.customer_name}</span></p>
-                  <p className="truncate text-xs text-muted-foreground">{itemSummary(t)}</p>
+                  <p className="text-sm font-medium">{t.order_id} <span className="font-normal text-muted-foreground">· {t.customer_name}</span></p>
+                  <p className="truncate text-xs text-muted-foreground">{swapText(t, products)}</p>
                 </Link>
                 <ToneBadge tone="neutral">{c.title}</ToneBadge>
                 {c.action && <Button size="sm" variant="secondary" onClick={() => openAction(t)}>{c.action}</Button>}
@@ -190,7 +221,18 @@ export default function Warehouse() {
             </div>
             <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
               {COLUMNS.map((c) => (
-                <section key={c.key} className={cn('flex min-h-[200px] flex-col rounded-xl bg-muted/70 p-2.5', mobileCol !== c.key && 'hidden md:flex')} aria-label={c.title}>
+                <section
+                  key={c.key}
+                  onDragOver={(e) => { if (canDrop(c.key)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== c.key) setOver(c.key); } }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === c.key ? null : o)); }}
+                  onDrop={(e) => { e.preventDefault(); onDropTo(c.key); }}
+                  className={cn('flex min-h-[200px] flex-col rounded-xl bg-muted/70 p-2.5 transition-[background-color,box-shadow,opacity] duration-150',
+                    mobileCol !== c.key && 'hidden md:flex',
+                    drag && canDrop(c.key) && 'bg-accent ring-2 ring-primary/30',
+                    over === c.key && 'ring-primary bg-accent',
+                    drag && !canDrop(c.key) && c.key !== drag.from && 'opacity-50')}
+                  aria-label={c.title}
+                >
                   <header className="flex items-center gap-2 px-1 pb-2.5 pt-1">
                     <c.icon className="size-4 text-muted-foreground" />
                     <h2 className="flex-1 truncate text-sm font-semibold font-sans">{c.title}</h2>
@@ -200,6 +242,11 @@ export default function Warehouse() {
                     {grouped[c.key].length === 0
                       ? <p className="py-8 text-center text-xs text-faint">{c.empty}</p>
                       : grouped[c.key].map((t) => <Card key={t.id} t={t} col={c} />)}
+                    {drag && canDrop(c.key) && (
+                      <div className={cn('grid place-items-center rounded-lg border-2 border-dashed py-6 text-xs font-medium transition-colors', over === c.key ? 'border-primary text-primary' : 'border-primary/30 text-muted-foreground')}>
+                        Drop to {COLUMNS[colIndex(drag.from)].action?.toLowerCase()}
+                      </div>
+                    )}
                   </div>
                 </section>
               ))}
@@ -212,7 +259,7 @@ export default function Warehouse() {
         open={active?.kind === 'return' || active?.kind === 'replacement'}
         onOpenChange={(o) => !o && setActive(null)}
         kind={active?.kind === 'replacement' ? 'replacement' : 'return'}
-        orderLabel={active ? `#${active.t.order_id}` : ''}
+        orderLabel={active ? `${active.t.order_id}` : ''}
         context={active?.t.notes}
         onSubmit={(agg, awb) => active!.kind === 'replacement'
           ? run(() => actions.bookReplacement(active!.t, agg, awb), 'Replacement shipment booked')
@@ -227,7 +274,7 @@ export default function Warehouse() {
       <ConfirmDialog
         open={active?.kind === 'received'}
         onOpenChange={(o) => !o && setActive(null)}
-        title={`Mark #${active?.t.order_id} as received?`}
+        title={`Mark ${active?.t.order_id} as received?`}
         description="Tip: scanning the AWB in the box above does this and opens QC in one step."
         confirmLabel="Mark received"
         loading={actions.pending}

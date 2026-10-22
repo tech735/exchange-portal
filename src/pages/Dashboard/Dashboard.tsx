@@ -11,7 +11,8 @@ import { useRecentActivity } from '@/hooks/useActivity';
 import { useUser } from '@/contexts/UserContext';
 import { canAccess } from '@/lib/navigation';
 import { getExchangeStatus, slaRemaining, OPEN_STATUSES } from '@/lib/exchangeStatus';
-import { itemSummary } from '@/pages/Exchanges/ExchangesList';
+import { useProducts } from '@/hooks/useProducts';
+import { swapText } from '@/lib/items';
 import { EVENT_LABELS, REASON_LABELS, type ReasonCode } from '@/types/database';
 
 function greeting() {
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const full = hasFullAccess() || user?.role === 'ADMIN';
   const role = user?.role;
   const { data: tickets = [], isLoading } = useTickets();
+  const { data: products = [] } = useProducts();
   const { data: activity = [] } = useRecentActivity();
   const can = (p: string) => canAccess(role, p, full);
 
@@ -98,8 +100,8 @@ export default function Dashboard() {
                   <li key={t.id}>
                     <Link to={`/exchanges/${t.id}`} className="group flex items-center gap-3 px-4 sm:px-5 py-3 transition-colors hover:bg-muted/50">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{s.nextAction!.label} <span className="font-normal text-muted-foreground">· #{t.order_id}</span></p>
-                        <p className="truncate text-xs text-muted-foreground">{t.customer_name} · {itemSummary(t)}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{s.nextAction!.label} <span className="font-normal text-muted-foreground">· {t.order_id}</span></p>
+                        <p className="truncate text-xs text-muted-foreground">{t.customer_name} · {swapText(t, products)}</p>
                       </div>
                       <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>
                       <ArrowRight className="size-4 shrink-0 text-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
@@ -119,7 +121,7 @@ export default function Dashboard() {
                   <li key={t.id}>
                     <Link to={`/exchanges/${t.id}`} className="flex items-center gap-3 rounded-lg px-2 py-2 -mx-2 transition-colors hover:bg-muted/50">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">#{t.order_id}</p>
+                        <p className="text-sm font-medium">{t.order_id}</p>
                         <p className="truncate text-xs text-muted-foreground">{s.label}</p>
                       </div>
                       <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>
@@ -172,7 +174,7 @@ export default function Dashboard() {
                     <Link to={`/exchanges/${a.ticketId}`} className="flex items-start gap-3 rounded-lg -mx-2 px-2 py-1 hover:bg-muted/50 transition-colors">
                       <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">{initials(a.customerName)}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{EVENT_LABELS[a.eventType]} <span className="text-muted-foreground">· #{a.orderId}</span></p>
+                        <p className="truncate text-sm">{EVENT_LABELS[a.eventType]} <span className="text-muted-foreground">· {a.orderId}</span></p>
                         <p className="text-[11px] text-faint">{formatDistanceToNowStrict(new Date(a.eventAt), { addSuffix: true })}</p>
                       </div>
                     </Link>

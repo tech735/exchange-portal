@@ -29,7 +29,8 @@ import {
   type ShipmentSettings,
   type TrackedShipment,
 } from '@/lib/shipmentTracking';
-import { DELIVERY_ZONE_LABELS, SHIPMENT_STATUS_LABELS, type ShipmentStatus } from '@/types/database';
+import { DELIVERY_ZONE_LABELS, SHIPMENT_STATUS_LABELS, type Shipment, type ShipmentStatus } from '@/types/database';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { DeliveryCheckBadge } from './DeliveryCheckBadge';
 import { ShipmentForm } from './ShipmentForm';
@@ -37,8 +38,7 @@ import { ShipmentList } from './ShipmentList';
 import { ShipmentSettingsDialog } from './ShipmentSettingsDialog';
 import { ImportTrackerDialog } from './ImportTrackerDialog';
 import { DailyReport } from './DailyReport';
-import { LookbackSelect } from './LookbackSelect';
-import { DEFAULT_LOOKBACK_DAYS } from './constants';
+import { LookbackSelect, DEFAULT_PERIOD, inPeriod, periodLoadDays, periodSince, type Period } from './LookbackSelect';
 
 // Most urgent first, so nothing that needs a call or a courier chase is
 // below the fold.
@@ -81,8 +81,8 @@ export default function Shipments() {
   const isAdmin = hasFullAccess() || user?.role === 'ADMIN';
 
   const [view, setView] = useState<View>('forward');
-  const [lookbackDays, setLookbackDays] = useState<number | null>(DEFAULT_LOOKBACK_DAYS);
-  const { data: shipments = [], isLoading, isError, refetch } = useShipments(lookbackDays);
+  const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
+  const { data: shipments = [], isLoading, isError, refetch } = useShipments(periodLoadDays(period));
   const { data: settings = DEFAULT_SHIPMENT_SETTINGS } = useShipmentSettings();
   const syncShipments = useSyncShipments();
   const updateShipment = useUpdateShipment();
@@ -106,7 +106,7 @@ export default function Shipments() {
 
   const tracked = useMemo(
     () =>
-      trackShipments(shipments, settings, now).sort(
+      trackShipments(shipments.filter((s) => inPeriod(period, s)), settings, now).sort(
         (a, b) =>
           CHECK_PRIORITY[a.check] - CHECK_PRIORITY[b.check] ||
           (b.raised_date ?? b.order_date).localeCompare(a.raised_date ?? a.order_date) ||
@@ -115,7 +115,7 @@ export default function Shipments() {
           a.shipment_ref.localeCompare(b.shipment_ref, undefined, { numeric: true })
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` matters only per hour
-    [shipments, settings, clockKey]
+    [shipments, settings, clockKey, period]
   );
 
   // Orders on the Forward tab; exchanges (F2 onwards) and returns on their own.
@@ -123,7 +123,7 @@ export default function Shipments() {
   const reverse = useMemo(() => tracked.filter((s) => shipmentKind(s.shipment_ref) !== 'FORWARD'), [tracked]);
   const reverseNeedsAction = reverse.filter((s) => s.needsAction).length;
 
-  const reportSince = lookbackDays === null ? null : toDateInput(subDays(new Date(), lookbackDays));
+  const reportSince = periodSince(period);
   const report = useMemo(
     () => dailyReport(tracked.filter((s) => shipmentKind(s.shipment_ref) !== 'EXCHANGE'), reportSince),
     [tracked, reportSince]
@@ -224,14 +224,25 @@ export default function Shipments() {
     });
   };
 
+  /** Shipments ordered or raised in an exact date range, for exports beyond what is loaded. */
+  const loadRange = async (from: string, to: string) => {
+    const { data, error } = await supabase
+      .from('order_shipments')
+      .select('*')
+      .or(`and(order_date.gte.${from},order_date.lte.${to}),and(raised_date.gte.${from},raised_date.lte.${to})`);
+    if (error) throw error;
+    return trackShipments(((data || []) as Shipment[]).filter((s) => inPeriod({ kind: 'range', from, to }, s)), settings, now);
+  };
+
   const listProps = {
     isLoading,
     isError,
     onRetry: () => void refetch(),
     today: now.date,
     reportSince,
-    lookbackDays,
-    onLookbackChange: setLookbackDays,
+    period,
+    onPeriodChange: setPeriod,
+    loadRange,
     busy: updateShipment.isPending,
     onOpen: setSelectedId,
     onChangeStatus: changeStatus,
@@ -297,7 +308,7 @@ export default function Shipments() {
               <p className="text-sm text-muted-foreground">
                 Orders placed, picked up and delivered each day. Returns count on the day they were raised.
               </p>
-              <LookbackSelect value={lookbackDays} onChange={setLookbackDays} className="sm:w-[150px]" />
+              <LookbackSelect value={period} onChange={setPeriod} className="sm:w-[150px]" />
             </div>
             <DailyReport rows={report} isLoading={isLoading} isError={isError} onRetry={() => void refetch()} />
           </div>

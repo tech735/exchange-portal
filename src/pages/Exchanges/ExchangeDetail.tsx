@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import {
-  PageHeader, SectionCard, Stepper, StatusBadge, PaymentBadge, ToneBadge, KV, EmptyState, ConfirmDialog, formatINR, initials,
+  PageHeader, SectionCard, Stepper, StatusBadge, PaymentBadge, ToneBadge, KV, EmptyState, ConfirmDialog, ProductThumb, formatINR, initials,
 } from '@/components/app';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,14 +22,29 @@ import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { getExchangeStatus, slaRemaining, EXCHANGE_STEPS, REQUEST_SOURCE_LABELS } from '@/lib/exchangeStatus';
 import { itemPrice } from '@/lib/exchangeMath';
-import { REASON_LABELS, type Ticket, type TicketItem } from '@/types/database';
+import { REASON_LABELS, type ProductCatalog, type Ticket, type TicketItem } from '@/types/database';
+import { useProducts } from '@/hooks/useProducts';
+import { describeItem, displayPhone } from '@/lib/items';
 import { cn } from '@/lib/utils';
 
 const fmt = (d?: string | null) => (d ? format(new Date(d), 'd MMM') : undefined);
 const fmtLong = (d?: string | null) => (d ? format(new Date(d), 'd MMM yyyy, h:mm a') : '—');
 const AGG_LABEL: Record<string, string> = { SHIPROCKET: 'Shiprocket', ITHINK: 'iThink Logistics', SHIPDELIGHT: 'ShipDelight' };
 
-function ItemColumn({ label, items, tone, prices }: { label: string; items: TicketItem[]; tone: 'danger' | 'success'; prices?: Record<string, number> }) {
+/** Old Shopify-created tickets carry machine notes; show them as plain, useful text. */
+function cleanReasonNotes(n?: string | null) {
+  if (!n) return '';
+  return n.split('\n').filter((l) => !/^Processed via Shopify UI/i.test(l.trim())).join('\n').trim();
+}
+function cleanNotes(n?: string | null) {
+  if (!n) return '';
+  return n.replace(/^Order fulfilled via:\s*/i, 'Original delivery: ')
+    .replace(/\(AWB:\s*([^,)]+),\s*Location:[^)]*\)/gi, 'AWB $1')
+    .replace(/\s*\|\s*/g, ' · ')
+    .trim();
+}
+
+function ItemColumn({ label, items, tone, prices, products }: { label: string; items: TicketItem[]; tone: 'danger' | 'success'; prices?: Record<string, number>; products: ProductCatalog[] }) {
   return (
     <div className="min-w-0 flex-1 rounded-lg bg-muted/50 p-3.5">
       <p className={cn('text-[11px] font-semibold uppercase tracking-wider', tone === 'danger' ? 'text-destructive' : 'text-success')}>{label}</p>
@@ -39,12 +54,13 @@ function ItemColumn({ label, items, tone, prices }: { label: string; items: Tick
         <ul className="mt-2 space-y-3">
           {items.map((it, i) => {
             const p = itemPrice(it, prices);
+            const d = describeItem(it, products);
             return (
               <li key={i} className="flex items-center gap-3">
-                <div className="grid size-12 shrink-0 place-items-center rounded-md bg-card text-[10px] text-faint border border-border">IMG</div>
+                <ProductThumb src={d.image} alt={d.name} size={56} className="bg-card" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{it.product_name}</p>
-                  <p className="text-xs text-muted-foreground">Size {it.size || '—'} · {it.sku || 'no SKU'}</p>
+                  <p className="truncate text-sm font-medium text-foreground" title={d.name}>{d.name}</p>
+                  <p className="text-xs text-muted-foreground">{d.variant ? <span className="font-medium text-foreground">{d.variant}</span> : 'Size not recorded'}{it.sku ? <> · <span className="font-mono">{it.sku}</span></> : ''}</p>
                   <p className="text-xs font-medium tabular">{p === null ? <span className="text-warning">Price missing</span> : `${formatINR(p)} × ${it.qty || 1}`}</p>
                 </div>
               </li>
@@ -79,6 +95,7 @@ export default function ExchangeDetail() {
   const { toast } = useToast();
   const { data: ticket, isLoading, error } = useTicket(id);
   const { data: prices } = useProductPrices();
+  const { data: products = [] } = useProducts();
   const { data: staff = [] } = useStaff();
   const actions = useExchangeActions();
   const deleteTicket = useDeleteTicket();
@@ -148,8 +165,8 @@ export default function ExchangeDetail() {
         <div className="flex items-center gap-2">
           <PageHeader
             className="flex-1"
-            breadcrumb={[{ label: 'Exchanges', to: full || user?.role === 'SUPPORT' ? '/exchanges' : undefined }, { label: `#${t.order_id}` }]}
-            title={<span className="flex flex-wrap items-center gap-2">#{t.order_id}<StatusBadge ticket={t} /><PaymentBadge ticket={t} />{st.key !== 'CLOSED' && <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>}</span>}
+            breadcrumb={[{ label: 'Exchanges', to: full || user?.role === 'SUPPORT' ? '/exchanges' : undefined }, { label: `${t.order_id}` }]}
+            title={<span className="flex flex-wrap items-center gap-2">{t.order_id}<StatusBadge ticket={t} /><PaymentBadge ticket={t} />{st.key !== 'CLOSED' && <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>}</span>}
             description={<>
               {t.customer_name}
               {t.request_source ? ` · via ${REQUEST_SOURCE_LABELS[t.request_source]}` : ''}
@@ -195,12 +212,12 @@ export default function ExchangeDetail() {
           <div className="min-w-0 space-y-5">
             <SectionCard title="Items" action={<ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code]}</ToneBadge>}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <ItemColumn label="Returning" items={t.return_items} tone="danger" prices={prices as Record<string, number>} />
+                <ItemColumn label="Returning" items={t.return_items} tone="danger" prices={prices as Record<string, number>} products={products} />
                 <ArrowRight className="hidden sm:block size-5 shrink-0 text-faint" />
-                <ItemColumn label="Sending" items={t.exchange_items} tone="success" prices={prices as Record<string, number>} />
+                <ItemColumn label="Sending" items={t.exchange_items} tone="success" prices={prices as Record<string, number>} products={products} />
               </div>
-              {t.reason_notes && <p className="mt-3 text-sm text-muted-foreground">“{t.reason_notes}”</p>}
-              {t.notes && <p className="mt-2 text-xs text-muted-foreground whitespace-pre-line">{t.notes}</p>}
+              {cleanReasonNotes(t.reason_notes) && <p className="mt-3 text-sm text-muted-foreground whitespace-pre-line">“{cleanReasonNotes(t.reason_notes)}”</p>}
+              {cleanNotes(t.notes) && <p className="mt-2 text-xs text-muted-foreground whitespace-pre-line">{cleanNotes(t.notes)}</p>}
             </SectionCard>
 
             <SectionCard title="Payment">
@@ -266,7 +283,7 @@ export default function ExchangeDetail() {
                   </div>
                 </div>
               </div>
-              <KV label="Phone">{t.customer_phone}</KV>
+              <KV label="Phone">{displayPhone(t.customer_phone) || <span className="text-muted-foreground">Not recorded</span>}</KV>
               {t.customer_email && <KV label="Email">{t.customer_email}</KV>}
               {t.student_name && t.student_name !== 'N/A' && <KV label="Student">{t.student_name}{t.student_grade ? ` · ${t.student_grade}${t.student_section ? `-${t.student_section}` : ''}` : ''}</KV>}
               {t.school_name && t.school_name !== 'Unknown' && <KV label="School">{t.school_name}</KV>}
@@ -327,7 +344,7 @@ export default function ExchangeDetail() {
         open={dialog === 'delete'}
         onOpenChange={(o) => !o && setDialog(null)}
         destructive
-        title={`Delete #${t.order_id}?`}
+        title={`Delete ${t.order_id}?`}
         description="This permanently removes the exchange and its history."
         confirmLabel="Delete"
         loading={deleteTicket.isPending}
@@ -337,7 +354,7 @@ export default function ExchangeDetail() {
         open={dialog === 'return' || dialog === 'replacement'}
         onOpenChange={(o) => !o && setDialog(null)}
         kind={dialog === 'replacement' ? 'replacement' : 'return'}
-        orderLabel={`#${t.order_id}`}
+        orderLabel={`${t.order_id}`}
         context={t.notes}
         onSubmit={(agg, awb) => dialog === 'replacement'
           ? run(() => actions.bookReplacement(t, agg, awb), 'Replacement shipment booked')

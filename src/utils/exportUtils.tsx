@@ -226,18 +226,45 @@ export function exportOrdersToCSV(orders: ShopifyOrder[]): void {
 // Shipment tracker workbook: the tracker rows (same columns as the old
 // "Ecom Order Tracker" sheet), the day-by-day report and the headline numbers.
 // exceljs is loaded only when someone downloads.
+export type ShipmentSheet = 'shipments' | 'daily' | 'summary';
+
 export async function exportShipmentsToExcel({
   shipments,
   daily,
   stats,
+  sheets = ['shipments', 'daily', 'summary'],
+  fileFormat = 'xlsx',
+  filename,
 }: {
   shipments: TrackedShipment[];
   daily: DailyReportRow[];
   stats: ShipmentStats;
+  sheets?: ShipmentSheet[];
+  fileFormat?: 'xlsx' | 'csv';
+  filename?: string;
 }): Promise<void> {
+  const day = (value: string | null) => (value ? format(parseISO(value), 'dd/MMM/yyyy') : '');
+  const base = filename || `shipment-tracker-${new Date().toISOString().split('T')[0]}`;
+
+  if (fileFormat === 'csv') {
+    const header = ['Order No.', 'Order Date', 'Customer Name', 'Phone', 'Email', 'City', 'Delivery Zone', 'Courier', 'AWB No.', 'Pickup Date', 'Expected Delivery', 'Delivered Date', 'Shipment Status', 'Days in Transit', 'Delivery Check', 'Days Delayed', 'Customer Notified', 'Notified On', 'Notified Via', 'Notes'];
+    const cell = (v: unknown) => {
+      let t = v === null || v === undefined ? '' : String(v);
+      if (/^[=+\-@]/.test(t)) t = "'" + t; // stop spreadsheet formula injection
+      return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const lines = shipments.map((s) => [
+      s.shipment_ref, day(s.order_date), s.customer_name, s.customer_phone, s.customer_email, s.city, DELIVERY_ZONE_LABELS[s.delivery_zone],
+      s.courier, s.awb_number, day(s.pickup_date), day(s.expectedDelivery), s.status === 'DELIVERED' ? day(s.delivered_date) : '',
+      SHIPMENT_STATUS_LABELS[s.status], s.daysInTransit ?? '', DELIVERY_CHECK_LABELS[s.check], s.daysDelayed ?? '',
+      s.customer_notified ? 'Yes' : 'No', day(s.notified_on), s.notified_via ? NOTIFICATION_CHANNEL_LABELS[s.notified_via] : '', s.notes,
+    ].map(cell).join(','));
+    downloadBlob(new Blob(['﻿' + [header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+    return;
+  }
+
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
-  const day = (value: string | null) => (value ? format(parseISO(value), 'dd/MMM/yyyy') : '');
 
   const addSheet = (name: string, columns: { header: string; key: string; width: number }[], rows: Record<string, unknown>[]) => {
     const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -249,7 +276,7 @@ export async function exportShipmentsToExcel({
     return sheet;
   };
 
-  addSheet(
+  if (sheets.includes('shipments')) addSheet(
     'Shipments',
     [
       { header: 'Order No.', key: 'ref', width: 18 },
@@ -297,7 +324,7 @@ export async function exportShipmentsToExcel({
     }))
   );
 
-  addSheet(
+  if (sheets.includes('daily')) addSheet(
     'Daily Report',
     [
       { header: 'Date', key: 'date', width: 13 },
@@ -322,7 +349,7 @@ export async function exportShipmentsToExcel({
   );
 
   const fixed = (value: number | null) => (value === null ? '' : Number(value.toFixed(1)));
-  addSheet(
+  if (sheets.includes('summary')) addSheet(
     'Summary',
     [
       { header: 'Metric', key: 'metric', width: 30 },
@@ -348,11 +375,14 @@ export async function exportShipmentsToExcel({
   );
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${base}.xlsx`);
+}
+
+function downloadBlob(blob: Blob, name: string) {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `shipment-tracker-${new Date().toISOString().split('T')[0]}.xlsx`);
+  link.setAttribute('download', name);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();

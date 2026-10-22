@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useProducts } from '@/hooks/useProducts';
 import type { ProductCatalog, TicketItem } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { ProductThumb } from '@/components/app';
 
 export interface SizeOption { size: string; sku: string; stock: number | null; price: number | null }
 
@@ -97,6 +98,7 @@ export function ProductCombobox({ value, onChange, placeholder = 'Search product
             {list.map((p) => (
               <CommandPrimitive.Item key={p.id} value={p.id} onSelect={() => { onChange(p); setOpen(false); setQ(''); }}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm data-[selected=true]:bg-accent">
+                <ProductThumb src={p.image_url} alt={p.product_name} size={32} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{p.product_name}</p>
                   <p className="truncate text-xs text-muted-foreground">{p.sku} · {(p.variants || []).length} sizes</p>

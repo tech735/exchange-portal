@@ -6,6 +6,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAppSettings, uploadQcPhoto } from '@/hooks/useAppData';
+import { useProducts } from '@/hooks/useProducts';
+import { describeItem } from '@/lib/items';
+import { ProductThumb } from '@/components/app';
 import { REASON_LABELS, type Ticket } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +28,7 @@ export function QcDialog({
   onSubmit: (decision: 'APPROVED' | 'DENIED', notes: string, checklist: Record<string, boolean>, photos: string[]) => Promise<unknown>;
 }) {
   const { data: settings } = useAppSettings();
+  const { data: products = [] } = useProducts();
   const items = settings?.qc_checklist.items ?? [];
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [decision, setDecision] = useState<'APPROVED' | 'DENIED'>('APPROVED');
@@ -76,12 +80,13 @@ export function QcDialog({
 
   if (!ticket) return null;
   const r = ticket.return_items?.[0];
+  const rd = r ? describeItem(r, products) : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Quality check · #{ticket.order_id}</DialogTitle>
+          <DialogTitle>Quality check · {ticket.order_id}</DialogTitle>
           <DialogDescription>
             {ticket.customer_name} · received {ticket.return_received_at ? new Date(ticket.return_received_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
             {ticket.return_awb ? ` · AWB ${ticket.return_awb}` : ''}
@@ -90,8 +95,8 @@ export function QcDialog({
 
         <div className="grid gap-5 sm:grid-cols-[220px_1fr]">
           <div className="space-y-2">
-            <div className="grid aspect-square place-items-center rounded-lg bg-muted text-xs text-faint">Returned item</div>
-            <p className="text-sm font-medium">{r ? `${r.product_name} · Size ${r.size}` : 'No return items listed'}</p>
+            <ProductThumb src={rd?.image} alt={rd?.name} size={220} className="aspect-square h-auto w-full rounded-lg" />
+            <p className="text-sm font-medium">{rd ? `${rd.name}${rd.variant ? ` · ${rd.variant}` : ''}` : 'No return items listed'}</p>
             <p className="text-xs text-muted-foreground">Reason: {REASON_LABELS[ticket.reason_code]}{ticket.reason_notes ? ` · “${ticket.reason_notes}”` : ''}</p>
           </div>
 

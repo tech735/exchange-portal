@@ -140,6 +140,8 @@ export interface ProductCatalog {
   active: boolean;
   shopify_product_id: number | null;
   shopify_variant_id: number | null;
+  image_url?: string | null;
+  variant_images?: Record<string, string>;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;

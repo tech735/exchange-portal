@@ -416,7 +416,7 @@ export default function Finance() {
           : `Mark ${confirmIds.length} refunds (${formatINR(confirmRefundTotal)}) as sent?`,
       description:
         confirmIds.length === 1 && confirmTickets[0]
-          ? `#${confirmTickets[0].order_id} · ${confirmTickets[0].customer_name}. The exchange will be closed.`
+          ? `${confirmTickets[0].order_id} · ${confirmTickets[0].customer_name}. The exchange will be closed.`
           : 'Each exchange will be recorded as refunded and closed.',
       cta: 'Mark refunded',
     },

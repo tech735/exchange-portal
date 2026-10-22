@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { ArrowRight, Check, Loader2, Mail, MessageCircle, Minus, Phone, Plus, Search, LifeBuoy, MoreHorizontal, Trash2 } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { PageHeader, SectionCard, ToneBadge, KV, formatINR } from '@/components/app';
+import { PageHeader, SectionCard, ToneBadge, KV, ProductThumb, formatINR } from '@/components/app';
+import { describeItem } from '@/lib/items';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -299,7 +300,7 @@ export default function NewExchange() {
                     {lookup === 'error' && <p className="text-sm text-destructive">{lookupErr}. Check the number, or enter the details manually.</p>}
                     {order && (
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-muted/60 px-3 py-2.5 text-sm animate-fade-in">
-                        <span className="font-medium">{order.name}</span>
+                        <span className="font-medium">{order.name.replace(/^#/, '')}</span>
                         <span className="text-muted-foreground">placed {format(new Date(order.created_at), 'd MMM')}</span>
                         {daysLeft !== null && (daysLeft >= 0
                           ? <ToneBadge tone="success">Eligible · {daysLeft}d left</ToneBadge>
@@ -348,7 +349,7 @@ export default function NewExchange() {
                   {lines.map((l) => (
                     <div key={l.key} className={cn('flex flex-wrap items-center gap-3 border-b border-border py-3 last:border-0', !l.selected && 'opacity-70')}>
                       <Checkbox checked={l.selected} onCheckedChange={(v) => setLine(l.key, { selected: v === true })} aria-label={`Return ${l.name}`} />
-                      <div className="grid size-11 place-items-center rounded-md bg-muted text-[10px] text-faint">IMG</div>
+                      <ProductThumb src={describeItem({ sku: l.sku, product_name: l.name, size: l.size, qty: 1 }, products).image} alt={l.name} size={44} />
                       <div className="min-w-0 flex-1 basis-40">
                         <p className="truncate text-sm font-medium">{l.name}</p>
                         <p className="text-xs text-muted-foreground">{l.size ? `Size ${l.size} · ` : ''}{l.price !== null ? formatINR(l.price) : 'no price'} · ordered {l.maxQty}</p>

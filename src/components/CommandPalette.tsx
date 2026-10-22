@@ -8,6 +8,7 @@ import { useUser } from '@/contexts/UserContext';
 import { navFor, canAccess } from '@/lib/navigation';
 import { getExchangeStatus } from '@/lib/exchangeStatus';
 import { ToneBadge } from '@/components/app';
+import { displayPhone } from '@/lib/items';
 
 /** Opens the palette on ⌘K / Ctrl+K anywhere, and on "/" outside text fields. */
 export function useCommandPaletteHotkey(open: () => void) {
@@ -75,8 +76,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   return (
                     <CommandPrimitive.Item key={t.id} value={`ticket-${t.id}`} onSelect={() => go(`/exchanges/${t.id}`)} className={item}>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-foreground">#{t.order_id} · {t.customer_name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t.customer_phone}{t.return_awb ? ` · AWB ${t.return_awb}` : ''}</p>
+                        <p className="truncate font-medium text-foreground">{t.order_id} · {t.customer_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{[displayPhone(t.customer_phone), t.return_awb && `AWB ${t.return_awb}`].filter(Boolean).join(' · ') || 'No phone'}</p>
                       </div>
                       <ToneBadge tone={st.tone}>{st.label}</ToneBadge>
                     </CommandPrimitive.Item>

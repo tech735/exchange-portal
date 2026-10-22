@@ -400,9 +400,21 @@ serve(async (req) => {
                     }
                 });
 
+                // Photos: product main image plus a per-variant image where Shopify has one.
+                const images: any[] = product.images || [];
+                const mainImage: string | null = product.image?.src || images[0]?.src || null;
+                const variantImages: Record<string, string> = {};
+                variants.forEach((v: any) => {
+                    if (!v.sku) return;
+                    const img = images.find((i: any) => i.id === v.image_id) || images.find((i: any) => (i.variant_ids || []).includes(v.id));
+                    if (img?.src) variantImages[v.sku] = img.src;
+                });
+
                 const row = {
                     sku,
                     product_name: productName,
+                    image_url: mainImage,
+                    variant_images: variantImages,
                     product_description: stripHtml(product.body_html),
                     category: product.product_type || null,
                     variants: sizes,

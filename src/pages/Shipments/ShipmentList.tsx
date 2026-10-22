@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronRight, Download, ExternalLink, Phone, Truck } from 'lucide-react';
-import { EmptyState, FilterChip, RowSkeleton, SearchField, ToneBadge } from '@/components/app';
+import { BulkBar, BulkBarButton, EmptyState, FilterChip, RowSkeleton, SearchField, ToneBadge } from '@/components/app';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportShipmentsDialog } from './ExportShipmentsDialog';
 import type { Tone } from '@/lib/exchangeStatus';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,8 +27,8 @@ import { exportShipmentsToExcel } from '@/utils/exportUtils';
 import { DELIVERY_ZONE_LABELS, type DeliveryZone, type ShipmentStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { DeliveryCheckBadge } from './DeliveryCheckBadge';
-import { LookbackSelect } from './LookbackSelect';
-import { CHECK_META, DEFAULT_LOOKBACK_DAYS, LOOKBACK_LABELS } from './constants';
+import { LookbackSelect, DEFAULT_PERIOD, isDefaultPeriod, periodLabel, type Period } from './LookbackSelect';
+import { CHECK_META } from './constants';
 
 type CheckFilter = 'all' | 'needs_action' | 'open' | 'delivered' | DeliveryCheck;
 type KindFilter = 'all' | Exclude<ShipmentKind, 'FORWARD'>;
@@ -187,8 +189,9 @@ export function ShipmentList({
   onRetry,
   today,
   reportSince,
-  lookbackDays,
-  onLookbackChange,
+  period,
+  onPeriodChange,
+  loadRange,
   busy,
   onOpen,
   onChangeStatus,
@@ -204,8 +207,9 @@ export function ShipmentList({
   onRetry: () => void;
   today: string;
   reportSince: string | null;
-  lookbackDays: number | null;
-  onLookbackChange: (days: number | null) => void;
+  period: Period;
+  onPeriodChange: (p: Period) => void;
+  loadRange: (from: string, to: string) => Promise<TrackedShipment[]>;
   busy: boolean;
   onOpen: (id: string) => void;
   onChangeStatus: (s: TrackedShipment, status: ShipmentStatus) => void;
@@ -223,7 +227,9 @@ export function ShipmentList({
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [quickExporting, setQuickExporting] = useState(false);
   const [confirmNotifyOpen, setConfirmNotifyOpen] = useState(false);
   const [notifyingAll, setNotifyingAll] = useState(false);
 
@@ -243,19 +249,26 @@ export function ShipmentList({
   });
 
   useEffect(() => setCurrentPage(1), [searchQuery, checkFilter, zoneFilter, kindFilter, reportSince]);
+  // Selection only keeps rows that are still in the list.
+  useEffect(() => setSelected((cur) => new Set([...cur].filter((id) => shipments.some((s) => s.id === id)))), [shipments]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleExport = async () => {
-    setExporting(true);
+  const selectedRows = shipments.filter((s) => selected.has(s.id));
+  const allOnPage = paginated.length > 0 && paginated.every((s) => selected.has(s.id));
+  const toggle = (id: string) => setSelected((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const togglePage = () => setSelected((cur) => { const n = new Set(cur); paginated.forEach((s) => (allOnPage ? n.delete(s.id) : n.add(s.id))); return n; });
+
+  const exportSelected = async () => {
+    setQuickExporting(true);
     try {
-      await exportShipmentsToExcel({ shipments: filtered, daily: dailyReport(shipments, reportSince), stats });
+      await exportShipmentsToExcel({ shipments: selectedRows, daily: dailyReport(selectedRows, reportSince), stats: summarizeShipments(selectedRows, today), filename: `shipments-selected-${today}` });
     } catch (error) {
       toast({ title: 'Download failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
-      setExporting(false);
+      setQuickExporting(false);
     }
   };
 
@@ -304,10 +317,10 @@ export function ShipmentList({
     reverse && kindFilter !== 'all' && { key: 'kind', label: `Type: ${SHIPMENT_KIND_LABELS[kindFilter]}`, clear: () => setKindFilter('all') },
     checkFilter !== DEFAULT_CHECK && { key: 'check', label: `Check: ${checkFilterLabel(checkFilter)}`, clear: () => setCheckFilter(DEFAULT_CHECK) },
     zoneFilter !== 'all' && { key: 'zone', label: `Zone: ${DELIVERY_ZONE_LABELS[zoneFilter]}`, clear: () => setZoneFilter('all') },
-    lookbackDays !== DEFAULT_LOOKBACK_DAYS && {
+    !isDefaultPeriod(period) && {
       key: 'lookback',
-      label: LOOKBACK_LABELS[lookbackDays === null ? 'all' : String(lookbackDays)] ?? `Last ${lookbackDays} days`,
-      clear: () => onLookbackChange(DEFAULT_LOOKBACK_DAYS),
+      label: periodLabel(period),
+      clear: () => onPeriodChange(DEFAULT_PERIOD),
     },
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
@@ -316,7 +329,7 @@ export function ShipmentList({
     setKindFilter('all');
     setCheckFilter(DEFAULT_CHECK);
     setZoneFilter('all');
-    if (lookbackDays !== DEFAULT_LOOKBACK_DAYS) onLookbackChange(DEFAULT_LOOKBACK_DAYS);
+    if (!isDefaultPeriod(period)) onPeriodChange(DEFAULT_PERIOD);
   };
 
   const noData = shipments.length === 0;
@@ -470,11 +483,11 @@ export function ShipmentList({
                 ))}
               </SelectContent>
             </Select>
-            <LookbackSelect value={lookbackDays} onChange={onLookbackChange} className="sm:w-[140px]" />
+            <LookbackSelect value={period} onChange={onPeriodChange} className="sm:w-[150px]" />
           </div>
-          <Button variant="secondary" className="md:ml-auto" onClick={handleExport} disabled={exporting || filtered.length === 0}>
+          <Button variant="secondary" className="md:ml-auto" onClick={() => setExportOpen(true)}>
             <Download />
-            {exporting ? 'Preparing…' : 'Excel'}
+            Export
           </Button>
         </div>
         {activeChips.length > 0 && (
@@ -508,6 +521,8 @@ export function ShipmentList({
                   onClick={() => onOpen(s.id)}
                 >
                   <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span onClick={(e) => e.stopPropagation()} className="pt-1"><Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} aria-label={`Select ${s.shipment_ref}`} /></span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-[15px] font-semibold text-foreground">{s.shipment_ref}</span>
@@ -516,6 +531,7 @@ export function ShipmentList({
                       <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
                         {s.customer_name || '—'} · {s.city || '—'} · {DELIVERY_ZONE_LABELS[s.delivery_zone]}
                       </p>
+                    </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <DeliveryCheckBadge check={s.check} />
@@ -585,6 +601,7 @@ export function ShipmentList({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-10"><Checkbox checked={allOnPage} onCheckedChange={togglePage} aria-label="Select page" /></TableHead>
                   <TableHead>Order · customer</TableHead>
                   <TableHead>Courier · AWB</TableHead>
                   <TableHead className="hidden lg:table-cell">Zone</TableHead>
@@ -602,9 +619,10 @@ export function ShipmentList({
                   return (
                     <TableRow
                       key={s.id}
-                      className={cn('cursor-pointer', s.needsAction && 'bg-destructive/[0.04] hover:bg-destructive/[0.07]')}
+                      className={cn('cursor-pointer', s.needsAction && 'bg-destructive/[0.04] hover:bg-destructive/[0.07]', selected.has(s.id) && 'bg-accent/60 hover:bg-accent')}
                       onClick={() => onOpen(s.id)}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} aria-label={`Select ${s.shipment_ref}`} /></TableCell>
                       <TableCell className="max-w-[220px]">
                         <div className="flex items-center gap-1.5">
                           <span className="truncate font-medium text-foreground">{s.shipment_ref}</span>
@@ -663,6 +681,21 @@ export function ShipmentList({
           </div>
         )}
       </div>
+
+      <BulkBar count={selected.size} onClear={() => setSelected(new Set())}>
+        <BulkBarButton onClick={exportSelected} disabled={quickExporting}><Download /> {quickExporting ? 'Preparing…' : 'Download Excel'}</BulkBarButton>
+        <BulkBarButton onClick={() => setExportOpen(true)}>More options…</BulkBarButton>
+      </BulkBar>
+
+      <ExportShipmentsDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        variant={variant}
+        viewRows={filtered}
+        selectedRows={selectedRows}
+        today={today}
+        loadRange={loadRange}
+      />
 
       {/* Bulk "mark notified" confirmation */}
       <Dialog open={confirmNotifyOpen} onOpenChange={(open) => !notifyingAll && setConfirmNotifyOpen(open)}>

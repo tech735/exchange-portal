@@ -1,6 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowRight, ArrowUpRight, Package, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, X } from 'lucide-react';
+import { ProductThumb } from '@/components/app';
+import { useProducts } from '@/hooks/useProducts';
+import { describeItem } from '@/lib/items';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { KV, ToneBadge, initials } from '@/components/app';
@@ -44,6 +47,7 @@ export function OrderPanel({
   showClose?: boolean;
   className?: string;
 }) {
+  const { data: products = [] } = useProducts();
   const navigate = useNavigate();
   const pay = paymentPill(order);
   const ful = fulfillmentPill(order);
@@ -71,7 +75,7 @@ export function OrderPanel({
       {/* Header */}
       <div className="space-y-3">
         <div className={cn('flex items-start gap-3', !showClose && 'pr-8')}>
-          <h2 className="min-w-0 flex-1 truncate font-heading text-lg font-semibold text-foreground">Order {order.name}</h2>
+          <h2 className="min-w-0 flex-1 truncate font-heading text-lg font-semibold text-foreground">Order {orderNumber(order)}</h2>
           {adminUrl && (
             <a
               href={adminUrl}
@@ -125,16 +129,10 @@ export function OrderPanel({
         <ul className="space-y-3">
           {order.line_items.map((item) => {
             const variant = item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : null;
-            const image = (item as { image?: { src?: string } | null }).image?.src;
+            const image = (item as { image?: { src?: string } | null }).image?.src || describeItem({ sku: item.sku, product_name: item.title || item.name, size: item.variant_title || '', qty: item.quantity }, products).image;
             return (
               <li key={item.id} className="flex items-center gap-3">
-                {image ? (
-                  <img src={image} alt="" className="size-10 shrink-0 rounded-lg border border-border object-cover" />
-                ) : (
-                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-faint" aria-hidden>
-                    <Package className="size-4" />
-                  </div>
-                )}
+                <ProductThumb src={image} alt={item.title || item.name} size={44} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{item.title || item.name}</p>
                   <p className="truncate text-xs text-muted-foreground tabular">

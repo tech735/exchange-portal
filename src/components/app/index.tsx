@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronRight, Search, X } from 'lucide-react';
+import { Check, ChevronRight, Package, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -406,5 +406,27 @@ export function ConfirmDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Product thumbnail (Shopify photo, falls back to a package icon)     */
+/* ------------------------------------------------------------------ */
+
+
+export function ProductThumb({ src, alt, size = 48, className }: { src?: string | null; alt?: string; size?: number; className?: string }) {
+  const [failed, setFailed] = React.useState(false);
+  const px = { width: size, height: size };
+  if (!src || failed) {
+    return (
+      <span style={px} className={cn('grid shrink-0 place-items-center rounded-md border border-border bg-muted text-faint', className)} aria-hidden>
+        <Package style={{ width: size * 0.42, height: size * 0.42 }} />
+      </span>
+    );
+  }
+  const thumb = src.includes('cdn.shopify.com') ? `${src}${src.includes('?') ? '&' : '?'}width=${Math.round(size * 2)}` : src;
+  return (
+    <img src={thumb} alt={alt ?? ''} loading="lazy" onError={() => setFailed(true)} style={px}
+      className={cn('shrink-0 rounded-md border border-border bg-muted object-cover', className)} />
   );
 }

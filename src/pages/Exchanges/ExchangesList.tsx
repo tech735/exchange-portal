@@ -5,7 +5,7 @@ import { ChevronRight, Download, MoreHorizontal, Plus, Repeat2, Trash2, CheckCir
 import Layout from '@/components/Layout';
 import {
   PageHeader, ViewTabs, SearchField, FilterChip, BulkBar, BulkBarButton, EmptyState, RowSkeleton,
-  StatusBadge, PaymentBadge, ToneBadge, ConfirmDialog, formatINR,
+  StatusBadge, PaymentBadge, ToneBadge, ConfirmDialog, ProductThumb, formatINR,
 } from '@/components/app';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,7 +17,9 @@ import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { exportTicketsToCSV } from '@/utils/exportUtils';
 import { getExchangeStatus, slaRemaining, EXCHANGE_QUEUES, OPEN_STATUSES, REQUEST_SOURCE_LABELS, type RequestSource } from '@/lib/exchangeStatus';
-import { REASON_LABELS, type ReasonCode, type Ticket } from '@/types/database';
+import { REASON_LABELS, type ProductCatalog, type ReasonCode, type Ticket } from '@/types/database';
+import { useProducts } from '@/hooks/useProducts';
+import { describeSwap, displayPhone } from '@/lib/items';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 25;
@@ -38,14 +40,19 @@ const VIEWS: { id: ViewId; label: string; match: (t: Ticket) => boolean }[] = [
 
 type SortId = 'sla' | 'newest' | 'oldest';
 
-export function itemSummary(t: Ticket) {
-  const r = t.return_items?.[0];
-  const e = t.exchange_items?.[0];
-  if (!r && !e) return 'No items';
-  const name = (r?.product_name || e?.product_name || '').replace(/\s*[-–—]\s*.*$/, '').split(' ').slice(0, 3).join(' ');
-  const swap = r && e ? `${r.size || '—'} → ${e.size || '—'}` : r ? `return ${r.size}` : `send ${e?.size}`;
-  const more = Math.max((t.return_items?.length || 0), (t.exchange_items?.length || 0)) - 1;
-  return `${name} ${swap}${more > 0 ? ` · +${more}` : ''}`;
+/** Thumbnail + two-line "what's being swapped" cell. */
+function ItemsCell({ t, products }: { t: Ticket; products: ProductCatalog[] }) {
+  const s = describeSwap(t, products);
+  const img = s.returnItem?.image ?? s.exchangeItem?.image;
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <ProductThumb src={img} alt={s.title} size={36} />
+      <div className="min-w-0">
+        <p className="truncate text-sm text-foreground" title={s.title}>{s.title}</p>
+        <p className="truncate text-xs text-muted-foreground" title={s.detail}>{s.detail}{s.more > 0 ? ` · +${s.more} more` : ''}</p>
+      </div>
+    </div>
+  );
 }
 
 export default function ExchangesList() {
@@ -64,6 +71,7 @@ export default function ExchangesList() {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: tickets = [], isLoading, error, refetch } = useTickets();
+  const { data: products = [] } = useProducts();
   const deleteTicket = useDeleteTicket();
   const { settlePayment, amountsFor, pending } = useExchangeActions();
   const { user, hasFullAccess } = useUser();
@@ -264,10 +272,10 @@ export default function ExchangesList() {
                       >
                         <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}><Checkbox checked={on} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} /></td>
                         <td className="py-3 pr-3">
-                          <p className="font-medium text-foreground">#{t.order_id}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-[220px]">{t.customer_name} · {t.customer_phone}</p>
+                          <p className="font-medium text-foreground">{t.order_id}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[220px]">{[t.customer_name, displayPhone(t.customer_phone)].filter(Boolean).join(' · ')}</p>
                         </td>
-                        <td className="py-3 pr-3 text-muted-foreground"><span className="line-clamp-1 max-w-[240px]">{itemSummary(t)}</span></td>
+                        <td className="py-3 pr-3 max-w-[300px]"><ItemsCell t={t} products={products} /></td>
                         <td className="hidden xl:table-cell py-3 pr-3"><ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code] ?? t.reason_code}</ToneBadge></td>
                         <td className="py-3 pr-3"><StatusBadge ticket={t} /></td>
                         <td className="hidden lg:table-cell py-3 pr-3"><PaymentBadge ticket={t} /></td>
@@ -289,10 +297,11 @@ export default function ExchangesList() {
                       <Checkbox className="mt-1" checked={selected.has(t.id)} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} />
                       <Link to={`/exchanges/${t.id}`} state={{ ids: rows.map((r) => r.id) }} className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-foreground">#{t.order_id}</p>
+                          <p className="font-medium text-foreground">{t.order_id}</p>
                           <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>
                         </div>
-                        <p className="mt-0.5 truncate text-sm text-muted-foreground">{t.customer_name} · {itemSummary(t)}</p>
+                        <p className="mt-0.5 truncate text-sm text-muted-foreground">{t.customer_name}</p>
+                        <div className="mt-2"><ItemsCell t={t} products={products} /></div>
                         <div className="mt-2 flex flex-wrap gap-1.5"><StatusBadge ticket={t} /><PaymentBadge ticket={t} /></div>
                       </Link>
                       <ChevronRight className="mt-1 size-4 shrink-0 text-faint" />
@@ -327,8 +336,8 @@ export default function ExchangesList() {
         destructive={confirm?.kind === 'delete'}
         loading={pending || deleteTicket.isPending}
         title={confirm?.kind === 'delete'
-          ? `Delete ${confirm.tickets.length > 1 ? `${confirm.tickets.length} exchanges` : `#${confirm?.tickets[0]?.order_id}`}?`
-          : `Record payment for ${confirm && confirm.tickets.length > 1 ? `${confirm.tickets.length} exchanges` : `#${confirm?.tickets[0]?.order_id}`}?`}
+          ? `Delete ${confirm.tickets.length > 1 ? `${confirm.tickets.length} exchanges` : `${confirm?.tickets[0]?.order_id}`}?`
+          : `Record payment for ${confirm && confirm.tickets.length > 1 ? `${confirm.tickets.length} exchanges` : `${confirm?.tickets[0]?.order_id}`}?`}
         description={confirm?.kind === 'delete' ? 'This permanently removes the exchange and its history.' : 'They move to the warehouse queue for return pickup.'}
         confirmLabel={confirm?.kind === 'delete' ? 'Delete' : 'Record payment'}
         onConfirm={runConfirm}
@@ -339,7 +348,7 @@ export default function ExchangesList() {
               const a = amountsFor(t);
               return (
                 <li key={t.id} className="flex justify-between gap-3">
-                  <span className="truncate">#{t.order_id} · {t.customer_name}</span>
+                  <span className="truncate">{t.order_id} · {t.customer_name}</span>
                   <span className="font-medium tabular">{a.net >= 0 ? `Collect ${formatINR(a.net)}` : `Refund ${formatINR(-a.net)}`}</span>
                 </li>
               );
