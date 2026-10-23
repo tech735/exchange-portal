@@ -15,6 +15,9 @@ import { BarList, Ring, SERIES, Sparkline, StageDonut, VolumeChart, type Slice, 
 
 type Range = 7 | 30 | 90;
 const RANGE_KEY = 'dashboard-range';
+// Same windows the hourly escalate-tickets job uses for the warehouse SLA.
+const WAREHOUSE_SLA_DAYS = 5;
+const REQUEST_SLA_DAYS = 7;
 
 function greeting() {
   const h = new Date().getHours();
@@ -120,7 +123,15 @@ export default function Dashboard() {
     const counts = { pay: 0, wh: 0, inv: 0, refund: 0 };
     for (const x of open) counts[bucketOf(x.s.key)]++;
 
-    const onTime = doneCur.filter((t) => !t.sla_breached).length;
+    // On time = replacement shipped within the warehouse SLA: 5 days from the return
+    // pickup being booked (7 days from the request if no pickup was recorded).
+    // Not the sla_breached flag: that is also set later when invoicing / closing
+    // lags, which says nothing about whether the customer got their item on time.
+    const shipped = doneCur.filter((t) => t.exchange_booked_at);
+    const dueBy = (t: Ticket) => t.return_booked_at
+      ? addDays(new Date(t.return_booked_at), WAREHOUSE_SLA_DAYS)
+      : addDays(new Date(t.created_at), REQUEST_SLA_DAYS);
+    const onTime = shipped.filter((t) => new Date(t.exchange_booked_at!) <= dueBy(t)).length;
     const reasons = Object.entries(tickets.filter((t) => inCur(t.created_at)).reduce<Record<string, number>>((a, t) => { a[t.reason_code] = (a[t.reason_code] ?? 0) + 1; return a; }, {}))
       .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => ({ label: REASON_LABELS[k as ReasonCode] ?? k, value: v }));
 
@@ -131,7 +142,7 @@ export default function Dashboard() {
       volume, lodged, lodgedPrev, done, donePrev, turnCur, turnPrev, turnSpark, breachedOpen, newBreaches,
       breachSpark: days.map((d) => breachBy.get(dayKey(d)) ?? 0),
       lodgedSpark: volume.map((v) => v.lodged), doneSpark: volume.map((v) => v.completed),
-      counts, onTime, late: done - onTime, reasons, queue,
+      counts, onTime, late: shipped.length - onTime, shippedCount: shipped.length, reasons, queue,
     };
   }, [tickets, range, role, full]);
 
@@ -207,8 +218,8 @@ export default function Dashboard() {
 
         {/* Rate · reasons · needs attention */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[300px_minmax(0,1fr)_400px]">
-          <SectionCard title="On-time rate" description={`Completed within SLA · ${periodLabel}`}>
-            <Ring value={m.done ? m.onTime / m.done : null} label="on time" />
+          <SectionCard title="On-time rate" description={`Replacement shipped within ${WAREHOUSE_SLA_DAYS} days of pickup · ${periodLabel}`}>
+            <Ring value={m.shippedCount ? m.onTime / m.shippedCount : null} label={m.shippedCount ? 'on time' : 'nothing shipped'} />
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
               <div className="rounded-lg bg-muted/60 py-2"><p className="font-heading text-lg font-semibold tabular">{m.onTime}</p><p className="text-[11px] text-muted-foreground">On time</p></div>
               <div className="rounded-lg bg-muted/60 py-2"><p className="font-heading text-lg font-semibold tabular">{m.late}</p><p className="text-[11px] text-muted-foreground">Late</p></div>
