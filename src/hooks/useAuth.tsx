@@ -84,10 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       fetchingProfileRef.current = userId;
-      console.log('Fetching profile for userId:', userId);
       
       // Safety timeout for profile fetch (increased to 15s to handle serverless cold starts)
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
       );
 
@@ -97,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
         console.error('Profile fetch error:', error);

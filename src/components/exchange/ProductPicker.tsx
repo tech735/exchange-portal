@@ -11,7 +11,7 @@ import { ProductThumb } from '@/components/app';
 export interface SizeOption { size: string; sku: string; stock: number | null; price: number | null }
 
 /** Sizes for a catalogue product, with stock and price per variant SKU. */
-export function sizesFor(p: ProductCatalog | undefined | null): SizeOption[] {
+function sizesFor(p: ProductCatalog | undefined | null): SizeOption[] {
   if (!p) return [];
   return (p.variants || []).map((size, i) => {
     const sku = p.variant_skus?.[i] || '';

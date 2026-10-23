@@ -79,7 +79,7 @@ export function paymentPill(o: OrderRecord): Pill {
 }
 
 /** The fulfillment marked delivered by the carrier, if any. */
-export function deliveredFulfillment(o: OrderRecord) {
+function deliveredFulfillment(o: OrderRecord) {
   return o.fulfillments?.find((f) => f.shipment_status === 'delivered');
 }
 

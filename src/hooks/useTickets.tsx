@@ -1,7 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { Ticket, TicketItem, ReasonCode, TicketStage, TicketStatus, EventType } from '@/types/database';
+import type { Ticket, TicketItem, ReasonCode, TicketStage, TicketStatus, EventType, TicketEvent } from '@/types/database';
 import { useAuth } from './useAuth';
+
+// The generated table types lag behind the migrations (ticket inserts resolve to `never`),
+// so writes go through an untyped handle. Regenerate the types to drop this.
+const writeDb = supabase as unknown as SupabaseClient;
 
 interface CreateTicketData {
   order_id: string;
@@ -118,11 +123,11 @@ function mapTicket(data: Record<string, unknown>): Ticket {
     amount_collected: Number(data.amount_collected || 0),
     closed_at: data.closed_at ? String(data.closed_at) : null,
     updated_at: String(data.updated_at),
-    return_aggregator: data.return_aggregator ? (data.return_aggregator as any) : null,
-    exchange_aggregator: data.exchange_aggregator ? (data.exchange_aggregator as any) : null,
+    return_aggregator: data.return_aggregator ? (data.return_aggregator as Ticket['return_aggregator']) : null,
+    exchange_aggregator: data.exchange_aggregator ? (data.exchange_aggregator as Ticket['exchange_aggregator']) : null,
     return_booked_at: data.return_booked_at ? String(data.return_booked_at) : null,
     return_received_at: data.return_received_at ? String(data.return_received_at) : null,
-    qc_decision: data.qc_decision ? (data.qc_decision as any) : null,
+    qc_decision: data.qc_decision ? (data.qc_decision as Ticket['qc_decision']) : null,
     qc_notes: data.qc_notes ? String(data.qc_notes) : null,
     exchange_booked_at: data.exchange_booked_at ? String(data.exchange_booked_at) : null,
     request_source: (data.request_source as Ticket['request_source']) ?? null,
@@ -168,7 +173,7 @@ export function useTickets(filters?: {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map((d: any) => mapTicket(d));
+      return (data || []).map((d) => mapTicket(d));
     },
   });
 }
@@ -180,7 +185,7 @@ export function useTicket(id: string | undefined) {
       if (!id) return null;
       const { data, error } = await supabase.from('tickets').select('*').eq('id', id).single();
       if (error) throw error;
-      return mapTicket(data as any);
+      return mapTicket(data);
     },
     enabled: !!id,
     staleTime: 60 * 1000,
@@ -195,7 +200,7 @@ export function useTicketEvents(ticketId: string | undefined) {
       if (!ticketId) return [];
       const { data, error } = await supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('event_at', { ascending: true });
       if (error) throw error;
-      return data as any[];
+      return data as unknown as TicketEvent[];
     },
     enabled: !!ticketId,
     staleTime: 60 * 1000,
@@ -210,7 +215,7 @@ export function useCreateTicket() {
   return useMutation({
     mutationFn: async (data: CreateTicketData) => {
       try {
-        const { data: tickets, error } = await (supabase.from('tickets') as any).insert({
+        const { data: tickets, error } = await writeDb.from('tickets').insert({
           order_id: data.order_id,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
@@ -244,7 +249,7 @@ export function useCreateTicket() {
         }
 
         try {
-          await (supabase.from('ticket_events') as any).insert({
+          await writeDb.from('ticket_events').insert({
             ticket_id: ticket.id,
             event_type: 'CREATED' as const,
             event_by_user_id: user?.id || null,
@@ -276,11 +281,11 @@ export function useUpdateTicket() {
 
   return useMutation({
     mutationFn: async ({ id, eventType, ...updates }: UpdateTicketData & { eventType?: EventType }) => {
-      const { data: ticket, error } = await (supabase.from('tickets') as any).update(updates).eq('id', id).select().single();
+      const { data: ticket, error } = await writeDb.from('tickets').update(updates).eq('id', id).select().single();
       if (error) throw error;
 
       if (eventType) {
-        await (supabase.from('ticket_events') as any).insert({
+        await writeDb.from('ticket_events').insert({
           ticket_id: id,
           event_type: eventType,
           event_by_user_id: user?.id || null,
@@ -315,24 +320,3 @@ export function useDeleteTicket() {
   });
 }
 
-export function useTicketStats() {
-  return useQuery({
-    queryKey: ['ticket-stats'],
-    // Match the server-side Redis TTL so we refetch exactly when the cache expires
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('ticket-stats');
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data as {
-        totalOpen: number;
-        pendingWarehouse: number;
-        pendingInvoicing: number;
-        slaBreached: number;
-        completedThisWeek: number;
-        denied: number;
-      };
-    },
-  });
-}

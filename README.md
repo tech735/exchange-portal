@@ -1,389 +1,62 @@
-# Exchange Flow Management System
+# KOTU exchange portal
 
-A comprehensive web application for managing school uniform exchange requests, warehouse operations, and invoicing processes. This system streamlines the entire exchange workflow from ticket creation to final invoicing.
+Internal staff app for school-uniform exchanges, live at **exchange.kotu.co.in**.
+Customers ask for an exchange by email, WhatsApp, phone or helpdesk; support lodges it here and
+it moves through pickup → warehouse QC → replacement shipped → finance settlement.
 
-## 🏗️ Application Overview
+## Stack
 
-The Exchange Flow Management System is a role-based React application that handles the complete lifecycle of school uniform exchange requests. It provides different interfaces for support staff, warehouse personnel, invoicing teams, and administrators.
+React 18 + TypeScript, Vite, Tailwind with shadcn/Radix components, React Query, Recharts,
+Supabase (Postgres with RLS, Auth, Storage, Edge Functions). Deployed on Vercel from `main`.
 
-## 🚀 Technology Stack
+## Getting started
 
-- **Frontend**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **UI Framework**: shadcn/ui components with Radix UI primitives
-- **Styling**: Tailwind CSS
-- **State Management**: React Query (TanStack Query) for server state
-- **Routing**: React Router DOM (v6)
-- **Forms**: React Hook Form with Zod validation
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Icons**: Lucide React
-- **Date Handling**: date-fns
-- **Payments**: Razorpay Integration (Payment Links)
-- **Integrations**: Shopify API (Order Data Sync)
-
-## 📋 Core Features
-
-### 1. **Multi-Role Access Control**
-- **Admin**: Full system access, user management, and ticket deletion
-- **Support**: Create, manage, and track exchange tickets
-- **Warehouse**: Process returns, QC checks, and ship exchanges
-- **Invoicing**: Manage payments, refunds, and final ticket closure
-
-### 2. **Advanced Ticket Management**
-- **Exchange Logic**: Automated calculation of exchange value (Net Amount)
-- **Payment Handling**: 
-  - "Mark As Collected" for positive values (Fixed typo)
-  - "Send Payment Link" integration (Moves ticket to In Process)
-  - "Send to Refund" for negative values (Refunds due)
-- **Customer Email**: Automated extraction from Shopify or manual entry
-- **Status Tracking**: Granular tracking across New, In-Process, and Completed states
-- **SLA Monitoring**: Breach alerts and escalation
-
-### 3. **Comprehensive Warehouse Flow**
-- **Five-Stage Processing**:
-  - **New Requests**: Incoming tickets awaiting warehouse action (Only Paid or Refunded tickets)
-  - **Return Pending**: AWB generated, waiting for pickup
-  - **Return Received**: Items received at warehouse
-  - **QC Processing**: Approve or Deny based on item condition
-  - **Exchange Booked**: Outbound shipment booked
-- **Aggregator Integration**: Direct links to ShipDelight, iThink Logistics, and ShipRocket
-- **QC Actions**: Detailed approval/denial workflows with notes
-
-### 4. **Financial Operations**
-- **Invoicing**: Generate invoices for completed exchanges
-- **Refund Management**: 
-  - Visual "Refund Due" indicators
-  - "Mark as Refunded" workflow with status tracking
-  - Automated Payment Summary updates
-- **Payment Reconciliation**: Track collected vs refunded amounts
-
-### 5. **Product Management**
-- Product catalog with SKU management
-- School-specific product tagging
-- Price management system
-- Inventory tracking
-
-### 6. **Global Search**
-- **Smart Navigation**: Instant access to tickets by Order ID or Customer Name
-- **Recent History**: Quick access to previously searched terms
-- **Live Results**: Real-time search suggestions with ticket details
-- **Keyboard Support**: Full keyboard navigation for power users
-- **Shopify Sync**: Automated data fetching from Shopify orders
-- **Real-time KPIs**: Live operational dashboard with ticket statistics
-- **Product Sync**: Integrated catalog synchronization with external sources
-
-## 🔄 Application Workflow
-
-### 1. **Ticket Creation & Lodging (Support)**
-```
-Customer Request → Ticket Created → Payment/Refund check → Status: LODGED
-```
-- Support creates ticket (Manually or via Shopify Sync).
-- System calculates Net Amount:
-  - **Positive**: Customer pays (Payment Link or Cash).
-  - **Negative**: Refund due to customer.
-- **Workflow Tabs**:
-  - **New**: Recently lodged tickets awaiting payment action.
-  - **In Process**: Tickets where "Send Payment Link" was clicked; awaiting customer payment.
-  - **Completed**: Tickets "Marked As Paid" or with confirmed collection; moves to Warehouse queue.
-
-### 2. **Warehouse Processing (Warehouse)**
-```
-New → Return Pending → Received → QC Check → Exchange Booked
-```
-1.  **New**: View paid/refunded tickets. Select Aggregator (ShipDelight/iThink/ShipRocket) to generate Pickup AWB.
-2.  **Return Pending**: Track pickup status. Mark as "Received" when item arrives.
-3.  **Return Received**: Perform QC (Quality Check).
-    - **Approve**: Move to Exchange Booking.
-    - **Deny**: Close ticket or request info.
-4.  **Exchange Booked**: Book outbound shipment for approved items.
-
-### 3. **Invoicing & Closure (Invoicing)**
-```
-EXCHANGE_BOOKED → INVOICING_PENDING → INVOICED → CLOSED
-```
-- Invoicing team sees completed exchanges.
-- Generates Invoice.
-- **For Refunds**: If `Refund Due`, clicks "Mark as Refunded". Status updates to `Refunded`.
-- **Closure**: Closes ticket once all financial and physical actions are complete.
-
-## 📊 Ticket Stages & Status
-
-### Ticket Stages
-- **LODGED**: Initial ticket creation
-- **WAREHOUSE_PENDING**: Awaiting warehouse processing
-- **WAREHOUSE_APPROVED**: Warehouse approved exchange
-- **WAREHOUSE_DENIED**: Warehouse denied exchange
-- **EXCHANGE_COMPLETED**: Exchange processed successfully
-- **INVOICING_PENDING**: Awaiting invoice generation
-- **INVOICED**: Invoice generated and sent
-- **CLOSED**: Ticket fully resolved
-- **TO_BE_REFUNDED**: Refund processing required
-- **ESCALATED**: SLA breach or special handling required
-
-### Ticket Status
-- **NEW**: Recently created ticket
-- **IN_PROCESS**: Currently being handled
-- **COMPLETED**: Successfully resolved
-- **DENIED**: Request denied
-- **ESCALATED**: Requires management intervention
-
-## 👥 User Roles & Permissions
-
-### Admin
-- ✅ Full access to all modules
-- ✅ User management and role assignment
-- ✅ System configuration and settings
-- ✅ Advanced reporting and analytics
-- ✅ Product catalog management
-
-### Support
-- ✅ Create and edit exchange tickets
-- ✅ View all ticket information
-- ✅ Communicate with customers
-- ✅ Generate basic reports
-- ✅ Track ticket progress
-
-### Warehouse
-- ✅ Process warehouse operations
-- ✅ Approve/deny exchange requests
-- ✅ Manage inventory
-- ✅ Update ticket statuses
-- ✅ AWB tracking management
-
-### Invoicing
-- ✅ Generate and manage invoices
-- ✅ Track payments
-- ✅ Financial reporting
-- ✅ Billing operations
-- ✅ Refund processing
-
-## 🗂️ Project Structure
-
-```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/             # shadcn/ui components
-│   ├── Layout.tsx      # Main application layout
-│   ├── GlobalSearch.tsx # Global search component
-│   ├── AWBFormDialog.tsx # AWB tracking dialog
-│   ├── ErrorBoundary.tsx # Error handling
-├── pages/              # Page components
-│   ├── Dashboard/      # Main dashboard with KPIs
-│   ├── ExchangeLodging/ # Ticket creation and management
-│   ├── Warehouse/      # Warehouse operations
-│   ├── Invoicing/      # Invoicing interface
-│   ├── TicketDetail/   # Individual ticket view
-│   ├── Users.tsx       # User management
-│   ├── Index/          # Home page
-│   ├── auth_screens/   # Authentication screens
-│   └── NotFound.tsx    # 404 page
-├── hooks/              # Custom React hooks
-│   ├── useAuth.ts      # Authentication logic
-│   ├── useTickets.ts   # Ticket data management
-│   ├── useProducts.ts  # Product management
-│   ├── useProductPrices.ts # Price management
-│   ├── use-mobile.tsx  # Mobile detection
-│   └── use-toast.ts   # Toast notifications
-├── contexts/           # React contexts
-│   └── UserContext.ts  # User state management
-├── types/              # TypeScript type definitions
-│   └── database.ts     # Database schema types
-├── lib/                # Utility functions
-├── utils/              # Helper functions
-└── integrations/       # External integrations
-    └── supabase/       # Supabase configuration
+```sh
+npm install
+cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
+npm run dev            # http://localhost:8080
 ```
 
-## 🗃️ Database Schema
+| Script | What it does |
+| --- | --- |
+| `npm run build` | Production build into `dist/` |
+| `npm run lint` | ESLint |
+| `npm run knip:ci` | Finds unused files, exports and dependencies |
+| `npm run test:e2e` | Playwright end-to-end suite (see below) |
 
-### Core Tables
+## Where things live
 
-#### Profiles
-- User management and authentication
-- Role-based access control (ADMIN, SUPPORT, WAREHOUSE, INVOICING)
-- User preferences and settings
+| Path | Contents |
+| --- | --- |
+| `src/pages/` | One folder per screen: Dashboard, Exchanges, Warehouse, Cases, Finance, Orders, Shipments, Settings, Users |
+| `src/components/app/` | The shared UI kit (page header, cards, KPI tiles, badges…). Read its README before building UI |
+| `src/components/ui/` | shadcn primitives |
+| `src/lib/exchangeStatus.ts` | The single status shown for an exchange, derived from the DB `stage`/`status` columns |
+| `src/lib/navigation.ts` | Pages and which roles can open them |
+| `src/hooks/` | Data hooks (React Query + Supabase) |
+| `supabase/migrations/` | Schema, RLS policies, triggers and cron jobs |
+| `supabase/functions/` | Edge Functions: user management, team e-mails, SLA escalation, Shopify sync, shipment tracking and alerts |
+| `e2e/` | Playwright specs plus seed/cleanup scripts |
 
-#### Tickets
-- Primary table for exchange requests
-- Contains customer information (Name, Phone, Email), items, and workflow status
-- Tracks timestamps for each stage transition
-- AWB tracking for shipments
-- **customer_email**: Captured from Shopify or Manual entry for communication
+## Roles
 
-#### Ticket Events
-- Audit trail for all ticket activities
-- Records who did what and when
-- Essential for compliance and debugging
+Admin, Support, Warehouse and Finance (`INVOICING` in the database). Admins assign roles and
+choose which pages each role can open under **Users & roles**.
 
-#### Product Catalog
-- Master list of available products
-- Includes SKUs, variants, and school tags
-- Supports inventory management
-- Price information
+## End-to-end tests
 
-#### Refunds
-- Financial refund tracking
-- Links to tickets requiring refunds
-- Status and amount tracking
+The suite runs against the live database using temporary `@e2e.kotu.test` accounts and
+`E2E-TEST-…` records, which the notification trigger ignores.
 
-## 🔧 Setup & Installation
-
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-- Supabase account
-
-### Installation Steps
-
-1. **Clone repository**
-   ```bash
-   git clone <repository-url>
-   cd exchange-flow-main
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```env
-   # Supabase Configuration
-   VITE_SUPABASE_URL=https://your-project-id.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-   ```
-
-4. **Set up database**
-   - Create a new Supabase project
-   - Run SQL migration scripts from `supabase/migrations/`
-   - Configure authentication settings
-
-5. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-6. **Access application**
-   - Open http://localhost:5173
-   - Log in with your Supabase credentials
-
-## 📈 Key Performance Indicators
-
-The dashboard tracks important metrics:
-
-- **Total Open Tickets**: Active tickets across all stages
-- **Pending Warehouse**: Tickets awaiting warehouse processing (Paid/Refunded)
-- **Pending Invoicing**: Tickets ready for invoice generation
-- **SLA Breached**: Tickets exceeding time limits (High Priority)
-- **Completed This Week**: Weekly resolution throughput
-- **Denied Tickets**: Rejected exchange requests for auditing
-- **Operational Overview**: Real-time activity map and team collaboration metrics
-- **Time Tracker**: Monitoring ticket age and processing speed
-
-## 🔐 Security Features
-
-- **Role-Based Access Control**: Users only see relevant modules
-- **Authentication**: Secure login via Supabase Auth
-- **Data Validation**: Form validation with Zod schemas
-- **Audit Trail**: Complete activity logging
-- **SLA Monitoring**: Automated escalation for overdue tickets
-- **Row Level Security**: Database-level access control
-
-## 📱 Responsive Design
-
-- Mobile-first approach with Tailwind CSS
-- Responsive layouts for tablets and desktops
-- Touch-friendly interface elements
-- Collapsible sidebar for mobile devices
-- Consistent user experience across devices
-
-## 🔄 Integration Capabilities
-
-### Google Sheets Integration
-- Product catalog synchronization
-- Automated data import/export
-- Custom reporting capabilities
-
-### External Systems
-- ERP system integration possibilities
-- Payment gateway connectivity
-- Email notification systems
-- SMS alert capabilities
-- AWB tracking integration
-
-## 🎨 UI/UX Features
-
-- **Modern Interface**: Clean, professional design with shadcn/ui
-- **Dark/Light Mode**: Theme switching capability
-- **Interactive Tables**: Sortable, filterable data tables
-- **Real-time Updates**: Live status updates
-- **Export Functionality**: CSV and Excel export options
-- **Toast Notifications**: Non-intrusive user feedback
-- **Loading States**: Skeleton loaders and progress indicators
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Errors**
-   - Verify Supabase credentials in `.env`
-   - Check Supabase project status
-   - Ensure tables are created via migrations
-
-2. **Authentication Issues**
-   - Clear browser cache and cookies
-   - Verify Supabase auth configuration
-   - Check user role assignments
-
-3. **Performance Issues**
-   - Monitor database query performance
-   - Check React Query caching
-   - Verify network connectivity
-
-4. **Build Issues**
-   - Ensure all dependencies are installed
-   - Check TypeScript configuration
-   - Verify environment variables
-
-## 🚀 Deployment
-
-### Production Build
-```bash
-npm run build
+```sh
+E2E_SECRETS=/path/to/secrets.json node e2e/seed.mjs
+npm run test:e2e
+E2E_SECRETS=/path/to/secrets.json node e2e/cleanup.mjs
 ```
 
-### Preview Build
-```bash
-npm run preview
-```
+The secrets file holds the service-role key. Never commit it.
 
-### Environment Variables for Production
-- All environment variables from development
-- Additional production-specific configurations
-- Supabase production credentials
+## Server-side secrets
 
-## 🤝 Contributing
-
-1. Fork repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is proprietary and confidential to the organization.
-
-## 📞 Support
-
-For technical support or questions:
-- Contact the development team
-- Check the troubleshooting section
-- Review the Supabase dashboard for database issues
-
----
-
-**Last Updated**: February 2026
-**Version**: 1.0.0
+Edge Function secrets (Resend, Shopify, courier APIs, MSG91) are set with
+`supabase secrets set`; `.env.example` lists them and explains how alerts are routed.

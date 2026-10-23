@@ -1,118 +1,35 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ProductWithPrice {
-  sku: string;
-  price: number;
-  product_name: string;
-}
-
-interface ProductWithoutPrice {
-  sku: string;
-  product_name: string;
-}
-
+/**
+ * SKU → price lookup, covering both the product handle and every variant SKU.
+ * SKUs without a real price are left out so the UI can flag them as missing.
+ */
 export function useProductPrices() {
   return useQuery({
     queryKey: ['product-prices'],
     queryFn: async () => {
-      console.log('Fetching product prices from database...');
-      
-      try {
-        // Try to fetch with price column first
-        const { data, error } = await supabase
-          .from('product_catalog')
-          .select('sku, price, product_name, variant_skus, variant_prices')
-          .eq('active', true);
-        
-        if (error) {
-          console.error('Error fetching product prices:', error);
-          
-          // If price column doesn't exist, fetch without it and use default prices
-          if (error.message?.includes('column "price" does not exist')) {
-            console.log('Price column not found, fetching products without prices...');
-            const { data: productsWithoutPrice, error: fallbackError } = await supabase
-              .from('product_catalog')
-              .select('sku, product_name, variant_skus, variant_prices')
-              .eq('active', true);
-            
-            if (fallbackError) {
-              console.error('Error fetching products:', fallbackError);
-              throw fallbackError;
-            }
-            
-            // Use default prices based on product type
-            const priceMap: Record<string, number> = {};
-            if (productsWithoutPrice && Array.isArray(productsWithoutPrice)) {
-              productsWithoutPrice.forEach((product: any) => {
-                const basePrice = getDefaultPrice(product.sku);
-                priceMap[product.sku] = basePrice;
-                
-                // Index by variant SKUs
-                if (product.variant_skus && Array.isArray(product.variant_skus)) {
-                  product.variant_skus.forEach((vSku: string) => {
-                    // Check if variant has a specific price in variant_prices
-                    const vPrice = product.variant_prices?.[vSku];
-                    priceMap[vSku] = vPrice !== undefined ? Number(vPrice) : basePrice;
-                  });
-                }
-              });
-            }
-            
-            console.log('Price map created with default prices:', priceMap);
-            return priceMap;
-          }
-          
-          throw error;
+      const { data, error } = await supabase
+        .from('product_catalog')
+        .select('sku, price, variant_skus, variant_prices')
+        .eq('active', true);
+      if (error) throw error;
+
+      const priceMap: Record<string, number> = {};
+      for (const product of data ?? []) {
+        const basePrice = Number(product.price) || 0;
+        if (basePrice > 0) priceMap[product.sku] = basePrice;
+
+        const variantPrices = (product.variant_prices ?? {}) as Record<string, unknown>;
+        const variantSkus = Array.isArray(product.variant_skus) ? product.variant_skus.map(String) : [];
+        for (const vSku of variantSkus) {
+          const vPrice = Number(variantPrices[vSku]) || basePrice;
+          if (vPrice > 0) priceMap[vSku] = vPrice;
         }
-        
-        console.log('Fetched products:', data);
-        
-        // Convert to price lookup map
-        const priceMap: Record<string, number> = {};
-        if (data && Array.isArray(data)) {
-          data.forEach((product: any) => {
-            const basePrice = Number(product.price) || getDefaultPrice(product.sku);
-            
-            // 1. Index by primary SKU (handle)
-            priceMap[product.sku] = basePrice;
-            
-            // 2. Index by all associated variant SKUs
-            if (product.variant_skus && Array.isArray(product.variant_skus)) {
-              product.variant_skus.forEach((vSku: string) => {
-                // Use variant-specific price if available, otherwise fallback to basePrice
-                const vPrice = product.variant_prices?.[vSku];
-                priceMap[vSku] = vPrice !== undefined ? Number(vPrice) : basePrice;
-              });
-            }
-          });
-        }
-        
-        console.log('Price map created:', priceMap);
-        return priceMap;
-        
-      } catch (error) {
-        console.error('Failed to fetch product prices:', error);
-        throw error;
       }
+      return priceMap;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes for fresher data
+    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
-}
-
-// Helper function to determine default price based on SKU
-function getDefaultPrice(sku: string): number {
-  const skuUpper = sku.toUpperCase();
-  if (skuUpper.includes('SHIRT')) return 25.99;
-  if (skuUpper.includes('SKIRT')) return 35.99;
-  if (skuUpper.includes('PANT')) return 45.99;
-  if (skuUpper.includes('BLZR')) return 89.99;
-  if (skuUpper.includes('SHOE')) return 55.99;
-  if (skuUpper.includes('SOCK')) return 12.99;
-  if (skuUpper.includes('TIE')) return 15.99;
-  if (skuUpper.includes('BELT')) return 18.99;
-  if (skuUpper.includes('BAG')) return 42.99;
-  if (skuUpper.includes('SPORT')) return 22.99;
-  return 30.00; // Default fallback price
 }

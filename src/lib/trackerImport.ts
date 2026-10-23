@@ -24,7 +24,7 @@ export interface TrackerRow {
 }
 
 // RFC 4180-ish: quoted fields may contain commas, quotes ("") and newlines.
-export function parseCsv(text: string): string[][] {
+function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -69,7 +69,7 @@ const MONTHS: Record<string, string> = {
 };
 
 // "01/Oct/2026" → "2026-10-01"; also accepts ISO dates.
-export function parseSheetDate(value: string): string | null {
+function parseSheetDate(value: string): string | null {
   const v = value.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
   const match = v.match(/^(\d{1,2})[/\- ]([A-Za-z]{3})[A-Za-z]*[/\- ](\d{4})$/);

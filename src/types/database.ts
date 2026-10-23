@@ -317,14 +317,6 @@ export const STAGE_LABELS: Record<TicketStage, string> = {
   ESCALATED: 'Escalated',
 };
 
-export const STATUS_LABELS: Record<TicketStatus, string> = {
-  NEW: 'New',
-  IN_PROCESS: 'In Process',
-  COMPLETED: 'Completed',
-  DENIED: 'Denied',
-  ESCALATED: 'Escalated',
-};
-
 export const EVENT_LABELS: Record<EventType, string> = {
   CREATED: 'Ticket Created',
   UPDATED: 'Ticket Updated',

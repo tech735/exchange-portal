@@ -17,7 +17,7 @@ export const BOARD_COLUMNS: { key: BoardColumn; title: string; icon: React.Eleme
 
 const TYPE_TONE: Record<SpecialCaseType, 'danger' | 'warning' | 'info' | 'neutral'> = { RTO: 'danger', RETURN: 'warning', EXCHANGE: 'info', OTHER: 'neutral' };
 
-export const columnOf = (c: SpecialCase): BoardColumn => (c.status === 'RESOLVED' ? 'CLOSED' : c.board_stage ?? 'NEW');
+const columnOf = (c: SpecialCase): BoardColumn => (c.status === 'RESOLVED' ? 'CLOSED' : c.board_stage ?? 'NEW');
 
 /** Back-office board: drag a case between columns; click to open it. */
 export function CaseBoard({

@@ -33,3 +33,6 @@ build*.log
 /.e2e/
 /test-results/
 /playwright-report/
+
+# Vite temp files
+vite.config.ts.timestamp-*.mjs

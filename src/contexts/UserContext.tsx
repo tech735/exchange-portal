@@ -22,16 +22,6 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Mock users for testing (fallback only)
-const mockUsers: Record<string, User> = {
-  admin: {
-    id: '0',
-    name: 'Admin',
-    role: 'ADMIN',
-    email: 'admin@kotu.com',
-  },
-};
-
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [originalAdminUser, setOriginalAdminUser] = useState<User | null>(null);
@@ -118,4 +108,3 @@ export function useUser() {
   return context;
 }
 
-export { mockUsers };

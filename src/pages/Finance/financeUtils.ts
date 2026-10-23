@@ -21,7 +21,7 @@ export const PROCESSING_STORAGE_KEY = 'processingInvoices';
 
 export type PriceMap = Record<string, number> | undefined;
 
-export function isRefundDue(t: Ticket) {
+function isRefundDue(t: Ticket) {
   return getExchangeStatus(t).key === 'REFUND_DUE';
 }
 

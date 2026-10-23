@@ -96,31 +96,6 @@ export function summarizeShipments(shipments: TrackedShipment[], today: string):
   };
 }
 
-// The two status lines at the top of the sheet.
-export function dailySummary(stats: ShipmentStats, today: string) {
-  const day = formatDay(today, 'd MMM');
-  const delayed = stats.delayedNotify + stats.delayedNotified + stats.escalated;
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-  const delivery =
-    delayed === 0
-      ? { ok: true, text: `${day}: no delivery delays – all within deadline` }
-      : {
-          ok: false,
-          text:
-            `${day}: ${plural(delayed, 'shipment')} past the delivery deadline` +
-            (stats.delayedNotify ? ` – ${plural(stats.delayedNotify, 'customer')} still to notify` : '') +
-            (stats.escalated ? ` – ${stats.escalated} escalated for RTO review` : ''),
-        };
-
-  const pickup =
-    stats.pickupDelayed === 0
-      ? { ok: true, text: 'Pickups: no pickup delays' }
-      : { ok: false, text: `Pickups: ${plural(stats.pickupDelayed, 'order')} not picked up by the deadline` };
-
-  return [delivery, pickup];
-}
-
 export interface DailyReportRow {
   date: string;
   placed: number;
