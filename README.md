@@ -49,12 +49,12 @@ The suite runs against the live database using temporary `@e2e.kotu.test` accoun
 `E2E-TEST-…` records, which the notification trigger ignores.
 
 ```sh
-E2E_SECRETS=/path/to/secrets.json node e2e/seed.mjs
-npm run test:e2e
-E2E_SECRETS=/path/to/secrets.json node e2e/cleanup.mjs
+E2E_SECRETS=<env file> E2E_STATE=<state.json> node e2e/seed.mjs
+E2E_STATE=<state.json> npm run test:e2e
+E2E_SECRETS=<env file> E2E_STATE=<state.json> node e2e/cleanup.mjs
 ```
 
-The secrets file holds the service-role key. Never commit it.
+The env file holds SUPABASE_URL, SERVICE_KEY and ANON_KEY. Keep it outside the repo and never commit it.
 
 ## Server-side secrets
 

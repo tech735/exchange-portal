@@ -14,7 +14,8 @@ import Layout from '@/components/Layout';
 import { useBodyPointerEventsGuard } from '@/hooks/useBodyPointerEventsGuard';
 import { PageLoader } from '@/components/ui/Loader';
 import { Button } from '@/components/ui/button';
-import { canAccess } from '@/lib/navigation';
+import { roleLabel } from '@/lib/navigation';
+import { useAccess } from '@/hooks/useAccess';
 
 // Pages load on demand so the first paint (login, dashboard) stays small.
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -41,7 +42,7 @@ function AccessDenied() {
         <div className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"><ShieldAlert className="size-6" /></div>
         <h1 className="text-xl font-semibold">This page isn’t part of your role</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
-          You’re signed in as {user?.role === 'INVOICING' ? 'Finance' : user?.role?.toLowerCase()}. Ask an admin if you need access.
+          You’re signed in as {roleLabel(user?.role)}. Ask an admin if you need access.
         </p>
         <Button asChild variant="secondary"><Link to="/dashboard">Go to dashboard</Link></Button>
       </div>
@@ -50,11 +51,18 @@ function AccessDenied() {
 }
 
 function ProtectedRoute({ children, path }: { children: React.ReactNode; path: string }) {
-  const { user, isLoading, hasFullAccess } = useUser();
+  const { user, isLoading } = useUser();
   const location = useLocation();
   if (isLoading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (!canAccess(user.role, path, hasFullAccess())) return <AccessDenied />;
+  return <RoleGate path={path}>{children}</RoleGate>;
+}
+
+/** Mounted only once signed in, so the role permissions are read with a real session. */
+function RoleGate({ children, path }: { children: React.ReactNode; path: string }) {
+  const access = useAccess();
+  if (access.isLoading) return <PageLoader />;
+  if (!access.canOpen(path)) return <AccessDenied />;
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 

@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppSettings, CaseUpdate, Profile } from '@/types/database';
+import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/navigation';
 
 /** Defaults used until the app_settings rows exist (or if a key is missing). */
 export const DEFAULT_SETTINGS: AppSettings = {
   exchange_policy: { window_days: 10, max_per_order: 2, block_final_sale: true, final_sale_tag: 'final-sale', allow_different_product: true },
   fees: { delivery_charge: 150, free_reasons: ['DEFECTIVE', 'WRONG_ITEM'], payment_provider: 'RAZORPAY' },
   qc_checklist: { items: ['Tags attached', 'Unworn & unwashed', 'No stains, tears or damage', 'Correct item and size returned'] },
+  role_permissions: DEFAULT_ROLE_PERMISSIONS,
 };
 
 // The new tables are not in the generated Supabase types yet.

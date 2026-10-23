@@ -7,7 +7,7 @@ import { SectionCard, ToneBadge, EmptyState, initials } from '@/components/app';
 import { Button } from '@/components/ui/button';
 import { useTickets } from '@/hooks/useTickets';
 import { useUser } from '@/contexts/UserContext';
-import { canAccess } from '@/lib/navigation';
+import { useAccess } from '@/hooks/useAccess';
 import { getExchangeStatus, slaRemaining, OPEN_STATUSES, type ExchangeStatusKey } from '@/lib/exchangeStatus';
 import { REASON_LABELS, type ReasonCode, type Ticket } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -59,10 +59,11 @@ function KpiTile({ label, value, delta, foot, spark, color, id, to }: { label: s
 }
 
 export default function Dashboard() {
-  const { user, hasFullAccess } = useUser();
-  const full = hasFullAccess() || user?.role === 'ADMIN';
+  const { user } = useUser();
+  const access = useAccess();
+  const full = access.full;
   const role = user?.role;
-  const can = (p: string) => canAccess(role, p, full);
+  const can = access.canOpen;
   const { data: tickets = [], isLoading } = useTickets();
   const [range, setRange] = useState<Range>(() => {
     try { const v = Number(localStorage.getItem(RANGE_KEY)); return v === 7 || v === 90 ? v : 30; } catch { return 30; }

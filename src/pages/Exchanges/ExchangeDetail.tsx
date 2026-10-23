@@ -19,6 +19,7 @@ import { useExchangeActions, RAZORPAY_LINKS_URL } from '@/hooks/useExchangeActio
 import { useProductPrices } from '@/hooks/useProductPrices';
 import { useStaff, useQcPhotoUrls } from '@/hooks/useAppData';
 import { useUser } from '@/contexts/UserContext';
+import { useAccess } from '@/hooks/useAccess';
 import { useToast } from '@/hooks/use-toast';
 import { getExchangeStatus, slaRemaining, EXCHANGE_STEPS, REQUEST_SOURCE_LABELS } from '@/lib/exchangeStatus';
 import { itemPrice } from '@/lib/exchangeMath';
@@ -99,8 +100,9 @@ export default function ExchangeDetail() {
   const { data: staff = [] } = useStaff();
   const actions = useExchangeActions();
   const deleteTicket = useDeleteTicket();
-  const { user, hasFullAccess } = useUser();
-  const full = hasFullAccess() || user?.role === 'ADMIN';
+  const { user } = useUser();
+  const access = useAccess();
+  const actAny = access.can('exchanges.act_any');
   const [dialog, setDialog] = useState<null | 'pay' | 'return' | 'replacement' | 'qc' | 'delete' | 'received' | 'undo'>(null);
 
   const ids = location.state?.ids;
@@ -133,7 +135,7 @@ export default function ExchangeDetail() {
   const t: Ticket = ticket;
   const sla = slaRemaining(t);
   const team = st.nextAction?.team;
-  const mayAct = full || (team === 'support' && user?.role === 'SUPPORT') || (team === 'warehouse' && user?.role === 'WAREHOUSE') || (team === 'finance' && user?.role === 'INVOICING');
+  const mayAct = actAny || (team === 'support' && user?.role === 'SUPPORT') || (team === 'warehouse' && user?.role === 'WAREHOUSE') || (team === 'finance' && user?.role === 'INVOICING');
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try { await fn(); toast({ title: ok }); setDialog(null); }
@@ -165,7 +167,7 @@ export default function ExchangeDetail() {
         <div className="flex items-center gap-2">
           <PageHeader
             className="flex-1"
-            breadcrumb={[{ label: 'Exchanges', to: full || user?.role === 'SUPPORT' ? '/exchanges' : undefined }, { label: `${t.order_id}` }]}
+            breadcrumb={[{ label: 'Exchanges', to: access.canOpen('/exchanges') ? '/exchanges' : undefined }, { label: `${t.order_id}` }]}
             title={<span className="flex flex-wrap items-center gap-2">{t.order_id}<StatusBadge ticket={t} /><PaymentBadge ticket={t} />{st.key !== 'CLOSED' && <ToneBadge tone={sla.tone}>{sla.label}</ToneBadge>}</span>}
             description={<>
               {t.customer_name}
@@ -185,7 +187,7 @@ export default function ExchangeDetail() {
                   <DropdownMenuTrigger asChild><Button variant="secondary" size="icon" aria-label="More"><MoreHorizontal /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(window.location.href); toast({ title: 'Link copied' }); }}><Copy className="mr-2 size-4" />Copy link</DropdownMenuItem>
-                    {['RETURN_PENDING', 'RETURN_RECEIVED', 'WAREHOUSE_APPROVED', 'WAREHOUSE_DENIED', 'EXCHANGE_BOOKED'].includes(t.stage) && (full || user?.role === 'WAREHOUSE') && (
+                    {['RETURN_PENDING', 'RETURN_RECEIVED', 'WAREHOUSE_APPROVED', 'WAREHOUSE_DENIED', 'EXCHANGE_BOOKED'].includes(t.stage) && (actAny || user?.role === 'WAREHOUSE') && (
                       <DropdownMenuItem onClick={() => setDialog('undo')}><Undo2 className="mr-2 size-4" />Undo last step</DropdownMenuItem>
                     )}
                     {(st.key === 'REQUESTED') && mayAct && (
@@ -193,7 +195,7 @@ export default function ExchangeDetail() {
                         <ExternalLink className="mr-2 size-4" />Send payment link (Razorpay)
                       </DropdownMenuItem>
                     )}
-                    {full && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDialog('delete')}><Trash2 className="mr-2 size-4" />Delete exchange</DropdownMenuItem></>)}
+                    {access.can('exchanges.delete') && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDialog('delete')}><Trash2 className="mr-2 size-4" />Delete exchange</DropdownMenuItem></>)}
                   </DropdownMenuContent>
                 </DropdownMenu>
                 {primary && <Button className="hidden md:inline-flex" onClick={primary.onClick}>{primary.label} <ArrowRight /></Button>}

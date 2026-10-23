@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTickets, useDeleteTicket } from '@/hooks/useTickets';
 import { useExchangeActions } from '@/hooks/useExchangeActions';
-import { useUser } from '@/contexts/UserContext';
+import { useAccess } from '@/hooks/useAccess';
 import { useToast } from '@/hooks/use-toast';
 import { exportTicketsToCSV } from '@/utils/exportUtils';
 import { getExchangeStatus, slaRemaining, EXCHANGE_QUEUES, OPEN_STATUSES, REQUEST_SOURCE_LABELS, type RequestSource } from '@/lib/exchangeStatus';
@@ -74,8 +74,7 @@ export default function ExchangesList() {
   const { data: products = [] } = useProducts();
   const deleteTicket = useDeleteTicket();
   const { settlePayment, amountsFor, pending } = useExchangeActions();
-  const { user, hasFullAccess } = useUser();
-  const isAdmin = user?.role === 'ADMIN' || hasFullAccess();
+  const canDelete = useAccess().can('exchanges.delete');
 
   const setParam = (k: string, v: string | null) => {
     const next = new URLSearchParams(params);
@@ -150,7 +149,7 @@ export default function ExchangesList() {
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => navigate(`/exchanges/${t.id}`)}><ExternalLink className="mr-2 size-4" />Open</DropdownMenuItem>
         {canSettle(t) && <DropdownMenuItem onClick={() => setConfirm({ kind: 'pay', tickets: [t] })}><CheckCircle2 className="mr-2 size-4" />Mark paid / settled</DropdownMenuItem>}
-        {isAdmin && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirm({ kind: 'delete', tickets: [t] })}><Trash2 className="mr-2 size-4" />Delete</DropdownMenuItem></>)}
+        {canDelete && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirm({ kind: 'delete', tickets: [t] })}><Trash2 className="mr-2 size-4" />Delete</DropdownMenuItem></>)}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -327,7 +326,7 @@ export default function ExchangesList() {
           <BulkBarButton onClick={() => setConfirm({ kind: 'pay', tickets: selectedTickets.filter(canSettle) })}><CheckCircle2 /> Mark paid</BulkBarButton>
         )}
         <BulkBarButton onClick={() => exportTicketsToCSV(selectedTickets)}><Download /> Export</BulkBarButton>
-        {isAdmin && <BulkBarButton onClick={() => setConfirm({ kind: 'delete', tickets: selectedTickets })}><Trash2 /> Delete</BulkBarButton>}
+        {canDelete && <BulkBarButton onClick={() => setConfirm({ kind: 'delete', tickets: selectedTickets })}><Trash2 /> Delete</BulkBarButton>}
       </BulkBar>
 
       <ConfirmDialog

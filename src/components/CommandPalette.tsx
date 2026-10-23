@@ -4,8 +4,7 @@ import { Command as CommandPrimitive } from 'cmdk';
 import { Plus, Search, CornerDownLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useTickets } from '@/hooks/useTickets';
-import { useUser } from '@/contexts/UserContext';
-import { navFor, canAccess } from '@/lib/navigation';
+import { useAccess } from '@/hooks/useAccess';
 import { getExchangeStatus } from '@/lib/exchangeStatus';
 import { ToneBadge } from '@/components/app';
 import { displayPhone } from '@/lib/items';
@@ -29,10 +28,9 @@ const group = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[c
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate();
-  const { user, hasFullAccess } = useUser();
-  const full = hasFullAccess();
+  const access = useAccess();
   const [q, setQ] = useState('');
-  const canSeeTickets = canAccess(user?.role, '/exchanges/x', full);
+  const canSeeTickets = access.can('exchanges.view');
   const { data: tickets = [] } = useTickets();
 
   useEffect(() => { if (!open) setQ(''); }, [open]);
@@ -46,7 +44,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   }, [q, tickets, canSeeTickets]);
 
   const go = (to: string) => { onOpenChange(false); navigate(to); };
-  const pages = navFor(user?.role, full);
+  const pages = access.nav;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,7 +84,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </CommandPrimitive.Group>
             )}
 
-            {q.trim().length < 2 && canAccess(user?.role, '/exchanges/new', full) && (
+            {q.trim().length < 2 && access.can('exchanges.create') && (
               <CommandPrimitive.Group heading="Actions" className={group}>
                 <CommandPrimitive.Item value="new-exchange" onSelect={() => go('/exchanges/new')} className={item}>
                   <span className="grid size-7 place-items-center rounded-md bg-accent text-primary"><Plus className="size-4" /></span>

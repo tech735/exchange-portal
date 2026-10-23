@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,14 +14,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EmptyState, PageHeader, RowSkeleton, SectionCard, initials } from '@/components/app';
-import { AlertTriangle, Eye, EyeOff, KeyRound, MoreHorizontal, Plus, RefreshCw, Trash2, Users as UsersIcon } from 'lucide-react';
+import { EmptyState, PageHeader, RowSkeleton, SectionCard, ViewTabs, initials } from '@/components/app';
+import { RolePermissionsEditor } from '@/components/RolePermissionsEditor';
+import { AlertTriangle, Eye, EyeOff, KeyRound, Pencil, MoreHorizontal, Plus, RefreshCw, Trash2, Users as UsersIcon } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { NAV_ITEMS, ROLE_ACCESS } from '@/lib/navigation';
+import { useAppSettings } from '@/hooks/useAppData';
+import { NAV_ITEMS, ROLE_LABEL, ROLE_ORDER, DEFAULT_ROLE_PERMISSIONS, effectivePermissions, roleLabel, type RolePermissions } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types/database';
 
@@ -33,15 +36,6 @@ interface User {
   updated_at: string;
 }
 
-const ROLE_ORDER: UserRole[] = ['ADMIN', 'SUPPORT', 'WAREHOUSE', 'INVOICING'];
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  SUPPORT: 'Support',
-  WAREHOUSE: 'Warehouse',
-  INVOICING: 'Finance',
-};
-
 const ROLE_SUMMARY: Record<UserRole, string> = {
   ADMIN: 'Full access, including people, roles and settings.',
   SUPPORT: 'Handles customer exchanges from request to dispatch.',
@@ -49,16 +43,16 @@ const ROLE_SUMMARY: Record<UserRole, string> = {
   INVOICING: 'Collects payments, invoices and processes refunds.',
 };
 
-const roleLabel = (role: string) => ROLE_LABEL[role as UserRole] ?? role;
-
-/** Human-readable list of areas a role can open, derived from ROLE_ACCESS. */
-function roleAreas(role: UserRole): string[] {
-  const prefixes = ROLE_ACCESS[role] ?? [];
-  if (prefixes.includes('/')) return ['Every page', 'Users & roles', 'Settings'];
-  return prefixes.map((p) => {
-    if (p === '/exchanges/') return 'Exchange details (from their queue)';
-    return NAV_ITEMS.find((n) => n.to === p)?.label ?? p;
-  });
+/** Human-readable list of what a role gets, from the saved role permissions. */
+function roleAreas(role: UserRole, perms: RolePermissions): string[] {
+  if (role === 'ADMIN') return ['Every page', 'Users & roles', 'Settings'];
+  const on = effectivePermissions(perms[role] ?? []);
+  const areas = NAV_ITEMS.filter((n) => on.has(n.permission)).map((n) => n.label);
+  if (on.has('exchanges.view') && !on.has('exchanges')) areas.push('Exchange details');
+  if (on.has('exchanges.create')) areas.push('Lodge exchanges');
+  if (on.has('exchanges.act_any')) areas.push('Act on any stage');
+  if (on.has('exchanges.delete')) areas.push('Delete exchanges');
+  return areas;
 }
 
 const formatDate = (value: string) => {
@@ -181,6 +175,11 @@ export default function Users() {
   const selfId = currentUser?.id ?? contextUser?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: settings } = useAppSettings();
+  const rolePerms = settings?.role_permissions ?? DEFAULT_ROLE_PERMISSIONS;
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'permissions' ? 'permissions' : 'people';
+  const setTab = (t: 'people' | 'permissions') => setParams(t === 'people' ? {} : { tab: t }, { replace: true });
 
   // Fetch users.
   //
@@ -570,14 +569,34 @@ export default function Users() {
           }
         />
 
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <ViewTabs
+          views={[
+            { id: 'people' as const, label: 'People', count: isLoading ? undefined : count },
+            { id: 'permissions' as const, label: 'Roles & permissions' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+
+        {/* Kept mounted while hidden so unsaved permission edits survive a tab switch. */}
+        <div className={cn(tab !== 'permissions' && 'hidden')}>
+          <RolePermissionsEditor counts={roleCounts} />
+        </div>
+
+        <div className={cn('grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]', tab !== 'people' && 'hidden')}>
           <section className="overflow-hidden rounded-xl border border-border bg-card" aria-label="People">
             {listBody}
           </section>
 
           <SectionCard
             title="What each role can do"
-            description="Access is set by role. Change someone's role in the list to change what they see."
+            description="Change someone's role in the list, or edit what each role can do."
+            action={
+              <Button variant="ghost" size="sm" onClick={() => setTab('permissions')}>
+                <Pencil />
+                Edit
+              </Button>
+            }
           >
             <ul className="space-y-4">
               {ROLE_ORDER.map((r) => (
@@ -592,7 +611,7 @@ export default function Users() {
                   </div>
                   <p className="text-xs text-muted-foreground">{ROLE_SUMMARY[r]}</p>
                   <div className="flex flex-wrap gap-1">
-                    {roleAreas(r).map((a) => (
+                    {roleAreas(r, rolePerms).map((a) => (
                       <span key={a} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                         {a}
                       </span>

@@ -1,3 +1,5 @@
+import type { RolePermissions } from '@/lib/navigation';
+
 export type TicketStage =
   | 'LODGED'
   | 'RETURN_PENDING'
@@ -257,6 +259,7 @@ export interface AppSettings {
   exchange_policy: ExchangePolicySettings;
   fees: FeeSettings;
   qc_checklist: QcChecklistSettings;
+  role_permissions: RolePermissions;
 }
 
 export const SPECIAL_CASE_TYPE_LABELS: Record<SpecialCaseType, string> = {

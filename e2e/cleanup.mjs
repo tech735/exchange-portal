@@ -35,6 +35,9 @@ for (const u of testUsers) {
 // Settings back to exactly what they were before the run
 if (state?.settings) {
   for (const row of state.settings) await db.rest('POST', 'app_settings', '?on_conflict=key', { key: row.key, value: row.value }, 'resolution=merge-duplicates');
+  // …and drop rows the run added (e.g. role_permissions saved from Users & roles)
+  const keep = state.settings.map((r) => `"${r.key}"`).join(',');
+  await db.rest('DELETE', 'app_settings', keep ? `?key=not.in.(${keep})` : '?key=not.is.null');
 }
 
 const left = await db.rest('GET', 'tickets', `?order_id=like.${like}&select=id`);

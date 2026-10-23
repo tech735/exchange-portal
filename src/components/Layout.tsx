@@ -6,7 +6,8 @@ import { useUser } from '@/contexts/UserContext';
 import { useTickets } from '@/hooks/useTickets';
 import { useSpecialCases } from '@/hooks/useShipments';
 import { cn } from '@/lib/utils';
-import { navFor, canAccess, type NavItem } from '@/lib/navigation';
+import { roleLabel, type NavItem } from '@/lib/navigation';
+import { useAccess } from '@/hooks/useAccess';
 import { getExchangeStatus } from '@/lib/exchangeStatus';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -69,9 +70,9 @@ function NavLink({ item, active, collapsed, count, onNavigate }: { item: NavItem
 
 function SidebarContent({ collapsed, onNavigate, onToggleCollapsed, showClose, onClose }: { collapsed: boolean; onNavigate?: () => void; onToggleCollapsed?: () => void; showClose?: boolean; onClose?: () => void }) {
   const { pathname } = useLocation();
-  const { user, hasFullAccess } = useUser();
+  const { user } = useUser();
   const counts = useNavCounts();
-  const items = navFor(user?.role, hasFullAccess());
+  const items = useAccess().nav;
   const ops = items.filter((i) => i.section === 'operations');
   const admin = items.filter((i) => i.section === 'admin');
 
@@ -138,7 +139,7 @@ function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-primary">{user?.role === 'INVOICING' ? 'Finance' : user?.role?.toLowerCase()}</p>
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-primary">{roleLabel(user?.role)}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
@@ -150,8 +151,7 @@ function UserMenu() {
 }
 
 function TopBar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void }) {
-  const { user, hasFullAccess } = useUser();
-  const canCreate = canAccess(user?.role, '/exchanges/new', hasFullAccess());
+  const canCreate = useAccess().can('exchanges.create');
   return (
     <header className="sticky top-0 z-30 flex h-14 md:h-16 shrink-0 items-center gap-2 border-b border-border bg-card/90 px-3 sm:px-6 lg:px-8 backdrop-blur supports-[backdrop-filter]:bg-card/75">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="Open menu"><Menu /></Button>
@@ -179,8 +179,7 @@ function TopBar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
 
 function MobileTabBar({ onMore }: { onMore: () => void }) {
   const { pathname } = useLocation();
-  const { user, hasFullAccess } = useUser();
-  const items = navFor(user?.role, hasFullAccess()).filter((i) => i.section === 'operations').slice(0, 4);
+  const items = useAccess().nav.filter((i) => i.section === 'operations').slice(0, 4);
   return (
     <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]" aria-label="Quick">
       {items.map((i) => {
