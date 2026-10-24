@@ -25,8 +25,10 @@ export default defineConfig(({ mode }) => ({
         // Libraries change far less often than app code: keep them in their own
         // files so browsers reuse the cached copy after each deploy.
         manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          supabase: ["@supabase/supabase-js", "@tanstack/react-query"],
+          // React Query calls React.createContext at load, so it must share React's chunk
+          // (in a separate chunk it can evaluate before React and crash the app).
+          react: ["react", "react-dom", "react-router-dom", "@tanstack/react-query"],
+          supabase: ["@supabase/supabase-js"],
           ui: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select", "@radix-ui/react-popover", "@radix-ui/react-tooltip", "@radix-ui/react-checkbox", "cmdk"],
           dates: ["date-fns"],
           charts: ["recharts"],
