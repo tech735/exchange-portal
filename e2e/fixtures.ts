@@ -62,12 +62,16 @@ export async function signIn(page: Page, email: string, password: string) {
 export async function humanDrag(page: Page, from: import('@playwright/test').Locator, to: import('@playwright/test').Locator) {
   await from.scrollIntoViewIfNeeded();
   const a = (await from.boundingBox())!;
-  await page.mouse.move(a.x + a.width / 2, a.y + Math.min(30, a.height / 2));
+  const startY = a.y + Math.min(30, a.height / 2);
+  await page.mouse.move(a.x + a.width / 2, startY);
   await page.mouse.down();
-  await page.mouse.move(a.x + a.width / 2 + 6, a.y + Math.min(36, a.height / 2) + 6, { steps: 4 });
+  await page.mouse.move(a.x + a.width / 2 + 6, startY + 6, { steps: 4 });
   await to.scrollIntoViewIfNeeded();
   const b = (await to.boundingBox())!;
-  await page.mouse.move(b.x + b.width / 2, b.y + Math.min(160, b.height / 2), { steps: 12 });
+  // Drop level with the card, kept inside the target column: once a long column has
+  // scrolled the page, the top of the target column can be above the viewport.
+  const dropY = Math.max(b.y + 20, Math.min(startY, b.y + b.height - 20));
+  await page.mouse.move(b.x + b.width / 2, dropY, { steps: 12 });
   await page.mouse.up();
 }
 
