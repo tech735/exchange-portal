@@ -56,6 +56,18 @@ E2E_SECRETS=<env file> E2E_STATE=<state.json> node e2e/cleanup.mjs
 
 The env file holds SUPABASE_URL, SERVICE_KEY and ANON_KEY. Keep it outside the repo and never commit it.
 
+## Security checks
+
+- **CI** (`.github/workflows/security.yml`): Gitleaks (secrets, full history), Semgrep (OWASP Top 10),
+  `npm audit` (fails on high/critical) with OSV-Scanner, and CodeQL. Runs on every PR, on push to
+  `main` and weekly. Dependabot opens grouped update PRs every Monday.
+- **Pre-commit secret check**, once per clone (needs `winget install Gitleaks.Gitleaks`):
+  ```sh
+  git config core.hooksPath .githooks
+  ```
+- Reviewed, non-secret Gitleaks findings are listed in `.gitleaksignore`.
+- Scan reports go in `security-reports/`, which is git-ignored. Don't share them outside the team.
+
 ## Server-side secrets
 
 Edge Function secrets (Resend, Shopify, courier APIs, MSG91) are set with

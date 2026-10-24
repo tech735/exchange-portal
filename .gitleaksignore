@@ -1,0 +1,16 @@
+# Findings reviewed on 2026-10-24 (old commits; the files are gone from the current tree).
+#
+# Supabase anon / publishable key: public by design (it ships in the website bundle;
+# row level security protects the data), so these are not secrets.
+c80261b15eb51995f70681d457fc4527bd0d07af:.env:jwt:3
+17309f90b3cec911ff501d184bff1288a440f6a4:.env:generic-api-key:3
+cd22994109fff872db90de737ec68520b8244bdf:debug-tickets.js:generic-api-key:6
+15a2f1d60a9b8d681b0a12f7afabf8b101132d75:.env:generic-api-key:4
+15a2f1d60a9b8d681b0a12f7afabf8b101132d75:google-sheets-sync.js:generic-api-key:9
+15a2f1d60a9b8d681b0a12f7afabf8b101132d75:NEW-SETUP.md:generic-api-key:34
+15a2f1d60a9b8d681b0a12f7afabf8b101132d75:test-new-connection.js:generic-api-key:7
+
+# REAL SECRET: Resend API key (VITE_RESEND_API_KEY) in old .env commits.
+# The repo is public, so this key must be REVOKED in the Resend dashboard.
+# Only after it has been revoked, uncomment the line below so CI stops flagging it.
+# 17309f90b3cec911ff501d184bff1288a440f6a4:.env:generic-api-key:6

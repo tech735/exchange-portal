@@ -1,0 +1,12 @@
+#!/bin/sh
+# Blocks a commit that contains a secret. Enable once per clone:
+#   git config core.hooksPath .githooks
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --redact --no-banner . || {
+    echo "gitleaks found a secret in the staged changes. Remove it (and rotate it if it was real)." >&2
+    exit 1
+  }
+else
+  echo "warning: gitleaks is not installed, so staged changes were not checked for secrets." >&2
+  echo "         install it with: winget install Gitleaks.Gitleaks" >&2
+fi

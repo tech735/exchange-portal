@@ -29,6 +29,15 @@ build*.log
 
 #Exclude env files
 .env
+.env.*
+!.env.example
+# .env.production stays tracked: it holds only public browser values (Supabase URL + publishable key)
+!.env.production
+
+# Keys and security scan output (reports describe real vulnerabilities)
+*.pem
+*.key
+security-reports/
 # Playwright
 /.e2e/
 /test-results/
