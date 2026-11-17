@@ -47,7 +47,7 @@ export function PageHeader({
           <h1 className="text-xl sm:text-2xl font-semibold text-foreground truncate">{title}</h1>
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:shrink-0">{actions}</div>}
       </div>
     </div>
   );

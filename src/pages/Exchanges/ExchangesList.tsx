@@ -243,18 +243,18 @@ export default function ExchangesList() {
             />
           ) : (
             <>
-              {/* Table: tablet and up */}
-              <table className="hidden md:table w-full text-sm">
+              {/* Table: wide screens (the full column set needs ~1000px) */}
+              <table className="hidden xl:table w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <th className="w-10 py-2.5 pl-4"><Checkbox checked={allOnPage} onCheckedChange={toggleAll} aria-label="Select page" /></th>
+                    <th className="w-10 py-2.5 pl-4 pr-3"><Checkbox checked={allOnPage} onCheckedChange={toggleAll} aria-label="Select page" /></th>
                     <th className="py-2.5 pr-3">Order · customer</th>
                     <th className="py-2.5 pr-3">Items</th>
-                    <th className="hidden xl:table-cell py-2.5 pr-3">Reason</th>
+                    <th className="hidden 2xl:table-cell py-2.5 pr-3">Reason</th>
                     <th className="py-2.5 pr-3">Status</th>
-                    <th className="hidden lg:table-cell py-2.5 pr-3">Payment</th>
+                    <th className="py-2.5 pr-3">Payment</th>
                     <th className="py-2.5 pr-3">SLA</th>
-                    <th className="hidden xl:table-cell py-2.5 pr-3">Updated</th>
+                    <th className="hidden 2xl:table-cell py-2.5 pr-3">Updated</th>
                     <th className="w-12 py-2.5 pr-3" />
                   </tr>
                 </thead>
@@ -270,17 +270,17 @@ export default function ExchangesList() {
                         tabIndex={0}
                         className={cn('cursor-pointer border-b border-border last:border-0 transition-colors duration-100 hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:outline-none', on && 'bg-accent/60 hover:bg-accent')}
                       >
-                        <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}><Checkbox checked={on} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} /></td>
+                        <td className="py-3 pl-4 pr-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={on} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} /></td>
                         <td className="py-3 pr-3">
                           <p className="font-medium text-foreground">{t.order_id}</p>
                           <p className="text-xs text-muted-foreground truncate max-w-[220px]">{[t.customer_name, displayPhone(t.customer_phone)].filter(Boolean).join(' · ')}</p>
                         </td>
-                        <td className="py-3 pr-3 max-w-[300px]"><ItemsCell t={t} products={products} /></td>
-                        <td className="hidden xl:table-cell py-3 pr-3"><ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code] ?? t.reason_code}</ToneBadge></td>
+                        <td className="w-full max-w-0 py-3 pr-3"><ItemsCell t={t} products={products} /></td>
+                        <td className="hidden 2xl:table-cell py-3 pr-3"><ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code] ?? t.reason_code}</ToneBadge></td>
                         <td className="py-3 pr-3"><StatusBadge ticket={t} /></td>
-                        <td className="hidden lg:table-cell py-3 pr-3"><PaymentBadge ticket={t} /></td>
+                        <td className="py-3 pr-3"><PaymentBadge ticket={t} /></td>
                         <td className="py-3 pr-3"><ToneBadge tone={sla.tone}>{sla.label}</ToneBadge></td>
-                        <td className="hidden xl:table-cell py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true })}</td>
+                        <td className="hidden 2xl:table-cell py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true })}</td>
                         <td className="py-3 pr-3 text-right" onClick={(e) => e.stopPropagation()}><RowMenu t={t} /></td>
                       </tr>
                     );
@@ -288,8 +288,8 @@ export default function ExchangesList() {
                 </tbody>
               </table>
 
-              {/* Cards: phones */}
-              <ul className="md:hidden divide-y divide-border">
+              {/* Cards: phones, tablets and narrow laptops */}
+              <ul className="xl:hidden divide-y divide-border">
                 {pageRows.map((t) => {
                   const sla = slaRemaining(t);
                   return (

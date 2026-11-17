@@ -250,7 +250,7 @@ export default function NewExchange() {
           breadcrumb={[{ label: 'Exchanges', to: '/exchanges' }, { label: 'New exchange' }]}
           title="New exchange"
           description="Lodge a request that came in by email, WhatsApp, phone or the helpdesk."
-          actions={<Button variant="ghost" onClick={() => navigate(-1)}>Cancel</Button>}
+          actions={<Button variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>}
         />
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -266,7 +266,7 @@ export default function NewExchange() {
                       const on = source === s;
                       return (
                         <button key={s} type="button" role="radio" aria-checked={on} onClick={() => setSource(s)}
-                          className={cn('inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all duration-150 active:scale-[0.97]',
+                          className={cn('inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 enabled:active:scale-[0.96]',
                             on ? 'border-primary bg-accent text-accent-foreground' : 'border-input bg-card text-foreground hover:bg-muted')}>
                           <Icon className={cn('size-4', on ? 'text-primary' : 'text-faint')} />{REQUEST_SOURCE_LABELS[s]}
                         </button>

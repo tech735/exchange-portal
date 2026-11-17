@@ -604,7 +604,7 @@ export function ShipmentList({
                   <TableHead className="w-10"><Checkbox checked={allOnPage} onCheckedChange={togglePage} aria-label="Select page" /></TableHead>
                   <TableHead>Order · customer</TableHead>
                   <TableHead>Courier · AWB</TableHead>
-                  <TableHead className="hidden lg:table-cell">Zone</TableHead>
+                  <TableHead className="hidden 2xl:table-cell">Zone</TableHead>
                   <TableHead className="whitespace-nowrap">Picked up</TableHead>
                   <TableHead>Expected</TableHead>
                   <TableHead>Status</TableHead>
@@ -636,7 +636,7 @@ export function ShipmentList({
                         <div className="text-foreground">{s.courier || '—'}</div>
                         <div className="text-xs"><AwbLink shipment={s} /></div>
                       </TableCell>
-                      <TableCell className="hidden whitespace-nowrap lg:table-cell">{DELIVERY_ZONE_LABELS[s.delivery_zone]}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap 2xl:table-cell">{DELIVERY_ZONE_LABELS[s.delivery_zone]}</TableCell>
                       <TableCell className="whitespace-nowrap"><PickupCell s={s} /></TableCell>
                       <TableCell className="whitespace-nowrap">
                         <div>{formatDay(s.expectedDelivery)}</div>

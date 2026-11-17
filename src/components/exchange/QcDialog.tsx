@@ -118,7 +118,7 @@ export function QcDialog({
                   <div key={p.path} className="group relative size-16 overflow-hidden rounded-lg border border-border">
                     <img src={p.preview} alt={`QC photo ${i + 1}`} className="size-full object-cover" />
                     <button type="button" aria-label="Remove photo" onClick={() => setPhotos((ps) => ps.filter((x) => x.path !== p.path))}
-                      className="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-foreground/70 text-background opacity-0 group-hover:opacity-100 transition-opacity">
+                      className="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-foreground/70 text-background transition-opacity [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
                       <X className="size-3" />
                     </button>
                   </div>
@@ -136,7 +136,7 @@ export function QcDialog({
             <div role="radiogroup" aria-label="Decision" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
               {(['APPROVED', 'DENIED'] as const).map((d) => (
                 <button key={d} type="button" role="radio" aria-checked={decision === d} onClick={() => setDecision(d)}
-                  className={cn('flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all duration-150',
+                  className={cn('flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150',
                     decision === d ? 'bg-card shadow-sm ' + (d === 'APPROVED' ? 'text-success' : 'text-destructive') : 'text-muted-foreground hover:text-foreground')}>
                   {d === 'APPROVED' ? <Check className="size-4" /> : <X className="size-4" />}
                   {d === 'APPROVED' ? 'Approve' : 'Reject'}

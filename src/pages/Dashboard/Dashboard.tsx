@@ -171,7 +171,7 @@ export default function Dashboard() {
             <div role="radiogroup" aria-label="Period" className="flex flex-1 rounded-lg bg-muted p-0.5 sm:inline-flex sm:flex-none">
               {([7, 30, 90] as Range[]).map((r) => (
                 <button key={r} role="radio" aria-checked={range === r} onClick={() => pickRange(r)}
-                  className={cn('h-8 flex-1 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-all duration-150 sm:flex-none', range === r ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                  className={cn('h-8 flex-1 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-150 sm:flex-none', range === r ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                   {r}<span className="hidden min-[360px]:inline"> days</span><span className="min-[360px]:hidden">d</span>
                 </button>
               ))}

@@ -134,7 +134,7 @@ export function ExportShipmentsDialog({
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1" role="radiogroup">
               {([['xlsx', 'Excel', FileSpreadsheet], ['csv', 'CSV', FileText]] as const).map(([k, l, Icon]) => (
                 <button key={k} type="button" role="radio" aria-checked={fileFormat === k} onClick={() => setFileFormat(k)}
-                  className={cn('flex h-8 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-all', fileFormat === k ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                  className={cn('flex h-8 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150', fileFormat === k ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
                   <Icon className="size-4" />{l}
                 </button>
               ))}

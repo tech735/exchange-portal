@@ -94,7 +94,7 @@ function SidebarContent({ collapsed, onNavigate, onToggleCollapsed, showClose, o
         )}
       </div>
 
-      <nav className={cn('flex-1 overflow-y-auto scrollbar-thin pb-4', collapsed ? 'px-2' : 'px-3')} aria-label="Main">
+      <nav className={cn('flex-1 overflow-y-auto overscroll-contain scrollbar-thin pb-4', collapsed ? 'px-2' : 'px-3')} aria-label="Main">
         {!collapsed && <p className="px-2.5 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-wider text-faint">Operations</p>}
         <div className="space-y-0.5">
           {ops.map((i) => <NavLink key={i.to} item={i} active={isActive(pathname, i.to)} collapsed={collapsed} count={counts[i.to]} onNavigate={onNavigate} />)}
@@ -130,7 +130,7 @@ function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="grid size-9 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground ring-offset-background transition-shadow hover:ring-2 hover:ring-primary/20 focus-visible:ring-2 focus-visible:ring-ring" aria-label="Account menu">
+        <button className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground ring-offset-background transition-shadow hover:ring-2 hover:ring-primary/20 focus-visible:ring-2 focus-visible:ring-ring" aria-label="Account menu">
           {initials(user?.name)}
         </button>
       </DropdownMenuTrigger>
@@ -158,7 +158,7 @@ function TopBar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
       <img src="/Vector-Blue-KOTU-Logo.png" alt="" className="size-7 rounded-full md:hidden" />
       <button
         onClick={onSearch}
-        className="hidden md:flex h-9 w-full max-w-md items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-faint transition-colors hover:border-input hover:text-muted-foreground"
+        className="hidden md:flex h-9 w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-faint transition-colors hover:border-input hover:text-muted-foreground"
       >
         <Search className="size-4" />
         <span className="flex-1 text-left truncate">Search orders, exchanges, AWB, phone…</span>
@@ -167,7 +167,7 @@ function TopBar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
       <div className="flex-1" />
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onSearch} aria-label="Search"><Search /></Button>
       {canCreate && (
-        <Button asChild size="sm" className="hidden sm:inline-flex">
+        <Button asChild size="sm" className="hidden shrink-0 sm:inline-flex">
           <Link to="/exchanges/new"><Plus /> New exchange</Link>
         </Button>
       )}
