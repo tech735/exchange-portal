@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronRight, Download, ExternalLink, Phone, Truck } from 'lucide-react';
-import { BulkBar, BulkBarButton, EmptyState, FilterChip, RowSkeleton, SearchField, ToneBadge } from '@/components/app';
+import { BulkBar, BulkBarButton, ChipFilter, EmptyState, FilterChip, RowSkeleton, SearchField, ToneBadge } from '@/components/app';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ExportShipmentsDialog } from './ExportShipmentsDialog';
 import type { Tone } from '@/lib/exchangeStatus';
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import {
-  DELIVERY_CHECK_LABELS,
   SHIPMENT_KIND_LABELS,
   dailyReport,
   formatDay,
@@ -30,13 +29,14 @@ import { DeliveryCheckBadge } from './DeliveryCheckBadge';
 import { LookbackSelect, DEFAULT_PERIOD, isDefaultPeriod, periodLabel, type Period } from './LookbackSelect';
 import { CHECK_META } from './constants';
 
-type CheckFilter = 'all' | 'needs_action' | 'open' | 'delivered' | DeliveryCheck;
+type ScopeId = 'all' | 'needs_action' | 'open' | 'delivered';
+type CheckFilter = ScopeId | DeliveryCheck;
 type KindFilter = 'all' | Exclude<ShipmentKind, 'FORWARD'>;
 
 const DEFAULT_CHECK: CheckFilter = 'open';
 const OPEN_CHECKS: DeliveryCheck[] = ['ESCALATED', 'DELAYED_NOTIFY', 'PICKUP_DELAYED', 'DELAYED_NOTIFIED', 'AWAITING_PICKUP', 'ON_TRACK'];
 
-const CHECK_FILTER_LABELS: Record<'all' | 'needs_action' | 'open' | 'delivered', string> = {
+const CHECK_FILTER_LABELS: Record<ScopeId, string> = {
   open: 'Open shipments',
   needs_action: 'Needs action',
   delivered: 'Delivered',
@@ -237,7 +237,8 @@ export function ShipmentList({
   const toNotify = useMemo(() => shipments.filter((s) => s.check === 'DELAYED_NOTIFY'), [shipments]);
   const delayed = stats.delayedNotify + stats.delayedNotified + stats.escalated;
 
-  const filtered = shipments.filter((s) => {
+  // Everything except the check filter, so the scope chips can show what each choice leaves.
+  const scoped = shipments.filter((s) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -245,8 +246,15 @@ export function ShipmentList({
         .some((v) => v?.toLowerCase().includes(q));
     const matchesZone = zoneFilter === 'all' || s.delivery_zone === zoneFilter;
     const matchesKind = kindFilter === 'all' || shipmentKind(s.shipment_ref) === kindFilter;
-    return matchesSearch && matchesZone && matchesKind && matchesCheck(s, checkFilter);
+    return matchesSearch && matchesZone && matchesKind;
   });
+  const filtered = scoped.filter((s) => matchesCheck(s, checkFilter));
+  const scopeOptions = (['open', 'needs_action', 'delivered', 'all'] as ScopeId[]).map((id) => ({
+    id,
+    label: id === 'open' ? 'Open' : id === 'all' ? 'All' : CHECK_FILTER_LABELS[id],
+    count: scoped.filter((s) => matchesCheck(s, id)).length,
+  }));
+  const isScope = (f: CheckFilter): f is ScopeId => f in CHECK_FILTER_LABELS;
 
   useEffect(() => setCurrentPage(1), [searchQuery, checkFilter, zoneFilter, kindFilter, reportSince]);
   // Selection only keeps rows that are still in the list.
@@ -315,7 +323,7 @@ export function ShipmentList({
   const activeChips: { key: string; label: string; clear: () => void }[] = [
     searchQuery.trim() && { key: 'q', label: `“${searchQuery.trim()}”`, clear: () => setSearchQuery('') },
     reverse && kindFilter !== 'all' && { key: 'kind', label: `Type: ${SHIPMENT_KIND_LABELS[kindFilter]}`, clear: () => setKindFilter('all') },
-    checkFilter !== DEFAULT_CHECK && { key: 'check', label: `Check: ${checkFilterLabel(checkFilter)}`, clear: () => setCheckFilter(DEFAULT_CHECK) },
+    !isScope(checkFilter) && { key: 'check', label: `Check: ${checkFilterLabel(checkFilter)}`, clear: () => setCheckFilter(DEFAULT_CHECK) },
     zoneFilter !== 'all' && { key: 'zone', label: `Zone: ${DELIVERY_ZONE_LABELS[zoneFilter]}`, clear: () => setZoneFilter('all') },
     !isDefaultPeriod(period) && {
       key: 'lookback',
@@ -445,6 +453,12 @@ export function ShipmentList({
             placeholder="Order, customer, phone, AWB…"
             className="w-full md:w-64"
           />
+          <ChipFilter<ScopeId>
+            label="Shipments to show"
+            value={isScope(checkFilter) ? checkFilter : null}
+            onChange={setCheckFilter}
+            options={scopeOptions}
+          />
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {reverse && (
               <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as KindFilter)}>
@@ -458,20 +472,6 @@ export function ShipmentList({
                 </SelectContent>
               </Select>
             )}
-            <Select value={checkFilter} onValueChange={(v) => setCheckFilter(v as CheckFilter)}>
-              <SelectTrigger className="sm:w-[190px]" aria-label="Delivery check">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Open shipments</SelectItem>
-                <SelectItem value="needs_action">Needs action ({stats.escalated + stats.delayedNotify + stats.pickupDelayed})</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="all">All shipments</SelectItem>
-                {(Object.keys(DELIVERY_CHECK_LABELS) as DeliveryCheck[]).map((check) => (
-                  <SelectItem key={check} value={check}>{DELIVERY_CHECK_LABELS[check]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={zoneFilter} onValueChange={(v) => setZoneFilter(v as 'all' | DeliveryZone)}>
               <SelectTrigger className="sm:w-[140px]" aria-label="Zone">
                 <SelectValue />

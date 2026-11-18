@@ -3,9 +3,14 @@ import { Link } from 'react-router-dom';
 import { addDays, differenceInHours, format, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import { ArrowRight, CheckCircle2, Plus } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { SectionCard, ToneBadge, EmptyState, initials } from '@/components/app';
+import { SectionCard, ToneBadge, EmptyState, ConfirmDialog, initials, formatINR } from '@/components/app';
 import { Button } from '@/components/ui/button';
+import { BookShipmentDialog } from '@/components/exchange/BookShipmentDialog';
+import { QcDialog } from '@/components/exchange/QcDialog';
 import { useTickets } from '@/hooks/useTickets';
+import { useExchangeActions } from '@/hooks/useExchangeActions';
+import { useToast } from '@/hooks/use-toast';
+import { financeTabOf } from '@/pages/Finance/financeUtils';
 import { useUser } from '@/contexts/UserContext';
 import { canAccess } from '@/lib/navigation';
 import { getExchangeStatus, slaRemaining, OPEN_STATUSES, type ExchangeStatusKey } from '@/lib/exchangeStatus';
@@ -40,6 +45,28 @@ function DeltaBadge({ value, unit = '%', goodWhen }: { value: number | null; uni
   return <ToneBadge tone={tone} dot={false}>{up ? '↑' : '↓'} {Math.abs(value)}{unit}</ToneBadge>;
 }
 
+type QueueAction = 'pay' | 'return' | 'received' | 'qc' | 'replacement';
+
+/** The one-click step for a queue row: opens the same dialog the exchange page uses, or links to Finance. */
+function rowAction(key: ExchangeStatusKey, t: Ticket): { label: string; kind: QueueAction } | { label: string; to: string } | null {
+  switch (key) {
+    case 'REQUESTED':
+    case 'AWAITING_PAYMENT': return { label: 'Record payment', kind: 'pay' };
+    case 'TO_BOOK_PICKUP': return { label: 'Book pickup', kind: 'return' };
+    case 'RETURN_IN_TRANSIT': return { label: 'Mark received', kind: 'received' };
+    case 'QC_PENDING': return { label: 'Run QC', kind: 'qc' };
+    case 'READY_TO_SHIP': return { label: 'Ship', kind: 'replacement' };
+    case 'SHIPPED':
+    case 'INVOICING':
+    case 'REFUND_DUE': {
+      const tab = financeTabOf(t);
+      const label = key === 'REFUND_DUE' ? 'Refund' : tab === 'invoiced' ? 'Close' : 'Invoice';
+      return { label, to: tab && tab !== 'to-invoice' ? `/finance?tab=${tab}` : '/finance' };
+    }
+    default: return null;
+  }
+}
+
 function KpiTile({ label, value, delta, foot, spark, color, id, to }: { label: string; value: React.ReactNode; delta: React.ReactNode; foot: string; spark: number[]; color: string; id: string; to?: string }) {
   const body = (
     <>
@@ -64,6 +91,15 @@ export default function Dashboard() {
   const role = user?.role;
   const can = (p: string) => canAccess(role, p, full);
   const { data: tickets = [], isLoading } = useTickets();
+  const actions = useExchangeActions();
+  const { toast } = useToast();
+  const [act, setAct] = useState<null | { kind: QueueAction; t: Ticket }>(null);
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    try { await fn(); toast({ title: ok }); setAct(null); }
+    catch (e) { toast({ title: 'Couldn’t save', description: (e as Error).message, variant: 'destructive' }); throw e; }
+  };
+  const actAmounts = act ? actions.amountsFor(act.t) : null;
+  const refundDue = !!actAmounts && actAmounts.net < 0;
   const [range, setRange] = useState<Range>(() => {
     try { const v = Number(localStorage.getItem(RANGE_KEY)); return v === 7 || v === 90 ? v : 30; } catch { return 30; }
   });
@@ -240,25 +276,70 @@ export default function Dashboard() {
               <EmptyState icon={CheckCircle2} title="Nothing waiting on you" className="py-8" />
             ) : (
               <ul>
-                {m.queue.slice(0, 5).map(({ t, s, sla }) => (
-                  <li key={t.id}>
-                    <Link to={`/exchanges/${t.id}`} className="group flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60">
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-semibold text-accent-foreground">{initials(t.customer_name)}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{s.nextAction!.label}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t.order_id}</p>
-                        <ToneBadge tone={sla.tone} className="mt-1 sm:hidden">{sla.label}</ToneBadge>
-                      </div>
-                      <ToneBadge tone={sla.tone} className="hidden sm:inline-flex">{sla.label}</ToneBadge>
-                      <ArrowRight className="size-4 shrink-0 text-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </Link>
-                  </li>
-                ))}
+                {m.queue.slice(0, 5).map(({ t, s, sla }) => {
+                  const a = rowAction(s.key, t);
+                  return (
+                    <li key={t.id} className="flex items-center gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60">
+                      <Link to={`/exchanges/${t.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-md">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-semibold text-accent-foreground">{initials(t.customer_name)}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">{s.nextAction!.label}</p>
+                          <p className="truncate text-xs text-muted-foreground">{t.order_id}{t.customer_name ? ` · ${t.customer_name}` : ''}</p>
+                          <ToneBadge tone={sla.tone} className="mt-1">{sla.label}</ToneBadge>
+                        </div>
+                      </Link>
+                      {a && ('to' in a
+                        ? <Button asChild variant="secondary" size="sm" className="shrink-0"><Link to={a.to}>{a.label}<ArrowRight /></Link></Button>
+                        : <Button variant="secondary" size="sm" className="shrink-0" onClick={() => setAct({ kind: a.kind, t })}>{a.label}</Button>)}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </SectionCard>
         </div>
       </div>
+
+      {/* Queue actions: the same dialogs and writes as the exchange page */}
+      <ConfirmDialog
+        open={act?.kind === 'pay'}
+        onOpenChange={(o) => !o && setAct(null)}
+        title={refundDue ? `Record refund due of ${formatINR(-(actAmounts?.net ?? 0))}?` : `Record payment of ${formatINR(actAmounts?.net ?? 0)}?`}
+        description={act ? `${act.t.order_id} · ${act.t.customer_name}. The exchange moves to the warehouse for return pickup.` : undefined}
+        confirmLabel={refundDue ? 'Record refund due' : 'Record payment'}
+        loading={actions.pending}
+        onConfirm={() => { if (act) run(() => actions.settlePayment(act.t), refundDue ? 'Refund marked as due' : 'Payment recorded').catch(() => {}); }}
+      />
+      <ConfirmDialog
+        open={act?.kind === 'received'}
+        onOpenChange={(o) => !o && setAct(null)}
+        title={`Mark ${act?.t.order_id ?? 'the return'} as received?`}
+        description={act?.t.return_awb ? `AWB ${act.t.return_awb}. It moves to quality check.` : 'It moves to quality check.'}
+        confirmLabel="Mark received"
+        loading={actions.pending}
+        onConfirm={() => { if (act) run(() => actions.markReceived(act.t), 'Return received').catch(() => {}); }}
+      />
+      <BookShipmentDialog
+        open={act?.kind === 'return' || act?.kind === 'replacement'}
+        onOpenChange={(o) => !o && setAct(null)}
+        kind={act?.kind === 'replacement' ? 'replacement' : 'return'}
+        orderLabel={act?.t.order_id ?? ''}
+        context={act?.t.notes ?? null}
+        onSubmit={(agg, awb) => {
+          if (!act) return Promise.resolve();
+          return act.kind === 'replacement'
+            ? run(() => actions.bookReplacement(act.t, agg, awb), 'Replacement shipment booked')
+            : run(() => actions.bookReturn(act.t, agg, awb), 'Return pickup booked');
+        }}
+      />
+      <QcDialog
+        ticket={act?.kind === 'qc' ? act.t : null}
+        open={act?.kind === 'qc'}
+        onOpenChange={(o) => !o && setAct(null)}
+        onSubmit={(d, notes, checklist, photos) => (act
+          ? run(() => actions.recordQc(act.t, d, notes, checklist, photos), d === 'APPROVED' ? 'QC approved' : 'Return rejected')
+          : Promise.resolve())}
+      />
     </Layout>
   );
 }

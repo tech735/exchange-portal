@@ -81,11 +81,13 @@ export function QcDialog({
   if (!ticket) return null;
   const r = ticket.return_items?.[0];
   const rd = r ? describeItem(r, products) : undefined;
+  const itemName = rd ? `${rd.name}${rd.variant ? ` · ${rd.variant}` : ''}` : 'No return items listed';
+  const checkedCount = items.filter((i) => checks[i]).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+        <DialogHeader className="text-left">
           <DialogTitle>Quality check · {ticket.order_id}</DialogTitle>
           <DialogDescription>
             {ticket.customer_name} · received {ticket.return_received_at ? new Date(ticket.return_received_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
@@ -93,26 +95,34 @@ export function QcDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 sm:grid-cols-[220px_1fr]">
-          <div className="space-y-2">
-            <ProductThumb src={rd?.image} alt={rd?.name} size={220} className="aspect-square h-auto w-full rounded-lg" />
-            <p className="text-sm font-medium">{rd ? `${rd.name}${rd.variant ? ` · ${rd.variant}` : ''}` : 'No return items listed'}</p>
-            <p className="text-xs text-muted-foreground">Reason: {REASON_LABELS[ticket.reason_code]}{ticket.reason_notes ? ` · “${ticket.reason_notes}”` : ''}</p>
+        <div className="grid gap-5 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-6">
+          {/* What came back: compact row on phones, photo column on wider screens */}
+          <div className="flex items-start gap-3 sm:block sm:space-y-3">
+            <div className="sm:hidden"><ProductThumb src={rd?.image} alt={rd?.name} size={64} className="rounded-lg" /></div>
+            <div className="hidden sm:block"><ProductThumb src={rd?.image} alt={rd?.name} size={200} className="rounded-xl" /></div>
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm font-medium leading-snug text-foreground">{itemName}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Reason: {REASON_LABELS[ticket.reason_code]}{ticket.reason_notes ? ` · “${ticket.reason_notes}”` : ''}
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Checklist</Label>
-              {items.map((i) => (
-                <label key={i} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                  <Checkbox checked={!!checks[i]} onCheckedChange={(v) => setChecks((c) => ({ ...c, [i]: v === true }))} />
-                  {i}
-                </label>
-              ))}
-            </div>
+          <div className="space-y-5">
+            <section className="space-y-2" aria-label="Checklist">
+              <SectionHead title="Checklist" meta={`${checkedCount}/${items.length} checked`} done={allChecked && items.length > 0} />
+              <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                {items.map((i) => (
+                  <label key={i} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-150 hover:bg-muted/50">
+                    <Checkbox checked={!!checks[i]} onCheckedChange={(v) => setChecks((c) => ({ ...c, [i]: v === true }))} />
+                    <span className="min-w-0">{i}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
 
-            <div className="space-y-2">
-              <Label>Photos <span className="font-normal text-muted-foreground">({photos.length}/4)</span></Label>
+            <section className="space-y-2" aria-label="Photos">
+              <SectionHead title="Photos" meta={`${photos.length}/4 · optional`} />
               <div className="flex flex-wrap gap-2">
                 {photos.map((p, i) => (
                   <div key={p.path} className="group relative size-16 overflow-hidden rounded-lg border border-border">
@@ -124,41 +134,48 @@ export function QcDialog({
                   </div>
                 ))}
                 {photos.length < 4 && (
-                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-                    className="grid size-16 place-items-center rounded-lg border border-dashed border-input text-muted-foreground hover:border-primary hover:text-primary transition-colors">
-                    {uploading ? <Loader2 className="size-5 animate-spin" /> : <Camera className="size-5" />}
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Add photo"
+                    className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-input text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-primary">
+                    {uploading ? <Loader2 className="size-5 animate-spin" /> : <><Camera className="size-5" />Add</>}
                   </button>
                 )}
                 <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
               </div>
-            </div>
+            </section>
 
-            <div role="radiogroup" aria-label="Decision" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-              {(['APPROVED', 'DENIED'] as const).map((d) => (
-                <button key={d} type="button" role="radio" aria-checked={decision === d} onClick={() => setDecision(d)}
-                  className={cn('flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150',
-                    decision === d ? 'bg-card shadow-sm ' + (d === 'APPROVED' ? 'text-success' : 'text-destructive') : 'text-muted-foreground hover:text-foreground')}>
-                  {d === 'APPROVED' ? <Check className="size-4" /> : <X className="size-4" />}
-                  {d === 'APPROVED' ? 'Approve' : 'Reject'}
-                  <kbd className="kbd ml-1 hidden sm:inline-flex">{d === 'APPROVED' ? 'A' : 'R'}</kbd>
-                </button>
-              ))}
-            </div>
+            <section className="space-y-2" aria-label="Decision">
+              <SectionHead title="Decision" />
+              <div role="radiogroup" aria-label="Decision" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                {(['APPROVED', 'DENIED'] as const).map((d) => (
+                  <button key={d} type="button" role="radio" aria-checked={decision === d} onClick={() => setDecision(d)}
+                    title={d === 'APPROVED' ? 'Shortcut: A · ⌘/Ctrl+Enter to save' : 'Shortcut: R · ⌘/Ctrl+Enter to save'} aria-keyshortcuts={d === 'APPROVED' ? 'A' : 'R'}
+                    className={cn('flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150',
+                      decision === d ? 'bg-card shadow-sm ' + (d === 'APPROVED' ? 'text-success' : 'text-destructive') : 'text-muted-foreground hover:text-foreground')}>
+                    {d === 'APPROVED' ? <Check className="size-4" /> : <X className="size-4" />}
+                    {d === 'APPROVED' ? 'Approve' : 'Reject'}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="qc-notes">{decision === 'DENIED' ? 'Reason for rejection (required)' : 'Notes (optional)'}</Label>
+            <section className="space-y-2">
+              <Label htmlFor="qc-notes">
+                {decision === 'DENIED' ? 'Reason for rejection' : 'Notes'}{' '}
+                <span className="font-normal text-muted-foreground">{decision === 'DENIED' ? '(required)' : '(optional)'}</span>
+              </Label>
               <Textarea id="qc-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
                 placeholder={decision === 'DENIED' ? 'e.g. Stains on the collar, tags removed' : 'e.g. Minor crease, acceptable'} />
-            </div>
-            {err && <p className="text-xs text-destructive">{err}</p>}
+              {err && <p className="text-xs text-destructive">{err}</p>}
+            </section>
           </div>
         </div>
 
-        <DialogFooter className="items-center gap-2 sm:gap-2">
+        {/* Phones: pinned to the bottom of the sheet so the decision is always in reach */}
+        <DialogFooter className="sticky -bottom-8 z-10 -mx-6 -mb-8 flex-row border-t border-border bg-card px-6 py-3 [&>button]:flex-1 sm:static sm:m-0 sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:[&>button]:flex-none">
           <p className="mr-auto hidden text-xs text-muted-foreground sm:block">
             {decision === 'APPROVED'
-              ? allChecked ? 'Next: the replacement goes to “Ready to ship”.' : 'Tick every checklist item to approve.'
-              : 'The customer’s item will be marked as rejected.'}
+              ? allChecked ? 'Moves to “Ready to ship”.' : 'Tick every checklist item to approve.'
+              : 'The returned item is marked as rejected.'}
           </p>
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant={decision === 'DENIED' ? 'destructive' : 'default'} onClick={submit} disabled={!canSubmit || busy || uploading}>
@@ -167,5 +184,15 @@ export function QcDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Section label on the left, status on the right: same rhythm for every block in the dialog. */
+function SectionHead({ title, meta, done }: { title: string; meta?: string; done?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      {meta && <span className={cn('text-xs tabular', done ? 'font-medium text-success' : 'text-muted-foreground')}>{meta}</span>}
+    </div>
   );
 }

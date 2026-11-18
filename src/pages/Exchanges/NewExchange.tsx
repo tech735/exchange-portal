@@ -40,6 +40,14 @@ interface ReturnLine {
   repDifferent?: boolean;
 }
 
+/** An extra product sent to the customer on top of the like-for-like replacements. */
+interface ExtraLine {
+  key: string;
+  product: ProductCatalog;
+  size: SizeOption;
+  qty: number;
+}
+
 type Collect = 'LINK' | 'PAID' | 'LATER';
 
 function Stepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
@@ -86,6 +94,9 @@ export default function NewExchange() {
   const [lines, setLines] = useState<ReturnLine[]>([]);
   const [manualReturn, setManualReturn] = useState<{ product?: ProductCatalog; size?: SizeOption }>({});
   const [reasonNotes, setReasonNotes] = useState('');
+  // 3 · Extra products sent on top of the replacements
+  const [extras, setExtras] = useState<ExtraLine[]>([]);
+  const [extraDraft, setExtraDraft] = useState<{ product?: ProductCatalog; size?: SizeOption; qty: number } | null>(null);
   // 4 · Payment
   const [delivery, setDelivery] = useState<number | null>(null);
   const [collect, setCollect] = useState<Collect>('LINK');
@@ -138,7 +149,10 @@ export default function NewExchange() {
   const deliveryCharge = delivery ?? (freeReason ? 0 : settings?.fees.delivery_charge ?? 150);
 
   const returnItems: TicketItem[] = chosen.map((l) => ({ sku: l.sku, product_name: l.name, size: l.size, qty: l.qty, ...(l.price !== null ? { price: l.price } : {}) }));
-  const exchangeItems: TicketItem[] = chosen.filter((l) => l.repProduct && l.repSize).map((l) => toTicketItem(l.repProduct!, l.repSize!, l.qty));
+  const exchangeItems: TicketItem[] = [
+    ...chosen.filter((l) => l.repProduct && l.repSize).map((l) => toTicketItem(l.repProduct!, l.repSize!, l.qty)),
+    ...extras.map((x) => toTicketItem(x.product, x.size, x.qty)),
+  ];
   const returnValue = returnItems.reduce((s, i) => s + (i.price ?? 0) * i.qty, 0);
   const exchangeValue = exchangeItems.reduce((s, i) => s + (i.price ?? 0) * i.qty, 0);
   const net = exchangeValue - returnValue + deliveryCharge;
@@ -168,6 +182,17 @@ export default function NewExchange() {
       price: size.price, reason: 'WRONG_SIZE', repProduct: product,
     }]);
     setManualReturn({});
+  };
+
+  const addExtra = () => {
+    if (!extraDraft?.product || !extraDraft.size) return;
+    const { product, size, qty } = extraDraft;
+    setExtras((xs) => {
+      // Same variant added twice → bump the quantity instead of a duplicate row.
+      const dup = xs.find((x) => x.product.id === product.id && x.size.size === size.size);
+      return dup ? xs.map((x) => (x === dup ? { ...x, qty: x.qty + qty } : x)) : [...xs, { key: `x-${Date.now()}`, product, size, qty }];
+    });
+    setExtraDraft(null);
   };
 
   const submit = async () => {
@@ -212,7 +237,7 @@ export default function NewExchange() {
   const Summary = (
     <SectionCard title="Summary" className="lg:sticky lg:top-24">
       <KV label={`Return value (${chosen.reduce((s, l) => s + l.qty, 0)} item${chosen.length === 1 ? '' : 's'})`}>− {formatINR(returnValue)}</KV>
-      <KV label="Replacement value">+ {formatINR(exchangeValue)}</KV>
+      <KV label={`Sending value (${exchangeItems.reduce((s, i) => s + i.qty, 0)} item${exchangeItems.reduce((s, i) => s + i.qty, 0) === 1 ? '' : 's'})`}>+ {formatINR(exchangeValue)}</KV>
       <div className="flex items-center justify-between py-1.5 text-sm">
         <span className="text-muted-foreground">Delivery charge{freeReason && delivery === null ? ' (free for this reason)' : ''}</span>
         <div className="inline-flex h-8 items-center rounded-lg border border-input">
@@ -421,6 +446,39 @@ export default function NewExchange() {
                       )}
                     </div>
                   ))}
+
+                  {/* Extra products on top of the replacements, e.g. the customer also wants a second item */}
+                  {extras.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Also sending</p>
+                      {extras.map((x) => (
+                        <div key={x.key} className="flex flex-wrap items-center gap-3 border-b border-border py-3 last:border-0">
+                          <ProductThumb src={x.product.image_url} alt={x.product.product_name} size={44} />
+                          <div className="min-w-0 flex-1 basis-40">
+                            <p className="truncate text-sm font-medium">{x.product.product_name}</p>
+                            <p className="text-xs text-muted-foreground">Size {x.size.size} · {x.size.price !== null ? formatINR(x.size.price) : 'no price'}</p>
+                          </div>
+                          <Stepper value={x.qty} max={20} onChange={(n) => setExtras((xs) => xs.map((e) => (e.key === x.key ? { ...e, qty: n } : e)))} />
+                          <Button variant="ghost" size="icon-sm" aria-label={`Remove ${x.product.product_name}`} onClick={() => setExtras((xs) => xs.filter((e) => e.key !== x.key))}><Trash2 /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {extraDraft ? (
+                    <div className="space-y-3 rounded-lg border border-dashed border-input p-3 animate-fade-in">
+                      <p className="text-xs font-medium text-muted-foreground">Add another product to send</p>
+                      <ProductCombobox value={extraDraft.product} onChange={(p) => setExtraDraft((d) => ({ qty: d?.qty ?? 1, product: p }))} placeholder="Search the product to add…" />
+                      {extraDraft.product && <SizeChips product={extraDraft.product} value={extraDraft.size?.size} onChange={(o) => setExtraDraft((d) => (d ? { ...d, size: o } : d))} />}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Stepper value={extraDraft.qty} max={20} onChange={(n) => setExtraDraft((d) => (d ? { ...d, qty: n } : d))} />
+                        <Button size="sm" variant="secondary" disabled={!extraDraft.product || !extraDraft.size} onClick={addExtra}><Plus /> Add product</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setExtraDraft(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button variant="secondary" size="sm" onClick={() => setExtraDraft({ qty: 1 })}><Plus /> Add another product</Button>
+                  )}
+
                   <div className="space-y-1.5">
                     <Label htmlFor="notes">Internal note <span className="font-normal text-muted-foreground">(optional)</span></Label>
                     <Textarea id="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything the warehouse should know" />
