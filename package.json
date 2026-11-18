@@ -73,7 +73,7 @@
     ]
   },
   "overrides": {
-    "@radix-ui/react-dismissable-layer": "1.1.20",
-    "@radix-ui/react-focus-scope": "1.2.0"
+    "@radix-ui/react-dismissable-layer": "1.2.1",
+    "@radix-ui/react-focus-scope": "1.3.1"
   }
 }
