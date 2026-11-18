@@ -252,7 +252,7 @@ export default function Warehouse() {
                   onDragOver={(e) => { if (canDrop(c.key)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== c.key) setOver(c.key); } }}
                   onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === c.key ? null : o)); }}
                   onDrop={(e) => { e.preventDefault(); onDropTo(c.key); }}
-                  className={cn('flex min-h-[200px] flex-col rounded-xl bg-muted/70 p-2.5 transition-[background-color,box-shadow,opacity] duration-150',
+                  className={cn('flex min-h-[200px] min-w-0 flex-col rounded-xl bg-muted/70 p-2.5 transition-[background-color,box-shadow,opacity] duration-150',
                     mobileCol !== c.key && 'hidden md:flex',
                     drag && canDrop(c.key) && 'bg-accent ring-2 ring-primary/30',
                     over === c.key && 'ring-primary bg-accent',
