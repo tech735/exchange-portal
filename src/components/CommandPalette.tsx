@@ -62,7 +62,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             />
             <kbd className="kbd hidden sm:inline-flex">Esc</kbd>
           </div>
-          <CommandPrimitive.List className="max-h-[60vh] overflow-y-auto scrollbar-thin p-2">
+          <CommandPrimitive.List className="max-h-[60vh] overflow-y-auto overscroll-contain scrollbar-thin p-2">
             <CommandPrimitive.Empty className="px-3 py-10 text-center text-sm text-muted-foreground">
               No matches for “{q}”. Try an order number, phone or AWB.
             </CommandPrimitive.Empty>

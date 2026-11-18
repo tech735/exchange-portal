@@ -47,7 +47,7 @@ export function PageHeader({
           <h1 className="text-xl sm:text-2xl font-semibold text-foreground truncate">{title}</h1>
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:shrink-0">{actions}</div>}
       </div>
     </div>
   );
@@ -178,6 +178,48 @@ export function FilterChip({ label, onRemove }: { label: React.ReactNode; onRemo
         </button>
       )}
     </span>
+  );
+}
+
+/** Single-choice filter shown as pill chips with live counts. Scrolls sideways when it runs out of room. */
+export function ChipFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  label: string;
+  options: { id: T; label: string; count?: number }[];
+  /** null when the current filter isn't one of these chips (e.g. set from elsewhere on the page). */
+  value: T | null;
+  onChange: (id: T) => void;
+  className?: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cn('flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-hide', className)}>
+      {options.map((o) => {
+        const on = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-150 enabled:active:scale-[0.96]',
+              on ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-card text-foreground hover:bg-muted',
+            )}
+          >
+            {o.label}
+            {o.count !== undefined && (
+              <span className={cn('text-[11px] tabular', on ? 'text-primary-foreground/75' : 'text-muted-foreground')}>{o.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

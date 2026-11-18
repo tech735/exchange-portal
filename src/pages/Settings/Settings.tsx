@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2, Truck, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2, Truck, Package } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { PageHeader, SectionCard, KV } from '@/components/app';
 import { Button } from '@/components/ui/button';
@@ -158,10 +158,13 @@ export default function Settings() {
             </SectionCard>
 
             <SectionCard title="Integrations" className="scroll-mt-24">
-              <div id="s-integrations" className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-medium"><RefreshCw className="size-4 text-faint" /> Shopify product catalogue</p>
-                  <p className="text-xs text-muted-foreground">Pulls products, sizes, prices and stock used in the exchange flow.</p>
+              <div id="s-integrations" className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-primary"><Package className="size-[18px]" /></span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Shopify product catalogue</p>
+                    <p className="text-xs text-muted-foreground">Pulls products, sizes, prices and stock used in the exchange flow.</p>
+                  </div>
                 </div>
                 <ProductSyncButton />
               </div>

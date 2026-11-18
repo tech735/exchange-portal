@@ -4,7 +4,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { ChevronRight, Download, MoreHorizontal, Plus, Repeat2, Trash2, CheckCircle2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import Layout from '@/components/Layout';
 import {
-  PageHeader, ViewTabs, SearchField, FilterChip, BulkBar, BulkBarButton, EmptyState, RowSkeleton,
+  PageHeader, ViewTabs, SearchField, FilterChip, ChipFilter, BulkBar, BulkBarButton, EmptyState, RowSkeleton,
   StatusBadge, PaymentBadge, ToneBadge, ConfirmDialog, ProductThumb, formatINR,
 } from '@/components/app';
 import { Button } from '@/components/ui/button';
@@ -86,27 +86,32 @@ export default function ExchangesList() {
 
   const counts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.id, tickets.filter(v.match).length])), [tickets]);
 
-  const rows = useMemo(() => {
+  // Everything except the payment filter, so the payment chips can show what each choice leaves.
+  const baseRows = useMemo(() => {
     const viewDef = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
     const s = q.trim().toLowerCase();
-    const now = Date.now();
-    const list = tickets.filter((t) => {
+    return tickets.filter((t) => {
       if (!viewDef.match(t)) return false;
       if (reason !== 'all' && t.reason_code !== reason) return false;
       if (source !== 'all' && t.request_source !== source) return false;
-      if (payment === 'paid' && !t.is_paid) return false;
-      if (payment === 'unpaid' && t.is_paid) return false;
       if (!s) return true;
       return [t.order_id, t.customer_name, t.customer_phone, t.customer_email, t.return_awb, t.exchange_awb, t.request_ref]
         .some((v) => v && String(v).toLowerCase().includes(s));
     });
+  }, [tickets, view, q, reason, source]);
+
+  const paidCount = useMemo(() => baseRows.filter((t) => t.is_paid).length, [baseRows]);
+
+  const rows = useMemo(() => {
+    const now = Date.now();
+    const list = baseRows.filter((t) => payment === 'all' || (payment === 'paid' ? t.is_paid : !t.is_paid));
     list.sort((a, b) => {
       if (sort === 'newest') return +new Date(b.created_at) - +new Date(a.created_at);
       if (sort === 'oldest') return +new Date(a.created_at) - +new Date(b.created_at);
       return slaRemaining(a, now).hours - slaRemaining(b, now).hours;
     });
     return list;
-  }, [tickets, view, q, reason, source, payment, sort]);
+  }, [baseRows, payment, sort]);
 
   const pageRows = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const openTicket = (id: string) => navigate(`/exchanges/${id}`, { state: { ids: rows.map((r) => r.id) } });
@@ -138,7 +143,6 @@ export default function ExchangesList() {
   const activeFilters = [
     reason !== 'all' && { label: `Reason: ${REASON_LABELS[reason]}`, clear: () => setReason('all') },
     source !== 'all' && { label: `Source: ${REQUEST_SOURCE_LABELS[source]}`, clear: () => setSource('all') },
-    payment !== 'all' && { label: payment === 'paid' ? 'Paid' : 'Unpaid', clear: () => setPayment('all') },
   ].filter(Boolean) as { label: string; clear: () => void }[];
 
   const RowMenu = ({ t }: { t: Ticket }) => (
@@ -170,14 +174,6 @@ export default function ExchangesList() {
           {Object.entries(REQUEST_SOURCE_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={payment} onValueChange={(v) => { setPayment(v as 'all' | 'paid' | 'unpaid'); setPage(0); }}>
-        <SelectTrigger className="h-8 w-full sm:w-[130px] text-[13px]"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Any payment</SelectItem>
-          <SelectItem value="paid">Paid</SelectItem>
-          <SelectItem value="unpaid">Unpaid</SelectItem>
-        </SelectContent>
-      </Select>
     </>
   );
 
@@ -205,6 +201,17 @@ export default function ExchangesList() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <SearchField value={q} onChange={(v) => setParam('q', v || null)} placeholder="Order, name, phone, AWB…" className="w-full sm:w-72" />
+            <ChipFilter
+              label="Payment"
+              className="w-full sm:w-auto"
+              value={payment}
+              onChange={(v) => { setPayment(v); setPage(0); setSelected(new Set()); }}
+              options={[
+                { id: 'all', label: 'All', count: baseRows.length },
+                { id: 'unpaid', label: 'Unpaid', count: baseRows.length - paidCount },
+                { id: 'paid', label: 'Paid', count: paidCount },
+              ]}
+            />
             <div className="hidden lg:flex items-center gap-2">{filterControls}</div>
             <Button variant="secondary" size="sm" className="lg:hidden" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}>
               <SlidersHorizontal /> Filters{activeFilters.length ? ` · ${activeFilters.length}` : ''}
@@ -219,7 +226,7 @@ export default function ExchangesList() {
               </SelectContent>
             </Select>
           </div>
-          {showFilters && <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:hidden animate-fade-in">{filterControls}</div>}
+          {showFilters && <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:hidden animate-fade-in">{filterControls}</div>}
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               {activeFilters.map((f) => <FilterChip key={f.label} label={f.label} onRemove={f.clear} />)}
@@ -242,18 +249,18 @@ export default function ExchangesList() {
             />
           ) : (
             <>
-              {/* Table: tablet and up */}
-              <table className="hidden md:table w-full text-sm">
+              {/* Table: wide screens (the full column set needs ~1000px) */}
+              <table className="hidden xl:table w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <th className="w-10 py-2.5 pl-4"><Checkbox checked={allOnPage} onCheckedChange={toggleAll} aria-label="Select page" /></th>
+                    <th className="w-10 py-2.5 pl-4 pr-3"><Checkbox checked={allOnPage} onCheckedChange={toggleAll} aria-label="Select page" /></th>
                     <th className="py-2.5 pr-3">Order · customer</th>
                     <th className="py-2.5 pr-3">Items</th>
-                    <th className="hidden xl:table-cell py-2.5 pr-3">Reason</th>
+                    <th className="hidden 2xl:table-cell py-2.5 pr-3">Reason</th>
                     <th className="py-2.5 pr-3">Status</th>
-                    <th className="hidden lg:table-cell py-2.5 pr-3">Payment</th>
+                    <th className="py-2.5 pr-3">Payment</th>
                     <th className="py-2.5 pr-3">SLA</th>
-                    <th className="hidden xl:table-cell py-2.5 pr-3">Updated</th>
+                    <th className="hidden 2xl:table-cell py-2.5 pr-3">Updated</th>
                     <th className="w-12 py-2.5 pr-3" />
                   </tr>
                 </thead>
@@ -269,17 +276,17 @@ export default function ExchangesList() {
                         tabIndex={0}
                         className={cn('cursor-pointer border-b border-border last:border-0 transition-colors duration-100 hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:outline-none', on && 'bg-accent/60 hover:bg-accent')}
                       >
-                        <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}><Checkbox checked={on} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} /></td>
+                        <td className="py-3 pl-4 pr-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={on} onCheckedChange={() => toggle(t.id)} aria-label={`Select ${t.order_id}`} /></td>
                         <td className="py-3 pr-3">
                           <p className="font-medium text-foreground">{t.order_id}</p>
                           <p className="text-xs text-muted-foreground truncate max-w-[220px]">{[t.customer_name, displayPhone(t.customer_phone)].filter(Boolean).join(' · ')}</p>
                         </td>
-                        <td className="py-3 pr-3 max-w-[300px]"><ItemsCell t={t} products={products} /></td>
-                        <td className="hidden xl:table-cell py-3 pr-3"><ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code] ?? t.reason_code}</ToneBadge></td>
+                        <td className="w-full max-w-0 py-3 pr-3"><ItemsCell t={t} products={products} /></td>
+                        <td className="hidden 2xl:table-cell py-3 pr-3"><ToneBadge tone="neutral" dot={false}>{REASON_LABELS[t.reason_code] ?? t.reason_code}</ToneBadge></td>
                         <td className="py-3 pr-3"><StatusBadge ticket={t} /></td>
-                        <td className="hidden lg:table-cell py-3 pr-3"><PaymentBadge ticket={t} /></td>
+                        <td className="py-3 pr-3"><PaymentBadge ticket={t} /></td>
                         <td className="py-3 pr-3"><ToneBadge tone={sla.tone}>{sla.label}</ToneBadge></td>
-                        <td className="hidden xl:table-cell py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true })}</td>
+                        <td className="hidden 2xl:table-cell py-3 pr-3 text-xs text-muted-foreground whitespace-nowrap">{formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true })}</td>
                         <td className="py-3 pr-3 text-right" onClick={(e) => e.stopPropagation()}><RowMenu t={t} /></td>
                       </tr>
                     );
@@ -287,8 +294,8 @@ export default function ExchangesList() {
                 </tbody>
               </table>
 
-              {/* Cards: phones */}
-              <ul className="md:hidden divide-y divide-border">
+              {/* Cards: phones, tablets and narrow laptops */}
+              <ul className="xl:hidden divide-y divide-border">
                 {pageRows.map((t) => {
                   const sla = slaRemaining(t);
                   return (

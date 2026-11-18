@@ -487,10 +487,10 @@ export default function Users() {
         {/* Tablet / desktop table */}
         <table className="hidden w-full text-sm md:table">
           <thead>
-            <tr className="border-b border-border text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Person</th>
-              <th className="px-4 py-2.5 font-medium">Role</th>
-              <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Added</th>
+            <tr className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-2.5">Person</th>
+              <th className="px-4 py-2.5">Role</th>
+              <th className="hidden px-4 py-2.5 xl:table-cell">Added</th>
               <th className="w-12 px-2 py-2.5"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -507,7 +507,7 @@ export default function Users() {
                       onChange={(r) => handleUpdateRole(row, r)}
                     />
                   </td>
-                  <td className="hidden whitespace-nowrap px-4 py-3 text-muted-foreground tabular lg:table-cell">
+                  <td className="hidden whitespace-nowrap px-4 py-3 text-muted-foreground tabular xl:table-cell">
                     {formatDate(row.created_at)}
                   </td>
                   <td className="px-2 py-3 text-right">{rowActions(row)}</td>

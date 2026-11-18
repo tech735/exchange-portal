@@ -29,6 +29,16 @@ test('manual entry: phone call request, catalogue item, replacement size, decide
   await replace.getByRole('radio', { name: state.products.single.sizes[1].size, exact: true }).click();
   await expect(replace.getByText(/^Selected/)).toBeVisible();
 
+  // An extra product on top of the replacement (customer wants one more item)
+  await replace.getByRole('button', { name: /Add another product/ }).click();
+  await replace.getByRole('combobox').filter({ hasText: 'Search the product to add' }).click();
+  await page.getByPlaceholder('Search the product to add…').last().fill(state.products.single.name);
+  await page.getByRole('option', { name: new RegExp(state.products.single.name) }).first().click();
+  await replace.getByRole('radiogroup', { name: 'Size' }).last().getByRole('radio', { name: state.products.single.sizes[0].size, exact: true }).click();
+  await replace.getByRole('button', { name: 'Add product' }).click();
+  await expect(replace.getByText('Also sending')).toBeVisible();
+  await expect(page.getByText('Sending value (2 items)').first()).toBeVisible();
+
   await page.getByRole('radio', { name: /Decide later/ }).click();
   await expect(lodge).toBeEnabled();
   await lodge.click();

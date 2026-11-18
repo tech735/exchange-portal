@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   BulkBar,
   BulkBarButton,
+  ChipFilter,
   EmptyState,
   FilterChip,
   PageHeader,
@@ -136,6 +137,18 @@ export default function Orders() {
       }),
     [orders, searchQuery, paymentFilter, fulfillmentFilter],
   );
+
+  // Counts for the fulfillment chips: everything except the fulfillment filter itself.
+  const fulfillmentCounts = useMemo(() => {
+    const base = orders.filter((o) => matchesSearch(o, searchQuery) && (paymentFilter === 'all' || o.financial_status?.toLowerCase() === paymentFilter));
+    const c: Record<string, number> = { all: base.length, unfulfilled: 0, partial: 0, fulfilled: 0 };
+    for (const o of base) {
+      const f = o.fulfillment_status?.toLowerCase();
+      if (!f) c.unfulfilled++;
+      else if (f in c) c[f]++;
+    }
+    return c;
+  }, [orders, searchQuery, paymentFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -272,7 +285,6 @@ export default function Orders() {
   );
 
   const paymentLabel = PAYMENT_OPTIONS.find((o) => o.value === paymentFilter)?.label;
-  const fulfillmentLabel = FULFILLMENT_OPTIONS.find((o) => o.value === fulfillmentFilter)?.label;
 
   return (
     <Layout>
@@ -299,35 +311,30 @@ export default function Orders() {
               placeholder="Order no., name, phone, email…"
               className="w-full sm:w-72"
             />
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                <SelectTrigger className="sm:w-[168px]" aria-label="Payment status">
-                  <SelectValue placeholder="Payment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All payments</SelectItem>
-                  {PAYMENT_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={fulfillmentFilter} onValueChange={setFulfillmentFilter}>
-                <SelectTrigger className="sm:w-[168px]" aria-label="Fulfillment status">
-                  <SelectValue placeholder="Fulfillment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All fulfillment</SelectItem>
-                  {FULFILLMENT_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger className="w-full sm:w-[168px]" aria-label="Payment status">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All payments</SelectItem>
+                {PAYMENT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ChipFilter
+              label="Fulfillment"
+              value={fulfillmentFilter}
+              onChange={setFulfillmentFilter}
+              options={[
+                { id: 'all', label: 'All', count: fulfillmentCounts.all },
+                ...FULFILLMENT_OPTIONS.slice().reverse().map((o) => ({ id: o.value, label: o.label, count: fulfillmentCounts[o.value] ?? 0 })),
+              ]}
+            />
           </div>
-          {(paymentFilter !== 'all' || fulfillmentFilter !== 'all') && (
+          {paymentFilter !== 'all' && (
             <div className="flex flex-wrap items-center gap-2">
-              {paymentFilter !== 'all' && <FilterChip label={`Payment: ${paymentLabel}`} onRemove={() => setPaymentFilter('all')} />}
-              {fulfillmentFilter !== 'all' && <FilterChip label={`Fulfillment: ${fulfillmentLabel}`} onRemove={() => setFulfillmentFilter('all')} />}
+              <FilterChip label={`Payment: ${paymentLabel}`} onRemove={() => setPaymentFilter('all')} />
               {hasFilters && (
                 <button type="button" onClick={clearFilters} className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
                   Clear all
@@ -463,7 +470,7 @@ export default function Orders() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => startExchange(order)}
-                                className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                                className="transition-opacity [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                               >
                                 Exchange
                               </Button>

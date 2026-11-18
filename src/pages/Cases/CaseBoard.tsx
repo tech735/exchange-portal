@@ -58,7 +58,7 @@ export function CaseBoard({
               className={cn('flex min-h-[420px] flex-col rounded-xl border border-border bg-card transition-[box-shadow,background-color] duration-150',
                 over === col.key && 'ring-2 ring-primary bg-accent/40')}
             >
-              <header className="flex items-center gap-2 border-b border-border px-3 py-2.5" title={col.hint}>
+              <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3" title={col.hint}>
                 <col.icon className={cn('size-4', col.tone)} />
                 <h2 className="flex-1 truncate font-sans text-sm font-medium">{col.title}</h2>
                 <span className="text-xs text-muted-foreground tabular">{items.length}</span>

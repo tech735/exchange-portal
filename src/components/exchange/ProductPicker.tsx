@@ -76,7 +76,7 @@ export function SizeChips({ product, value, current, onChange }: { product: Prod
               const on = g === group;
               return (
                 <button key={g} type="button" role="radio" aria-checked={on} onClick={() => setGroup(g)}
-                  className={cn('inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-all duration-150 active:scale-[0.97]',
+                  className={cn('inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-150 enabled:active:scale-[0.96]',
                     on ? 'border-primary bg-primary text-primary-foreground' : available ? 'border-input bg-card hover:border-primary/50' : 'border-transparent bg-muted text-faint')}>
                   {g}
                   {!available && <span className="text-[11px] font-normal">· sold out</span>}
@@ -99,7 +99,7 @@ export function SizeChips({ product, value, current, onChange }: { product: Prod
             return (
               <button key={o.size} type="button" role="radio" aria-checked={on} disabled={out} onClick={() => onChange(o)}
                 title={out ? 'Sold out' : o.stock === null ? 'Stock unknown' : `${o.stock} in stock`}
-                className={cn('relative inline-flex h-9 min-w-[52px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-all duration-150 active:scale-[0.97]',
+                className={cn('relative inline-flex h-9 min-w-[52px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 enabled:active:scale-[0.96]',
                   on && 'border-primary bg-accent text-accent-foreground ring-[3px] ring-primary/10',
                   !on && !out && 'border-input bg-card hover:border-primary/50',
                   isCurrent && !on && 'border-dashed',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, Package } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { shopifyService } from '@/services/shopify';
 import { useToast } from '@/hooks/use-toast';
@@ -58,48 +58,22 @@ export function ProductSyncButton() {
   };
 
   return (
-    <div className="card-base">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Package className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Product Catalogue</h3>
-          <p className="text-xs text-muted-foreground">Sync from Shopify store</p>
-        </div>
-      </div>
-
+    <div className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
+      <Button id="sync-products-button" variant="secondary" onClick={handleSync} disabled={isSyncing}>
+        <RefreshCw className={isSyncing ? 'animate-spin' : undefined} />
+        {isSyncing ? 'Syncing products…' : 'Sync from Shopify'}
+      </Button>
       {lastResult && (
-        <div className="mb-3 rounded-lg bg-muted/50 p-3 text-xs space-y-1">
-          <div className="flex items-center gap-1.5 text-success">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>{lastResult.synced} products synced</span>
-          </div>
+        <p className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs">
+          <span className="inline-flex items-center gap-1 text-success"><CheckCircle2 className="size-3.5" />{lastResult.synced} synced</span>
           {lastResult.deactivated > 0 && (
-            <div className="flex items-center gap-1.5 text-warning">
-              <AlertCircle className="h-3.5 w-3.5" />
-              <span>{lastResult.deactivated} stale products deactivated</span>
-            </div>
+            <span className="inline-flex items-center gap-1 text-warning"><AlertCircle className="size-3.5" />{lastResult.deactivated} deactivated</span>
           )}
           {lastResult.errors > 0 && (
-            <div className="flex items-center gap-1.5 text-destructive">
-              <AlertCircle className="h-3.5 w-3.5" />
-              <span>{lastResult.errors} errors</span>
-            </div>
+            <span className="inline-flex items-center gap-1 text-destructive"><AlertCircle className="size-3.5" />{lastResult.errors} errors</span>
           )}
-        </div>
+        </p>
       )}
-
-      <Button
-        id="sync-products-button"
-        onClick={handleSync}
-        disabled={isSyncing}
-        className="w-full rounded-full"
-        variant="outline"
-      >
-        <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-        {isSyncing ? 'Syncing Products...' : 'Sync Products from Shopify'}
-      </Button>
     </div>
   );
 }

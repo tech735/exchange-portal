@@ -57,7 +57,7 @@ export function NotificationsPanel() {
           <p className="font-heading font-semibold text-sm">Notifications</p>
           <span className="text-xs text-muted-foreground">{activity?.length ?? 0} recent</span>
         </div>
-        <div className="max-h-80 overflow-y-auto scrollbar-thin">
+        <div className="max-h-80 overflow-y-auto overscroll-contain scrollbar-thin">
           {!activity || activity.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>
           ) : (
