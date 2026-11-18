@@ -29,6 +29,12 @@ test('manual entry: phone call request, catalogue item, replacement size, decide
   await replace.getByRole('radio', { name: state.products.single.sizes[1].size, exact: true }).click();
   await expect(replace.getByText(/^Selected/)).toBeVisible();
 
+  // Quantity to send starts at the returned qty (1) and can go up or down
+  await replace.getByRole('button', { name: 'More' }).first().click();
+  await replace.getByRole('button', { name: 'More' }).first().click();
+  await replace.getByRole('button', { name: 'Less' }).first().click();
+  await expect(page.getByText('Sending value (2 items)').first()).toBeVisible();
+
   // An extra product on top of the replacement (customer wants one more item)
   await replace.getByRole('button', { name: /Add another product/ }).click();
   await replace.getByRole('combobox').filter({ hasText: 'Search the product to add' }).click();
@@ -37,7 +43,7 @@ test('manual entry: phone call request, catalogue item, replacement size, decide
   await replace.getByRole('radiogroup', { name: 'Size' }).last().getByRole('radio', { name: state.products.single.sizes[0].size, exact: true }).click();
   await replace.getByRole('button', { name: 'Add product' }).click();
   await expect(replace.getByText('Also sending')).toBeVisible();
-  await expect(page.getByText('Sending value (2 items)').first()).toBeVisible();
+  await expect(page.getByText('Sending value (3 items)').first()).toBeVisible();
 
   await page.getByRole('radio', { name: /Decide later/ }).click();
   await expect(lodge).toBeEnabled();

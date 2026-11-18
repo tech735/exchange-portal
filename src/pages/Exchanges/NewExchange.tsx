@@ -38,7 +38,11 @@ interface ReturnLine {
   repProduct?: ProductCatalog;
   repSize?: SizeOption;
   repDifferent?: boolean;
+  /** How many to send; follows the returned qty until the agent changes it. */
+  repQty?: number;
 }
+
+const sendQty = (l: ReturnLine) => l.repQty ?? l.qty;
 
 /** An extra product sent to the customer on top of the like-for-like replacements. */
 interface ExtraLine {
@@ -150,7 +154,7 @@ export default function NewExchange() {
 
   const returnItems: TicketItem[] = chosen.map((l) => ({ sku: l.sku, product_name: l.name, size: l.size, qty: l.qty, ...(l.price !== null ? { price: l.price } : {}) }));
   const exchangeItems: TicketItem[] = [
-    ...chosen.filter((l) => l.repProduct && l.repSize).map((l) => toTicketItem(l.repProduct!, l.repSize!, l.qty)),
+    ...chosen.filter((l) => l.repProduct && l.repSize).map((l) => toTicketItem(l.repProduct!, l.repSize!, sendQty(l))),
     ...extras.map((x) => toTicketItem(x.product, x.size, x.qty)),
   ];
   const returnValue = returnItems.reduce((s, i) => s + (i.price ?? 0) * i.qty, 0);
@@ -439,11 +443,20 @@ export default function NewExchange() {
                         )}
                       </div>
                       {l.repProduct && <SizeChips product={l.repProduct} value={l.repSize?.size} current={l.repDifferent ? undefined : l.size} onChange={(o) => setLine(l.key, { repSize: o })} />}
-                      {l.repSize && (
-                        <p className={cn('text-xs', (l.repSize.price ?? 0) === (l.price ?? 0) ? 'text-success' : 'text-muted-foreground')}>
-                          {l.repSize.price === null ? 'No price in catalogue' : (l.repSize.price ?? 0) === (l.price ?? 0) ? 'Same price · nothing extra for the item' : `${formatINR(l.repSize.price)} (difference ${formatINR((l.repSize.price ?? 0) - (l.price ?? 0))})`}
-                        </p>
+                      {l.repProduct && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground">Quantity to send</span>
+                          <Stepper value={sendQty(l)} max={Math.max(1, Math.min(20, l.repSize?.stock ?? 20))} onChange={(n) => setLine(l.key, { repQty: n })} />
+                        </div>
                       )}
+                      {l.repSize && (() => {
+                        const diff = (l.repSize.price ?? 0) * sendQty(l) - (l.price ?? 0) * l.qty;
+                        return (
+                          <p className={cn('text-xs', diff === 0 ? 'text-success' : 'text-muted-foreground')}>
+                            {l.repSize.price === null ? 'No price in catalogue' : diff === 0 ? 'Same value · nothing extra for these items' : `${formatINR(l.repSize.price)} each (difference ${formatINR(diff)})`}
+                          </p>
+                        );
+                      })()}
                     </div>
                   ))}
 
