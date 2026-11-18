@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    # PRs land on the pre-live branch; main is only updated when going live
+    target-branch: revamp
     schedule:
       interval: weekly
       day: monday
@@ -10,12 +12,18 @@ updates:
     # Only suggest versions that have been public for 2 weeks (security updates are not delayed)
     cooldown:
       default-days: 14
+    # Major upgrades (React 19, Tailwind 4, TypeScript 7...) need code changes; do them by hand.
+    # This only stops version-update PRs; security-fix PRs still come through.
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: revamp
     schedule:
       interval: weekly
       day: monday
