@@ -45,3 +45,6 @@ security-reports/
 
 # Vite temp files
 vite.config.ts.timestamp-*.mjs
+
+# Supabase CLI local cache (rewritten by the CLI)
+supabase/.temp/
